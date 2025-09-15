@@ -8,18 +8,19 @@
 .
 ├── .github/
 │   └── workflows/                    # GitHub Actions
-├── api/
-│   └── src/
-│       ├── daily.ts                  # daily scheduled job
-│       └── handler.ts                # REST API source code
 ├── docs/                             # Documentation
 ├── infra/
 │   └── terraform/
 │       ├── bootstrap/                # Create AWS resources (run once)
 │       ├── envs/                     # Environment configuration files
-│       │   └── poc                   
+│       │   └── poc/                  
 │       │       └── poc.tfvars        # Variables for poc environment
 │       └── main.tf                   # The main Terraform configuration file
+├── lambda/
+│   ├── api/                          # API tests
+│   │   └── src/                      # REST API source code
+│   └── daily/
+│       └── src/                      # Daily scheduled job source code
 ├── scripts/                          # Scripts
 ├── tests/                            # 
 │   ├── api/                          # API tests
