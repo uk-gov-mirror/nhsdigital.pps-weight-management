@@ -1,0 +1,17 @@
+# Node / build
+node_modules/
+dist/
+*.zip
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+override.tf
+# IDE
+.vscode/
+.DS_Store
+# Test output
+/playwright-report/
+/test-results/
+/reports/

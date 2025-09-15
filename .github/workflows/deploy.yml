@@ -1,0 +1,555 @@
+name: Deploy + Test
+
+concurrency:
+  group: pr-${{ github.event.pull_request.number || github.ref }}-lock
+  cancel-in-progress: false  
+  
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, closed]
+    branches: [ main ]
+    paths:
+      - 'infra/**'
+      - 'lambda/**'
+      - 'web/**'
+      - 'tests/**'
+      - '.github/workflows/**'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        type: choice
+        required: true
+        options: [poc]
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+env:
+  PROJECT:         ${{ vars.PROJECT }}
+  AWS_REGION:      ${{ vars.AWS_REGION }}
+  TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+  TF_STATE_LOCK:   ${{ vars.TF_STATE_LOCK_TABLE }}
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      deploy_env: ${{ steps.outs.outputs.deploy_env }}
+      gh_env:     ${{ steps.outs.outputs.gh_env }}
+    steps:
+      - name: Summarize trigger
+        env:
+          EV: ${{ github.event_name }}
+          ACT: ${{ github.event.action }}
+          REF: ${{ github.ref }}
+        run: |
+          {
+            echo "### Trigger"
+            echo "- event: ${{ github.event_name }}"
+            echo "- action: ${{ github.event.action }}"
+            echo "- ref: ${{ github.ref }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - id: outs
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "deploy_env=${{ inputs.environment }}" >> "$GITHUB_OUTPUT"
+            echo "gh_env=${{ inputs.environment }}"     >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" = "pull_request" ]; then
+            if [ "${{ github.event.action }}" = "closed" ] && [ "${{ github.event.pull_request.merged }}" = "true" ]; then
+              echo "deploy_env=poc" >> "$GITHUB_OUTPUT"
+            else
+              echo "deploy_env=pr-${{ github.event.number }}" >> "$GITHUB_OUTPUT"
+            fi
+            echo "gh_env=poc" >> "$GITHUB_OUTPUT"
+          fi
+
+  changes:
+    needs: prepare
+    runs-on: ubuntu-latest
+    outputs:
+      infra: ${{ steps.filter.outputs.infra }}
+      web:   ${{ steps.filter.outputs.web }}
+      tests: ${{ steps.filter.outputs.tests }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            infra:
+              - 'infra/**'
+              - 'lambda/**'
+            web:
+              - 'web/**'
+            tests:
+              - 'tests/**'
+
+  expose_env_vars:
+    needs: [prepare, changes]
+    runs-on: ubuntu-latest
+    environment: ${{ needs.prepare.outputs.gh_env }}
+    outputs:
+      env_account_id: ${{ steps.expose.outputs.account_id }}
+      env_name:       ${{ steps.expose.outputs.env_name }}
+    steps:
+      - id: expose
+        run: |
+          echo "account_id=${{ vars.AWS_ACCOUNT_ID }}" >> "$GITHUB_OUTPUT"
+          echo "env_name=${{ vars.ENV }}"              >> "$GITHUB_OUTPUT"
+      
+  decide:
+    needs: [prepare, changes, expose_env_vars]
+    runs-on: ubuntu-latest
+    outputs:
+      run_infra:     ${{ steps.set.outputs.run_infra }}
+      run_web:       ${{ steps.set.outputs.run_web }}
+      run_tests:     ${{ steps.set.outputs.run_tests }}
+    env:
+      AWS_ACCOUNT_ID: ${{ needs.expose_env_vars.outputs.env_account_id }}
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/${{ env.PROJECT }}-${{ needs.prepare.outputs.gh_env }}-github-oidc
+          role-session-name: gha-decide
+
+      - id: state
+        env:
+          DEPLOY_ENV: ${{ needs.prepare.outputs.deploy_env }}
+        run: |
+         if aws s3api head-object \
+              --bucket "${TF_STATE_BUCKET}" \
+              --key "${DEPLOY_ENV}/terraform.tfstate" >/dev/null 2>&1; then
+           echo "exists=true" >> "$GITHUB_OUTPUT"
+         else
+           echo "exists=false" >> "$GITHUB_OUTPUT"
+         fi
+
+      - id: set
+        env:
+          INFRA_CHANGED: ${{ needs.changes.outputs.infra }}
+          WEB_CHANGED:   ${{ needs.changes.outputs.web }}
+          TESTS_CHANGED: ${{ needs.changes.outputs.tests }}
+          STATE_EXISTS:  ${{ steps.state.outputs.exists }}
+        run: |
+          EVENT="${{ github.event_name }}"
+          ACTION="${{ github.event.action }}"
+          MERGED="${{ github.event.pull_request.merged }}"    
+
+          run_infra=false
+          run_web=false
+          run_tests=false
+          
+          # Infra: manual OR merged OR infra changed OR (PR opened/reopened with no state yet)
+          if [ "$EVENT" = "workflow_dispatch" ] \
+             || { [ "$EVENT" = "pull_request" ] && [ "$ACTION" = "closed" ] && [ "$MERGED" = "true" ]; } \
+             || [ "$INFRA_CHANGED" = "true" ] \
+             || { [ "$EVENT" = "pull_request" ] && { [ "$ACTION" = "opened" ] || [ "$ACTION" = "reopened" ]; } && [ "$STATE_EXISTS" = "false" ]; }
+          then
+            run_infra=true
+          fi
+ 
+          # Web: run if web changed OR infra will run OR manual OR merged
+          if [ "$WEB_CHANGED" = "true" ] || [ "$run_infra" = "true" ] \
+             || [ "$EVENT" = "workflow_dispatch" ] \
+             || { [ "$EVENT" = "pull_request" ] && [ "$ACTION" = "closed" ] && [ "$MERGED" = "true" ]; }
+          then
+            run_web=true
+          fi
+ 
+          # Tests: adjust to taste; here we run when web runs OR tests changed OR manual/merged
+          if [ "$run_web" = "true" ] || [ "$TESTS_CHANGED" = "true" ] \
+             || [ "$EVENT" = "workflow_dispatch" ] \
+             || { [ "$EVENT" = "pull_request" ] && [ "$ACTION" = "closed" ] && [ "$MERGED" = "true" ]; }
+          then
+            run_tests=true
+          fi 
+ 
+          echo "run_infra=$run_infra"         >> "$GITHUB_OUTPUT"
+          echo "run_web=$run_web"             >> "$GITHUB_OUTPUT"
+          echo "run_tests=$run_tests"         >> "$GITHUB_OUTPUT"
+
+  infra:
+    name: Infra -> ${{ needs.prepare.outputs.deploy_env }}
+    needs: [prepare, changes, expose_env_vars, decide]
+    runs-on: ubuntu-latest
+    concurrency:
+      group: infra-${{ needs.prepare.outputs.deploy_env }}
+      cancel-in-progress: false
+    env:
+      DEPLOY_ENV:     ${{ needs.prepare.outputs.deploy_env }}
+      GH_ENV:         ${{ needs.prepare.outputs.gh_env }}
+      RUN_INFRA:      ${{ needs.decide.outputs.run_infra }}
+      AWS_ACCOUNT_ID: ${{ needs.expose_env_vars.outputs.env_account_id }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS creds (stable role)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/${{ env.PROJECT }}-${{ env.GH_ENV }}-github-oidc
+          role-session-name: gha-${{ env.DEPLOY_ENV }}
+
+      - name: Setup Node
+        if: ${{ env.RUN_INFRA == 'true' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build API Lambda (TypeScript -> dist -> zip)
+        if: ${{ env.RUN_INFRA == 'true' }}
+        run: |
+          set -e
+          cd lambda/api
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+          npm run build
+          cd ../..
+          rm -f api.zip
+          cd lambda/api/dist && zip -r ../../../api.zip . && cd ../../..
+
+      - name: Build Daily Lambda (TypeScript -> dist -> zip)
+        if: ${{ env.RUN_INFRA == 'true' }}
+        run: |
+          set -e
+          cd lambda/daily
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+          npm run build
+          cd ../..
+          rm -f daily.zip
+          cd lambda/daily/dist && zip -r ../../../daily.zip . && cd ../../..
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.6
+
+      # Only run TF when infra changed, on manual, or on merged PR
+      - name: Terraform init
+        if: ${{ env.RUN_INFRA == 'true' }}
+        working-directory: infra/terraform
+        run: |
+          terraform init \
+            -reconfigure \
+            -backend-config="bucket=${TF_STATE_BUCKET}" \
+            -backend-config="dynamodb_table=${TF_STATE_LOCK}" \
+            -backend-config="key=${DEPLOY_ENV}/terraform.tfstate" \
+            -backend-config="region=${AWS_REGION}"
+
+      - name: Terraform apply
+        if: ${{ env.RUN_INFRA == 'true' }}
+        working-directory: infra/terraform
+        env:
+          TF_VAR_project:         ${{ env.PROJECT }}
+          TF_VAR_region:          ${{ env.AWS_REGION }}
+          TF_VAR_env:             ${{ env.DEPLOY_ENV }}
+          TF_VAR_api_zip_path:    "../../api.zip"
+          TF_VAR_daily_zip_path:  "../../daily.zip"
+          TF_VAR_gh_owner:        ${{ github.repository_owner }}
+          TF_VAR_gh_repo:         ${{ github.event.repository.name }}
+        run: terraform apply -auto-approve
+
+      - name: Capture Terraform outputs
+        id: tfout
+        if: ${{ env.RUN_INFRA == 'true' }}
+        working-directory: infra/terraform
+        run: |
+          terraform output -no-color || true
+          terraform output -json > tf_outputs.json || echo "{}" > tf_outputs.json
+          echo "cloudfront_url=$(terraform output -raw cloudfront_url 2>/dev/null || echo)" >> "$GITHUB_OUTPUT"
+
+      - name: Comment preview URL on PR (opened/reopened)
+        if: ${{ github.event_name == 'pull_request' && steps.tfout.outputs.cloudfront_url != '' }}
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: preview-env
+          message: |
+            **Preview ready** — `${{ env.DEPLOY_ENV }}`
+            URL: **${{ steps.tfout.outputs.cloudfront_url }}**
+
+      - name: Create Test Cognito User
+        if: ${{ env.RUN_INFRA == 'true' }}
+        working-directory: scripts
+        run: python3 create_cognito_test_user.py
+        env:
+          TF_VAR_project: ${{ env.PROJECT }}
+          TF_VAR_env:     ${{ env.DEPLOY_ENV }}
+
+      - name: No infra changes — skipping apply
+        if: ${{ !(needs.changes.outputs.infra == 'true' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged)) }}
+        run: echo "Infra unchanged; continuing so Web can run."
+
+  web:
+    name: Web -> ${{ needs.prepare.outputs.deploy_env }}
+    needs: [prepare, changes, expose_env_vars, decide, infra]
+    runs-on: ubuntu-latest
+    concurrency:
+      group: web-${{ needs.prepare.outputs.deploy_env }}
+      cancel-in-progress: false
+    env:
+      DEPLOY_ENV:     ${{ needs.prepare.outputs.deploy_env }}
+      GH_ENV:         ${{ needs.prepare.outputs.gh_env }}
+      RUN_WEB:        ${{ needs.decide.outputs.run_web }}
+      AWS_ACCOUNT_ID: ${{ needs.expose_env_vars.outputs.env_account_id }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS creds (stable role)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/${{ env.PROJECT }}-${{ env.GH_ENV }}-github-oidc
+          role-session-name: gha-${{ env.DEPLOY_ENV }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.6
+
+      - name: Read CloudFront ID from Terraform state
+        id: tfout
+        working-directory: infra/terraform
+        env:
+          TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+          TF_STATE_LOCK:   ${{ vars.TF_STATE_LOCK_TABLE }}
+          AWS_REGION:      ${{ env.AWS_REGION }}
+          DEPLOY_ENV:      ${{ env.DEPLOY_ENV }}
+        run: |
+          set -euo pipefail
+          terraform init \
+            -reconfigure \
+            -backend-config="bucket=${TF_STATE_BUCKET}" \
+            -backend-config="dynamodb_table=${TF_STATE_LOCK}" \
+            -backend-config="key=${DEPLOY_ENV}/terraform.tfstate" \
+            -backend-config="region=${AWS_REGION}"
+          echo "dist_id=$(terraform output -raw cloudfront_distribution_id)" >> "$GITHUB_OUTPUT"
+
+      - name: Invalidate CloudFront cache
+        if: ${{ steps.tfout.outputs.dist_id != '' }}
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "${{ steps.tfout.outputs.dist_id }}" \
+            --paths "/*"
+
+      - name: Upload index.html (no-cache)
+        if: ${{ env.RUN_WEB == 'true' }} && ${{ hashFiles('web/index.html') != '' }}
+        run: |
+          aws s3 cp web/index.html "s3://${{ env.PROJECT }}-${{ env.DEPLOY_ENV }}-site/index.html" \
+            --cache-control "no-cache" \
+            --content-type "text/html"
+
+      - name: Upload static site to S3
+        if: ${{ env.RUN_WEB == 'true' }}
+        run: aws s3 sync web "s3://${{ env.PROJECT }}-${{ env.DEPLOY_ENV }}-site/" --delete
+
+      - name: No web changes — skipping web deploy
+        if: ${{ env.RUN_WEB != 'true' }}
+        run: echo "Web unchanged; proceeding to tests."
+
+  resolve-env:
+    name: Resolve Preview URL -> ${{ needs.prepare.outputs.deploy_env }}
+    needs: [prepare, changes, expose_env_vars, decide, web]
+    runs-on: ubuntu-latest
+    if: ${{ needs.decide.outputs.run_tests == 'true' }}
+    env:
+      DEPLOY_ENV:     ${{ needs.prepare.outputs.deploy_env }}
+      AWS_ACCOUNT_ID: ${{ needs.expose_env_vars.outputs.env_account_id }}
+    outputs:
+      web: ${{ steps.url.outputs.web }}
+      cognito_client_ci: ${{ steps.cognito.outputs.client_ci }}
+      origin_secret: ${{ steps.secret.outputs.origin_secret }}
+      cognito_client: ${{ steps.out.outputs.cognito_client }}
+      cognito_secret: ${{ steps.out.outputs.cognito_secret }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS creds (stable role)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/${{ env.PROJECT }}-${{ needs.prepare.outputs.gh_env }}-github-oidc
+          role-session-name: gha-${{ needs.prepare.outputs.deploy_env }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.6
+
+      - name: Resolve Preview URL from Terraform state
+        id: url
+        working-directory: infra/terraform
+        env:
+          DEPLOY_ENV: ${{ needs.prepare.outputs.deploy_env }}
+        run: |
+          set -euo pipefail
+          terraform init \
+            -reconfigure \
+            -backend-config="bucket=${TF_STATE_BUCKET}" \
+            -backend-config="dynamodb_table=${TF_STATE_LOCK}" \
+            -backend-config="key=${DEPLOY_ENV}/terraform.tfstate" \
+            -backend-config="region=${AWS_REGION}"
+
+          echo "web=$(terraform output -raw cloudfront_url 2>/dev/null || echo)" >> "$GITHUB_OUTPUT"
+
+      - name: Read Cognito outputs
+        id: cognito
+        working-directory: infra/terraform
+        run: |
+          set -euo pipefail
+          CLIENT_CI="$(terraform output -raw cognito_client_id_ci)"
+          echo "client_ci=${CLIENT_CI}" >> "$GITHUB_OUTPUT"
+    
+      - name: API Secret
+        id: out
+        working-directory: infra/terraform
+        run: |
+          set -euo pipefail
+          ORIGIN_SECRET="$(terraform output -raw origin_secret)"
+
+          echo "::add-mask::${ORIGIN_SECRET}"
+          echo "origin_secret=${ORIGIN_SECRET}"  >> "$GITHUB_OUTPUT"
+    
+  api-tests:
+    name: api-tests
+    if: ${{ needs.decide.outputs.run_tests == 'true' }}
+    needs: [resolve-env]
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION:        ${{ vars.AWS_REGION }}
+      WEB_BASE_URL:      ${{ needs.resolve-env.outputs.web }}
+      API_BASE_URL:      ${{ needs.resolve-env.outputs.web }}
+      API_PREFIX_PUBLIC: /public/api
+      API_PREFIX_SECURE: /secure/api
+      CF_ORIGIN_SECRET:  ${{ needs.resolve-env.outputs.origin_secret }}
+      COGNITO_CLIENT_ID: ${{ needs.resolve-env.outputs.cognito_client_ci }}
+      COGNITO_USERNAME:  test-user
+      COGNITO_PASSWORD:  MySecurePassword123!
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Warm up endpoints (non-blocking)
+        continue-on-error: true
+        run: |
+          join () { base="${1%/}"; path="${2}"; echo "${base}${path}"; }
+          curl -fsS -m 8 "$(join "$WEB_BASE_URL" "$API_PREFIX_PUBLIC")/ping" >/dev/null || true
+
+      - name: Run Jest (API)
+        run: npm run test:ci:api
+
+      - name: Debug API reports
+        if: always()
+        run: |
+          echo "== reports/junit =="
+          ls -la reports/junit || true
+    
+      - name: Upload JUnit (API)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-api
+          path: reports/junit/*.xml
+          if-no-files-found: warn
+
+  ui-tests:
+    name: ui-tests
+    if: ${{ needs.decide.outputs.run_tests == 'true' }}
+    needs: [resolve-env]
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.55.0-jammy   
+    env:
+      HOME: /root  
+      WEB_BASE_URL: ${{ needs.resolve-env.outputs.web }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx playwright test
+    
+      - name: Upload JUnit (UI)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-ui
+          path: |
+            reports/junit/*.xml
+            test-results.xml
+          if-no-files-found: warn
+ 
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report
+
+  pr-comment:
+    name: PR Comment (Test Summary)
+    if: ${{ needs.decide.outputs.run_tests == 'true' }}
+    needs: [ui-tests, api-tests]
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: write
+      checks: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all test report artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: test-reports 
+
+      - name: Build test summary
+        id: tr
+        uses: dorny/test-reporter@v1.9.1
+        with:
+          name: CI Test Summary
+          path: 'test-reports/**/*.xml' 
+          reporter: java-junit
+          list-tests: all
+          list-suites: all
+          only-summary: 'false'
+          fail-on-error: false
+          fail-on-empty: false
+
+      - name: Resolve check run URL
+        id: check
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const ref = context.payload.pull_request?.head?.sha || context.sha;
+            const { data } = await github.rest.checks.listForRef({ owner, repo, ref, per_page: 100 });
+            const run = data.check_runs.find(c => c.name === 'CI Test Summary');
+            core.info('Found check run: ' + (run?.html_url || 'none'));
+            core.setOutput('url', run?.html_url || '');
+      
+      - name: Sticky summary comment
+        if: github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          number: ${{ github.event.pull_request.number }}
+          header: test-summary
+          message: |
+            ### CI Test Summary
+            **Passed:** ${{ steps.tr.outputs.passed }}  •  **Failed:** ${{ steps.tr.outputs.failed }}  •  **Skipped:** ${{ steps.tr.outputs.skipped }}
+            Duration: ${{ steps.tr.outputs.time }} ms  
+            [View full report](${{ steps.tr.outputs.url_html || steps.check.outputs.url || format('{0}/{1}/actions/runs/{2}', github.server_url, github.repository, github.run_id) }})
