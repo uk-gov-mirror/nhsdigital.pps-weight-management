@@ -31,48 +31,48 @@
 ## Infrastructure
 This repository deploys a **public static website** (S3 + CloudFront + WAF), and a **public REST API** and a **JWT-protected secure REST API** (API Gateway HTTP API + Lambda Node/TypeScript + DynamoDB) using **Terraform** and **GitHub Actions (OIDC)**. It also deploys Event Scheduler to trigger a daily scheduled job.
 ```
-#               +--------------------------+
-#               |    AWS WAFv2 Web ACL     |
-#               |   (Global Protection)    |
-#               +------------+-------------+
-#                            |
-#                            v
-# +----------------------------------------------------------------+
-# |            AWS CloudFront (CDN Distribution)                   |
-# |                                                                |
-# |  +------------------+ +--------------------------------------+ |
-# |  |  Static Content  | |          API Requests                | |
-# |  |   (path: /*)     | | (paths: /public/api/*,/secure/api/*) | |
-# |  +------------------+ +--------------------------------------+ |
-# |           |                            |                       |
-# +----------------------------------------------------------------+
-#             |                            |
-#             v                            v
-#    +----------------+           +-----------------+
-#    |  S3 Bucket     |           |   API Gateway   |
-#    | (Static Site)  |           |   (HTTP API)    |
-#    +----------------+           +-----------------+
-#                                          |
-#                                          |
-#                          +---------------+-------------+
-#                          |  Public API   | Secure API  |
-#                          |  (No Auth)    | (JWT Auth)  |
-#                          +---------------+-------------+
-#                                  |       |   Cognito   |
-#   +------------------+           |       |  User Pool  |
-#   | Event Scheduler  |           |       +-------------+
-#   |                  |           |             |
-#   +--------+---------+           +-------------+
-#            |                             |
-#            v                             v
-#   +--------+---------+         +------------------+
-#   |    AWS Lambda    |         |    AWS Lambda    |
-#   |    (Daily Job)   |         |   (API Backend)  |
-#   +------------------+         +--------+---------+
-#                                         |
-#                                         v
-#                                +------------------+
-#                                |  AWS DynamoDB    |
-#                                | (Data Storage)   |
-#                                +------------------+
+               +--------------------------+
+               |    AWS WAFv2 Web ACL     |
+               |   (Global Protection)    |
+               +------------+-------------+
+                            |
+                            v
+ +----------------------------------------------------------------+
+ |            AWS CloudFront (CDN Distribution)                   |
+ |                                                                |
+ |  +------------------+ +--------------------------------------+ |
+ |  |  Static Content  | |          API Requests                | |
+ |  |   (path: /*)     | | (paths: /public/api/*,/secure/api/*) | |
+ |  +------------------+ +--------------------------------------+ |
+ |           |                            |                       |
+ +----------------------------------------------------------------+
+             |                            |
+             v                            v
+    +----------------+           +-----------------+
+    |  S3 Bucket     |           |   API Gateway   |
+    | (Static Site)  |           |   (HTTP API)    |
+    +----------------+           +-----------------+
+                                          |
+                                          |
+                          +---------------+-------------+
+                          |  Public API   | Secure API  |
+                          |  (No Auth)    | (JWT Auth)  |
+                          +---------------+-------------+
+                                  |       |   Cognito   |
+   +------------------+           |       |  User Pool  |
+   | Event Scheduler  |           |       +-------------+
+   |                  |           |             |
+   +--------+---------+           +-------------+
+            |                             |
+            v                             v
+   +--------+---------+         +------------------+
+   |    AWS Lambda    |         |    AWS Lambda    |
+   |    (Daily Job)   |         |   (API Backend)  |
+   +------------------+         +--------+---------+
+                                         |
+                                         v
+                                +------------------+
+                                |  AWS DynamoDB    |
+                                | (Data Storage)   |
+                                +------------------+
 ```
