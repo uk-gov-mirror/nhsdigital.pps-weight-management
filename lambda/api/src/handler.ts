@@ -65,7 +65,7 @@ export const handler = async (event: any) => {
       return { statusCode: 201, body: JSON.stringify({ message: "Item created successfully" }) };
     }
 
-    return { statusCode: 404, body: JSON.stringify({ message: "Not found B" }) };
+    return { statusCode: 404, body: JSON.stringify({ message: "Not found" }) };
   } catch (err) {
     console.error(err);
     return {

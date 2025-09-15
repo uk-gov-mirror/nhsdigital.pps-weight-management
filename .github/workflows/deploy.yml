@@ -8,12 +8,6 @@ on:
   pull_request:
     types: [opened, reopened, synchronize, closed]
     branches: [ main ]
-    paths:
-      - 'infra/**'
-      - 'lambda/**'
-      - 'web/**'
-      - 'tests/**'
-      - '.github/workflows/**'
   workflow_dispatch:
     inputs:
       environment:
@@ -162,7 +156,7 @@ jobs:
           fi
  
           # Tests: adjust to taste; here we run when web runs OR tests changed OR manual/merged
-          if [ "$run_web" = "true" ] || [ "$TESTS_CHANGED" = "true" ] \
+          if [ "$run_infra" = "true" ] || [ "$run_web" = "true" ] || [ "$TESTS_CHANGED" = "true" ] \
              || [ "$EVENT" = "workflow_dispatch" ] \
              || { [ "$EVENT" = "pull_request" ] && [ "$ACTION" = "closed" ] && [ "$MERGED" = "true" ]; }
           then
@@ -300,6 +294,7 @@ jobs:
 
       - name: Configure AWS creds (stable role)
         uses: aws-actions/configure-aws-credentials@v4
+        if: ${{ env.RUN_WEB == 'true' }}
         with:
           aws-region: ${{ env.AWS_REGION }}
           role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/${{ env.PROJECT }}-${{ env.GH_ENV }}-github-oidc
@@ -307,11 +302,13 @@ jobs:
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
+        if: ${{ env.RUN_WEB == 'true' }}
         with:
           terraform_version: 1.6.6
 
       - name: Read CloudFront ID from Terraform state
         id: tfout
+        if: ${{ env.RUN_WEB == 'true' }}
         working-directory: infra/terraform
         env:
           TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
@@ -329,7 +326,7 @@ jobs:
           echo "dist_id=$(terraform output -raw cloudfront_distribution_id)" >> "$GITHUB_OUTPUT"
 
       - name: Invalidate CloudFront cache
-        if: ${{ steps.tfout.outputs.dist_id != '' }}
+        if: ${{ env.RUN_WEB == 'true' }} && ${{ steps.tfout.outputs.dist_id != '' }}
         run: |
           aws cloudfront create-invalidation \
             --distribution-id "${{ steps.tfout.outputs.dist_id }}" \
@@ -354,10 +351,10 @@ jobs:
     name: Resolve Preview URL -> ${{ needs.prepare.outputs.deploy_env }}
     needs: [prepare, changes, expose_env_vars, decide, web]
     runs-on: ubuntu-latest
-    if: ${{ needs.decide.outputs.run_tests == 'true' }}
     env:
       DEPLOY_ENV:     ${{ needs.prepare.outputs.deploy_env }}
       AWS_ACCOUNT_ID: ${{ needs.expose_env_vars.outputs.env_account_id }}
+      RUN_TESTS:      ${{ needs.decide.outputs.run_tests }}
     outputs:
       web: ${{ steps.url.outputs.web }}
       cognito_client_ci: ${{ steps.cognito.outputs.client_ci }}
@@ -368,6 +365,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Configure AWS creds (stable role)
+        if: ${{ env.RUN_TESTS == 'true' }}
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-region: ${{ env.AWS_REGION }}
@@ -375,11 +373,13 @@ jobs:
           role-session-name: gha-${{ needs.prepare.outputs.deploy_env }}
 
       - name: Set up Terraform
+        if: ${{ env.RUN_TESTS == 'true' }}
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.6.6
 
       - name: Resolve Preview URL from Terraform state
+        if: ${{ env.RUN_TESTS == 'true' }}
         id: url
         working-directory: infra/terraform
         env:
@@ -396,6 +396,7 @@ jobs:
           echo "web=$(terraform output -raw cloudfront_url 2>/dev/null || echo)" >> "$GITHUB_OUTPUT"
 
       - name: Read Cognito outputs
+        if: ${{ env.RUN_TESTS == 'true' }}
         id: cognito
         working-directory: infra/terraform
         run: |
@@ -404,6 +405,7 @@ jobs:
           echo "client_ci=${CLIENT_CI}" >> "$GITHUB_OUTPUT"
     
       - name: API Secret
+        if: ${{ env.RUN_TESTS == 'true' }}
         id: out
         working-directory: infra/terraform
         run: |
@@ -412,11 +414,14 @@ jobs:
 
           echo "::add-mask::${ORIGIN_SECRET}"
           echo "origin_secret=${ORIGIN_SECRET}"  >> "$GITHUB_OUTPUT"
+
+      - name: Not running tests - skip resolving environment values
+        if: ${{ env.RUN_TESTS != 'true' }}
+        run: echo "Not running tests - skip resolving environment values"
     
   api-tests:
     name: api-tests
-    if: ${{ needs.decide.outputs.run_tests == 'true' }}
-    needs: [resolve-env]
+    needs: [resolve-env, decide]
     runs-on: ubuntu-latest
     env:
       AWS_REGION:        ${{ vars.AWS_REGION }}
@@ -428,54 +433,64 @@ jobs:
       COGNITO_CLIENT_ID: ${{ needs.resolve-env.outputs.cognito_client_ci }}
       COGNITO_USERNAME:  test-user
       COGNITO_PASSWORD:  MySecurePassword123!
+      RUN_TESTS:         ${{ needs.decide.outputs.run_tests }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Setup Node
+        if: ${{ env.RUN_TESTS == 'true' }}
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
 
       - name: Install deps
+        if: ${{ env.RUN_TESTS == 'true' }}
         run: npm ci
 
       - name: Warm up endpoints (non-blocking)
+        if: ${{ env.RUN_TESTS == 'true' }}
         continue-on-error: true
         run: |
           join () { base="${1%/}"; path="${2}"; echo "${base}${path}"; }
           curl -fsS -m 8 "$(join "$WEB_BASE_URL" "$API_PREFIX_PUBLIC")/ping" >/dev/null || true
 
       - name: Run Jest (API)
+        if: ${{ env.RUN_TESTS == 'true' }}
         run: npm run test:ci:api
 
       - name: Debug API reports
-        if: always()
+        if: ${{ env.RUN_TESTS == 'true' }}
         run: |
           echo "== reports/junit =="
           ls -la reports/junit || true
     
       - name: Upload JUnit (API)
-        if: always()
+        if: ${{ env.RUN_TESTS == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: junit-api
           path: reports/junit/*.xml
           if-no-files-found: warn
 
+      - name: Not running tests - skip API tests
+        if: ${{ env.RUN_TESTS != 'true' }}
+        run: echo "Not running tests - skip API tests"
+
   ui-tests:
     name: ui-tests
-    if: ${{ needs.decide.outputs.run_tests == 'true' }}
-    needs: [resolve-env]
+    needs: [resolve-env, decide]
     runs-on: ubuntu-latest
     container: mcr.microsoft.com/playwright:v1.55.0-jammy   
     env:
-      HOME: /root  
+      HOME:         /root  
       WEB_BASE_URL: ${{ needs.resolve-env.outputs.web }}
+      RUN_TESTS:    ${{ needs.decide.outputs.run_tests }}
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
+        if: ${{ env.RUN_TESTS == 'true' }}
         with:
           node-version: 20
           cache: npm
@@ -483,7 +498,7 @@ jobs:
       - run: npx playwright test
     
       - name: Upload JUnit (UI)
-        if: always()
+        if: ${{ env.RUN_TESTS == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: junit-ui
@@ -493,31 +508,38 @@ jobs:
           if-no-files-found: warn
  
       - name: Upload Playwright report
-        if: always()
+        if: ${{ env.RUN_TESTS == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
           path: playwright-report
 
+      - name: Not running tests - skip UI tests
+        if: ${{ env.RUN_TESTS != 'true' }}
+        run: echo "Not running tests - skip UI tests"
+
   pr-comment:
     name: PR Comment (Test Summary)
-    if: ${{ needs.decide.outputs.run_tests == 'true' }}
-    needs: [ui-tests, api-tests]
+    needs: [ui-tests, api-tests, decide]
     runs-on: ubuntu-latest
     permissions:
       actions: read
       contents: read
       pull-requests: write
       checks: write
+    env:
+      RUN_TESTS: ${{ needs.decide.outputs.run_tests }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Download all test report artifacts
+        if: ${{ env.RUN_TESTS == 'true' }}
         uses: actions/download-artifact@v4
         with:
           path: test-reports 
 
       - name: Build test summary
+        if: ${{ env.RUN_TESTS == 'true' }}
         id: tr
         uses: dorny/test-reporter@v1.9.1
         with:
@@ -531,6 +553,7 @@ jobs:
           fail-on-empty: false
 
       - name: Resolve check run URL
+        if: ${{ env.RUN_TESTS == 'true' }}
         id: check
         uses: actions/github-script@v7
         with:
@@ -543,7 +566,7 @@ jobs:
             core.setOutput('url', run?.html_url || '');
       
       - name: Sticky summary comment
-        if: github.event_name == 'pull_request'
+        if: ${{ env.RUN_TESTS == 'true' && github.event_name == 'pull_request' }}
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           number: ${{ github.event.pull_request.number }}
@@ -553,3 +576,7 @@ jobs:
             **Passed:** ${{ steps.tr.outputs.passed }}  •  **Failed:** ${{ steps.tr.outputs.failed }}  •  **Skipped:** ${{ steps.tr.outputs.skipped }}
             Duration: ${{ steps.tr.outputs.time }} ms  
             [View full report](${{ steps.tr.outputs.url_html || steps.check.outputs.url || format('{0}/{1}/actions/runs/{2}', github.server_url, github.repository, github.run_id) }})
+
+      - name: Not running tests - skip upload test summary
+        if: ${{ env.RUN_TESTS != 'true' }}
+        run: echo "Not running tests - skip upload test summary"
