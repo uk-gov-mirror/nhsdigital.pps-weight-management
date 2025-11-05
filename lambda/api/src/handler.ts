@@ -62,7 +62,7 @@ export const handler = async (event: any) => {
         TableName,
         Item: item
       }));
-      return { statusCode: 201, body: JSON.stringify({ message: "Item created successfully" }) };
+      return { statusCode: 201, body: JSON.stringify({ message: "Item created successfully." }) };
     }
 
     return { statusCode: 404, body: JSON.stringify({ message: "Not found" }) };
@@ -71,7 +71,7 @@ export const handler = async (event: any) => {
     return {
       statusCode: 500,
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ message: "An unexpected error occurred" }),
+      body: JSON.stringify({ message: "An unexpected error occurred." }),
     };
   }
 };
