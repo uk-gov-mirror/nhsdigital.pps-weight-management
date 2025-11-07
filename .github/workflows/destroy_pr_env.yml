@@ -42,7 +42,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-region: ${{ env.AWS_REGION }}
-          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/${{ env.PROJECT }}-${{ env.GH_ENV }}-github-oidc
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/${{ env.PROJECT }}-${{ env.GH_ENV }}-gh-oidc
           role-session-name: gha-destroy-${{ env.DEPLOY_ENV }}
 
       - id: state
