@@ -1,5 +1,6 @@
 # Run tests
 # .\scripts\run-tests.ps1 -EnvName dev-jb -Api -Ui -InstallBrowsers
+# .\scripts\run-tests.ps1 -EnvName pr-38 -DjangoBaseUrl http://127.0.0.1:8000 -Api -Ui -InstallBrowsers
 
 param(
   [Parameter(Mandatory = $true)]
@@ -8,8 +9,7 @@ param(
   [string]$AwsRegion     = "eu-west-2",
   [string]$TfStateBucket = "nhse-pps-wm-terraform-state-bucket",
   [string]$TfLockTable   = "nhse-pps-wm-terraform-lock",
-  [string]$WebBaseUrl,
-  [string]$CfOriginSecret,
+  [string]$DjangoBaseUrl,
   [string]$CognitoClientId,
   [string]$CognitoUsername = "test-user",
   [string]$CognitoPassword = "MySecurePassword123!",
@@ -36,11 +36,8 @@ if ($TfStateBucket -and $TfLockTable) {
       -backend-config="key=$EnvName/terraform.tfstate" `
       -backend-config="region=$AwsRegion" | Out-Null
 
-    if (-not $WebBaseUrl) {
-      $WebBaseUrl = terraform output -raw cloudfront_url
-    }
-    if (-not $CfOriginSecret) {
-      try { $CfOriginSecret = terraform output -raw origin_secret } catch { $CfOriginSecret = $null }
+    if (-not $DjangoBaseUrl) {
+      $DjangoBaseUrl = terraform output -raw cloudfront_url
     }
     if (-not $CognitoClientId) {
       try { $CognitoClientId = terraform output -raw cognito_client_id_ci } catch { $CognitoClientId = $null }
@@ -48,27 +45,24 @@ if ($TfStateBucket -and $TfLockTable) {
   }
   finally { Pop-Location }
 }
-elseif (-not $WebBaseUrl) {
-  throw "Set -WebBaseUrl or provide Terraform backend details to auto-resolve it."
+elseif (-not $DjangoBaseUrl) {
+  throw "Set -DjangoBaseUrl or provide Terraform backend details to auto-resolve it."
 }
 
 # 2) Export environment variables for this PowerShell session
 Write-Info "Configuring environment variables..."
 $env:AWS_REGION        = $AwsRegion
-$env:WEB_BASE_URL      = $WebBaseUrl.TrimEnd('/')
-$env:API_BASE_URL      = $env:WEB_BASE_URL
+$env:DJANGO_BASE_URL   = $DjangoBaseUrl.TrimEnd('/')
 $env:API_PREFIX_PUBLIC = "/public/api"
 $env:API_PREFIX_SECURE = "/secure/api"
 
-if ($CfOriginSecret) { $env:CF_ORIGIN_SECRET = $CfOriginSecret }
 if ($CognitoClientId) { $env:COGNITO_CLIENT_ID = $CognitoClientId }
 $env:COGNITO_USERNAME  = $CognitoUsername
 $env:COGNITO_PASSWORD  = $CognitoPassword
 
-Write-Host "WEB_BASE_URL         = $env:WEB_BASE_URL"
+Write-Host "DJANGO_BASE_URL      = $env:DJANGO_BASE_URL"
 Write-Host "API_PREFIX_PUBLIC    = $env:API_PREFIX_PUBLIC"
 Write-Host "API_PREFIX_SECURE    = $env:API_PREFIX_SECURE"
-if ($env:CF_ORIGIN_SECRET)  { Write-Host "CF_ORIGIN_SECRET      = (set)" }
 if ($env:COGNITO_CLIENT_ID) { Write-Host "COGNITO_CLIENT_ID     = $env:COGNITO_CLIENT_ID" }
 Write-Host "COGNITO_USERNAME     = $env:COGNITO_USERNAME"
 
@@ -85,8 +79,8 @@ if ($InstallBrowsers -or $Ui) {
 # 5) Warm up endpoints (optional)
 Write-Info "Warming up endpoints (non-blocking)..."
 try {
-  curl.exe -fsS -m 8 "$($env:WEB_BASE_URL)" | Out-Null
-  curl.exe -fsS -m 8 "$($env:WEB_BASE_URL)$($env:API_PREFIX_PUBLIC)/ping" | Out-Null
+  curl.exe -fsS -m 8 "$($env:DJANGO_BASE_URL)" | Out-Null
+  curl.exe -fsS -m 8 "$($env:DJANGO_BASE_URL)$($env:API_PREFIX_PUBLIC)/ping" | Out-Null
 } catch { }
 
 # 6) Run tests

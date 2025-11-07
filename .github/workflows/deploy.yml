@@ -1,4 +1,4 @@
-name: Deploy + Test
+name: Deploy and Test
 
 concurrency:
   group: pr-${{ github.event.pull_request.number || github.ref }}-lock
@@ -65,9 +65,9 @@ jobs:
     needs: prepare
     runs-on: ubuntu-latest
     outputs:
-      infra: ${{ steps.filter.outputs.infra }}
-      web:   ${{ steps.filter.outputs.web }}
-      tests: ${{ steps.filter.outputs.tests }}
+      infra:  ${{ steps.filter.outputs.infra }}
+      django: ${{ steps.filter.outputs.django }}
+      tests:  ${{ steps.filter.outputs.tests }}
     steps:
       - uses: actions/checkout@v4
       - id: filter
@@ -76,9 +76,8 @@ jobs:
           filters: |
             infra:
               - 'infra/**'
-              - 'lambda/**'
-            web:
-              - 'web/**'
+            django:
+              - 'django-app/**'
             tests:
               - 'tests/**'
 
@@ -99,16 +98,16 @@ jobs:
     needs: [prepare, changes, expose_env_vars]
     runs-on: ubuntu-latest
     outputs:
-      run_infra:     ${{ steps.set.outputs.run_infra }}
-      run_web:       ${{ steps.set.outputs.run_web }}
-      run_tests:     ${{ steps.set.outputs.run_tests }}
+      run_infra:  ${{ steps.set.outputs.run_infra }}
+      run_django: ${{ steps.set.outputs.run_django }}
+      run_tests:  ${{ steps.set.outputs.run_tests }}
     env:
       AWS_ACCOUNT_ID: ${{ needs.expose_env_vars.outputs.env_account_id }}
     steps:
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-region: ${{ env.AWS_REGION }}
-          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/${{ env.PROJECT }}-${{ needs.prepare.outputs.gh_env }}-github-oidc
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/${{ env.PROJECT }}-${{ needs.prepare.outputs.gh_env }}-gh-oidc
           role-session-name: gha-decide
 
       - id: state
@@ -125,17 +124,17 @@ jobs:
 
       - id: set
         env:
-          INFRA_CHANGED: ${{ needs.changes.outputs.infra }}
-          WEB_CHANGED:   ${{ needs.changes.outputs.web }}
-          TESTS_CHANGED: ${{ needs.changes.outputs.tests }}
-          STATE_EXISTS:  ${{ steps.state.outputs.exists }}
+          INFRA_CHANGED:  ${{ needs.changes.outputs.infra }}
+          DJANGO_CHANGED: ${{ needs.changes.outputs.django }}
+          TESTS_CHANGED:  ${{ needs.changes.outputs.tests }}
+          STATE_EXISTS:   ${{ steps.state.outputs.exists }}
         run: |
           EVENT="${{ github.event_name }}"
           ACTION="${{ github.event.action }}"
           MERGED="${{ github.event.pull_request.merged }}"    
 
           run_infra=false
-          run_web=false
+          run_django=false
           run_tests=false
           
           # Infra: manual OR merged OR infra changed OR (PR opened/reopened with no state yet)
@@ -147,25 +146,25 @@ jobs:
             run_infra=true
           fi
  
-          # Web: run if web changed OR infra will run OR manual OR merged
-          if [ "$WEB_CHANGED" = "true" ] || [ "$run_infra" = "true" ] \
+          # Django: run if django changed OR infra will run OR manual OR merged
+          if [ "$DJANGO_CHANGED" = "true" ] || [ "$run_infra" = "true" ] \
              || [ "$EVENT" = "workflow_dispatch" ] \
              || { [ "$EVENT" = "pull_request" ] && [ "$ACTION" = "closed" ] && [ "$MERGED" = "true" ]; }
           then
-            run_web=true
+            run_django=true
           fi
  
-          # Tests: adjust to taste; here we run when web runs OR tests changed OR manual/merged
-          if [ "$run_infra" = "true" ] || [ "$run_web" = "true" ] || [ "$TESTS_CHANGED" = "true" ] \
+          # Tests: run when infra changed OR django changed OR tests changed OR manual/merged
+          if [ "$run_infra" = "true" ] || [ "$run_django" = "true" ] || [ "$TESTS_CHANGED" = "true" ] \
              || [ "$EVENT" = "workflow_dispatch" ] \
              || { [ "$EVENT" = "pull_request" ] && [ "$ACTION" = "closed" ] && [ "$MERGED" = "true" ]; }
           then
             run_tests=true
           fi 
  
-          echo "run_infra=$run_infra"         >> "$GITHUB_OUTPUT"
-          echo "run_web=$run_web"             >> "$GITHUB_OUTPUT"
-          echo "run_tests=$run_tests"         >> "$GITHUB_OUTPUT"
+          echo "run_infra=$run_infra"   >> "$GITHUB_OUTPUT"
+          echo "run_django=$run_django" >> "$GITHUB_OUTPUT"
+          echo "run_tests=$run_tests"   >> "$GITHUB_OUTPUT"
 
   infra:
     name: Infra -> ${{ needs.prepare.outputs.deploy_env }}
@@ -186,36 +185,8 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-region: ${{ env.AWS_REGION }}
-          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/${{ env.PROJECT }}-${{ env.GH_ENV }}-github-oidc
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/${{ env.PROJECT }}-${{ env.GH_ENV }}-gh-oidc
           role-session-name: gha-${{ env.DEPLOY_ENV }}
-
-      - name: Setup Node
-        if: ${{ env.RUN_INFRA == 'true' }}
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Build API Lambda (TypeScript -> dist -> zip)
-        if: ${{ env.RUN_INFRA == 'true' }}
-        run: |
-          set -e
-          cd lambda/api
-          if [ -f package-lock.json ]; then npm ci; else npm install; fi
-          npm run build
-          cd ../..
-          rm -f api.zip
-          cd lambda/api/dist && zip -r ../../../api.zip . && cd ../../..
-
-      - name: Build Daily Lambda (TypeScript -> dist -> zip)
-        if: ${{ env.RUN_INFRA == 'true' }}
-        run: |
-          set -e
-          cd lambda/daily
-          if [ -f package-lock.json ]; then npm ci; else npm install; fi
-          npm run build
-          cd ../..
-          rm -f daily.zip
-          cd lambda/daily/dist && zip -r ../../../daily.zip . && cd ../../..
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
@@ -241,8 +212,6 @@ jobs:
           TF_VAR_project:         ${{ env.PROJECT }}
           TF_VAR_region:          ${{ env.AWS_REGION }}
           TF_VAR_env:             ${{ env.DEPLOY_ENV }}
-          TF_VAR_api_zip_path:    "../../api.zip"
-          TF_VAR_daily_zip_path:  "../../daily.zip"
           TF_VAR_gh_owner:        ${{ github.repository_owner }}
           TF_VAR_gh_repo:         ${{ github.event.repository.name }}
         run: terraform apply -auto-approve
@@ -275,57 +244,44 @@ jobs:
 
       - name: No infra changes — skipping apply
         if: ${{ !(needs.changes.outputs.infra == 'true' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged)) }}
-        run: echo "Infra unchanged; continuing so Web can run."
+        run: echo "Infra unchanged; continuing so Django can run."
 
-  web:
-    name: Web -> ${{ needs.prepare.outputs.deploy_env }}
+  django:
+    name: Django -> ${{ needs.prepare.outputs.deploy_env }}
     needs: [prepare, changes, expose_env_vars, decide, infra]
     runs-on: ubuntu-latest
     concurrency:
-      group: web-${{ needs.prepare.outputs.deploy_env }}
+      group: django-${{ needs.prepare.outputs.deploy_env }}
       cancel-in-progress: false
     env:
-      DEPLOY_ENV:     ${{ needs.prepare.outputs.deploy_env }}
-      GH_ENV:         ${{ needs.prepare.outputs.gh_env }}
-      RUN_WEB:        ${{ needs.decide.outputs.run_web }}
-      AWS_ACCOUNT_ID: ${{ needs.expose_env_vars.outputs.env_account_id }}
+      DEPLOY_ENV:      ${{ needs.prepare.outputs.deploy_env }}
+      GH_ENV:          ${{ needs.prepare.outputs.gh_env }}
+      RUN_DJANGO:      ${{ needs.decide.outputs.run_django }}
+      AWS_ACCOUNT_ID:  ${{ needs.expose_env_vars.outputs.env_account_id }}
+      ECS_CLUSTER:     ${{ format('{0}-{1}-ecs', vars.PROJECT, needs.prepare.outputs.deploy_env) }}
+      ECS_SERVICE:     ${{ format('{0}-{1}-web', vars.PROJECT, needs.prepare.outputs.deploy_env) }}
+      ECS_TASK_FAMILY: ${{ format('{0}-{1}-django', vars.PROJECT, needs.prepare.outputs.deploy_env) }}
+      ECR_REPO_NAME:   ${{ format('{0}-{1}-django', vars.PROJECT, needs.prepare.outputs.deploy_env) }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-          with:
-          node-version: 20
-          cache: npm
-
-      - name: Install dependencies + Playwright browsers
-        run: |
-          npm ci
-          npx playwright install --with-deps
-
-      - name: Run Playwright UI tests
-        env:
-          WEB_BASE_URL: http://localhost:3000
-          PW_WEBSERVER_CMD: npm start -- --port 3000 --host
-        run: npx playwright test
-
       - name: Configure AWS creds (stable role)
         uses: aws-actions/configure-aws-credentials@v4
-        if: ${{ env.RUN_WEB == 'true' }}
+        if: ${{ env.RUN_DJANGO == 'true' }}
         with:
           aws-region: ${{ env.AWS_REGION }}
-          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/${{ env.PROJECT }}-${{ env.GH_ENV }}-github-oidc
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/${{ env.PROJECT }}-${{ env.GH_ENV }}-gh-oidc
           role-session-name: gha-${{ env.DEPLOY_ENV }}
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
-        if: ${{ env.RUN_WEB == 'true' }}
+        if: ${{ env.RUN_DJANGO == 'true' }}
         with:
           terraform_version: 1.6.6
 
       - name: Read CloudFront ID from Terraform state
         id: tfout
-        if: ${{ env.RUN_WEB == 'true' }}
+        if: ${{ env.RUN_DJANGO == 'true' }}
         working-directory: infra/terraform
         env:
           TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
@@ -343,39 +299,189 @@ jobs:
           echo "dist_id=$(terraform output -raw cloudfront_distribution_id)" >> "$GITHUB_OUTPUT"
 
       - name: Invalidate CloudFront cache
-        if: ${{ env.RUN_WEB == 'true' }} && ${{ steps.tfout.outputs.dist_id != '' }}
+        if: ${{ env.RUN_DJANGO == 'true' && steps.tfout.outputs.dist_id != '' }}
         run: |
           aws cloudfront create-invalidation \
             --distribution-id "${{ steps.tfout.outputs.dist_id }}" \
             --paths "/*"
 
-      - name: Upload index.html (no-cache)
-        if: ${{ env.RUN_WEB == 'true' }} && ${{ hashFiles('web/index.html') != '' }}
+      - name: Login to Amazon ECR
+        id: ecr-login
+        if: ${{ env.RUN_DJANGO == 'true' }}
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Compute image tags
+        id: meta
+        if: ${{ env.RUN_DJANGO == 'true' }}
         run: |
-          aws s3 cp web/index.html "s3://${{ env.PROJECT }}-${{ env.DEPLOY_ENV }}-site/index.html" \
-            --cache-control "no-cache" \
-            --content-type "text/html"
+          ECR="${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com"
+          IMAGE="${ECR}/${{ env.ECR_REPO_NAME }}"
+          echo "account_id=${{ env.AWS_ACCOUNT_ID }}" >> "$GITHUB_OUTPUT"
+          echo "ecr_registry=${ECR}"                  >> "$GITHUB_OUTPUT"
+          echo "image=${IMAGE}"                       >> "$GITHUB_OUTPUT"
+          echo "tag_sha=${IMAGE}:${GITHUB_SHA}"       >> "$GITHUB_OUTPUT"
+          echo "tag_latest=${IMAGE}:latest"           >> "$GITHUB_OUTPUT"
 
-      - name: Upload static site to S3
-        if: ${{ env.RUN_WEB == 'true' }}
-        run: aws s3 sync web "s3://${{ env.PROJECT }}-${{ env.DEPLOY_ENV }}-site/" --delete
+      - name: Build image
+        if: ${{ env.RUN_DJANGO == 'true' }}
+        working-directory: django-app
+        run: |
+          docker build \
+            -t "${{ steps.meta.outputs.tag_sha }}" \
+            -t "${{ steps.meta.outputs.tag_latest }}" \
+            .
 
-      - name: No web changes — skipping web deploy
-        if: ${{ env.RUN_WEB != 'true' }}
-        run: echo "Web unchanged; proceeding to tests."
+      - name: Push image
+        if: ${{ env.RUN_DJANGO == 'true' }}
+        run: |
+          docker push "${{ steps.meta.outputs.tag_sha }}"
+          docker push "${{ steps.meta.outputs.tag_latest }}"
+
+      - name: Get current task definition
+        id: td
+        if: ${{ env.RUN_DJANGO == 'true' }}
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition "${{ env.ECS_TASK_FAMILY }}" \
+            --query "taskDefinition" > td.json
+          echo "td_path=$PWD/td.json" >> "$GITHUB_OUTPUT"
+
+      - name: Inject new image into task definition
+        id: patch
+        if: ${{ env.RUN_DJANGO == 'true' }}
+        run: |
+          NEW_IMAGE="${{ steps.meta.outputs.tag_sha }}"
+          # Replace the image of the container named "web" (Terraform uses container name 'web')
+          cat td.json | jq --arg IMG "$NEW_IMAGE" '
+            .containerDefinitions |= (map(if .name=="web" then .image=$IMG else . end)) |
+            del(.taskDefinitionArn,.revision,.status,.requiresAttributes,.compatibilities,.registeredAt,.registeredBy)
+          ' > td_patched.json
+          echo "patched=$PWD/td_patched.json" >> "$GITHUB_OUTPUT"
+
+      - name: Register new task definition revision
+        id: register
+        if: ${{ env.RUN_DJANGO == 'true' }}
+        run: |
+          NEW_TD_ARN=$(aws ecs register-task-definition --cli-input-json file://td_patched.json --query "taskDefinition.taskDefinitionArn" --output text)
+          echo "arn=$NEW_TD_ARN" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch ECS service networking
+        id: net
+        if: ${{ env.RUN_DJANGO == 'true' }}
+        env:
+          CLUSTER: ${{ env.ECS_CLUSTER }}
+          SERVICE: ${{ env.ECS_SERVICE }}
+        run: |
+          set -euo pipefail
+          SUBNETS=$(aws ecs describe-services \
+            --cluster "$CLUSTER" --services "$SERVICE" \
+            --query 'join(`,`, services[0].networkConfiguration.awsvpcConfiguration.subnets)' \
+            --output text)
+          SGS=$(aws ecs describe-services \
+            --cluster "$CLUSTER" --services "$SERVICE" \
+            --query 'join(`,`, services[0].networkConfiguration.awsvpcConfiguration.securityGroups)' \
+            --output text)
+      
+          [ -z "$SUBNETS" ] && { echo "::error::Service has no subnets"; exit 1; }
+          [ -z "$SGS" ] && { echo "::error::Service has no security groups"; exit 1; }
+
+          echo "subnets=$SUBNETS" >> "$GITHUB_OUTPUT"
+          echo "sgs=$SGS" >> "$GITHUB_OUTPUT"
+
+      # Create Update DB Task
+      - name: Make DB job task definition
+        id: make_dbjob
+        run: |
+          set -euo pipefail
+          SRC="${{ steps.patch.outputs.patched }}"
+          DST="$PWD/td_dbjob.json"
+          jq '
+            .family = (.family + "-job") |
+            .containerDefinitions = (
+              .containerDefinitions
+              | map(if .name == "web"
+                    then . + { entryPoint: ["bash","-lc"],
+                               command: ["python3 manage.py update_db"] }
+                    else . end)
+            )
+          ' "$SRC" > "$DST"
+          echo "dbjob=$DST" >> "$GITHUB_OUTPUT"
+
+      # Run Update DB Task
+      - name: Run DB update (one-off ECS task)
+        if: ${{ env.RUN_DJANGO == 'true' }}
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        timeout-minutes: 20
+        with:
+          task-definition: ${{ steps.make_dbjob.outputs.dbjob }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          run-task: true
+          run-task-launch-type: FARGATE
+          wait-for-task-stopped: true
+          run-task-subnets: ${{ steps.net.outputs.subnets }}
+          run-task-security-groups: ${{ steps.net.outputs.sgs }}
+          run-task-assign-public-IP: DISABLED
+          run-task-started-by: db-update-${{ github.run_id }}
+          enable-ecs-managed-tags: true
+          run-task-tags: '[{"key":"ci","value":"db-update"}]'
+
+      # Check Udpate DB Task outcome
+      - name: Diagnose DB update task (on failure)
+        if: failure() && env.RUN_DJANGO == 'true'
+        env:
+          CLUSTER: ${{ env.ECS_CLUSTER }}
+          REGION: ${{ env.AWS_DEFAULT_REGION }}
+        run: |
+          set -euo pipefail
+          STARTED_BY="db-update-${{ github.run_id }}"
+      
+          TASK_ARN=$(aws ecs list-tasks --cluster "$CLUSTER" --desired-status STOPPED --started-by "$STARTED_BY" --query 'taskArns[-1]' --output text)
+          echo "Task: $TASK_ARN"
+
+          aws ecs describe-tasks --cluster "$CLUSTER" --tasks "$TASK_ARN" \
+            --query 'tasks[0].{stoppedReason:stoppedReason, containers:containers[].{name:name,exitCode:exitCode,reason:reason,log:logStreamName}}' \
+            --output table
+
+          LOG_STREAM=$(aws ecs describe-tasks --cluster "$CLUSTER" --tasks "$TASK_ARN" --query 'tasks[0].containers[0].logStreamName' --output text)
+          if [ "$LOG_STREAM" != "None" ] && [ -n "$LOG_STREAM" ]; then
+            echo "---- Last 200 log lines ----"
+            aws logs get-log-events --region "$REGION" --log-group-name "/ecs/${{ env.ECS_TASK_FAMILY }}" --log-stream-name "$LOG_STREAM" --limit 200 --query 'events[].message' --output text || true
+            echo "----------------------------"
+          else
+            echo "No CloudWatch Logs stream found for the container."
+          fi
+    
+      - name: Update ECS service
+        if: ${{ env.RUN_DJANGO == 'true' }}
+        run: |
+          aws ecs update-service \
+            --cluster "${{ env.ECS_CLUSTER }}" \
+            --service "${{ env.ECS_SERVICE }}" \
+            --task-definition "${{ steps.register.outputs.arn }}" \
+            --force-new-deployment
+
+      - name: Wait for service stability
+        if: ${{ env.RUN_DJANGO == 'true' }}
+        run: |
+          aws ecs wait services-stable \
+            --cluster "${{ env.ECS_CLUSTER }}" \
+            --services "${{ env.ECS_SERVICE }}"
+            
+      - name: No django changes — skipping django deploy
+        if: ${{ env.RUN_DJANGO != 'true' }}
+        run: echo "Django unchanged; proceeding to tests."
 
   resolve-env:
     name: Resolve Preview URL -> ${{ needs.prepare.outputs.deploy_env }}
-    needs: [prepare, changes, expose_env_vars, decide, web]
+    needs: [prepare, changes, expose_env_vars, decide, django]
     runs-on: ubuntu-latest
     env:
       DEPLOY_ENV:     ${{ needs.prepare.outputs.deploy_env }}
       AWS_ACCOUNT_ID: ${{ needs.expose_env_vars.outputs.env_account_id }}
       RUN_TESTS:      ${{ needs.decide.outputs.run_tests }}
     outputs:
-      web: ${{ steps.url.outputs.web }}
+      django: ${{ steps.url.outputs.django }}
       cognito_client_ci: ${{ steps.cognito.outputs.client_ci }}
-      origin_secret: ${{ steps.secret.outputs.origin_secret }}
       cognito_client: ${{ steps.out.outputs.cognito_client }}
       cognito_secret: ${{ steps.out.outputs.cognito_secret }}
     steps:
@@ -386,7 +492,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-region: ${{ env.AWS_REGION }}
-          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/${{ env.PROJECT }}-${{ needs.prepare.outputs.gh_env }}-github-oidc
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/${{ env.PROJECT }}-${{ needs.prepare.outputs.gh_env }}-gh-oidc
           role-session-name: gha-${{ needs.prepare.outputs.deploy_env }}
 
       - name: Set up Terraform
@@ -410,7 +516,7 @@ jobs:
             -backend-config="key=${DEPLOY_ENV}/terraform.tfstate" \
             -backend-config="region=${AWS_REGION}"
 
-          echo "web=$(terraform output -raw cloudfront_url 2>/dev/null || echo)" >> "$GITHUB_OUTPUT"
+          echo "django=$(terraform output -raw cloudfront_url 2>/dev/null || echo)" >> "$GITHUB_OUTPUT"
 
       - name: Read Cognito outputs
         if: ${{ env.RUN_TESTS == 'true' }}
@@ -420,17 +526,6 @@ jobs:
           set -euo pipefail
           CLIENT_CI="$(terraform output -raw cognito_client_id_ci)"
           echo "client_ci=${CLIENT_CI}" >> "$GITHUB_OUTPUT"
-    
-      - name: API Secret
-        if: ${{ env.RUN_TESTS == 'true' }}
-        id: out
-        working-directory: infra/terraform
-        run: |
-          set -euo pipefail
-          ORIGIN_SECRET="$(terraform output -raw origin_secret)"
-
-          echo "::add-mask::${ORIGIN_SECRET}"
-          echo "origin_secret=${ORIGIN_SECRET}"  >> "$GITHUB_OUTPUT"
 
       - name: Not running tests - skip resolving environment values
         if: ${{ env.RUN_TESTS != 'true' }}
@@ -442,11 +537,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       AWS_REGION:        ${{ vars.AWS_REGION }}
-      WEB_BASE_URL:      ${{ needs.resolve-env.outputs.web }}
-      API_BASE_URL:      ${{ needs.resolve-env.outputs.web }}
+      DJANGO_BASE_URL:   ${{ needs.resolve-env.outputs.django }}
       API_PREFIX_PUBLIC: /public/api
       API_PREFIX_SECURE: /secure/api
-      CF_ORIGIN_SECRET:  ${{ needs.resolve-env.outputs.origin_secret }}
       COGNITO_CLIENT_ID: ${{ needs.resolve-env.outputs.cognito_client_ci }}
       COGNITO_USERNAME:  test-user
       COGNITO_PASSWORD:  MySecurePassword123!
@@ -470,7 +563,7 @@ jobs:
         continue-on-error: true
         run: |
           join () { base="${1%/}"; path="${2}"; echo "${base}${path}"; }
-          curl -fsS -m 8 "$(join "$WEB_BASE_URL" "$API_PREFIX_PUBLIC")/ping" >/dev/null || true
+          curl -fsS -m 8 "$(join "$DJANGO_BASE_URL" "$API_PREFIX_PUBLIC")/ping" >/dev/null || true
 
       - name: Run Jest (API)
         if: ${{ env.RUN_TESTS == 'true' }}
@@ -501,11 +594,11 @@ jobs:
     name: ui-tests
     needs: [resolve-env, decide]
     runs-on: ubuntu-latest
-    container: mcr.microsoft.com/playwright:v1.55.0-jammy   
+    container: mcr.microsoft.com/playwright:v1.56.1-jammy   
     env:
       HOME:         /root  
-      WEB_BASE_URL: ${{ needs.resolve-env.outputs.web }}
-      RUN_TESTS:    ${{ needs.decide.outputs.run_tests }}
+      DJANGO_BASE_URL: ${{ needs.resolve-env.outputs.django }}
+      RUN_TESTS:       ${{ needs.decide.outputs.run_tests }}
     steps:
       - uses: actions/checkout@v4
 
@@ -537,7 +630,7 @@ jobs:
       - name: Not running tests - skip UI tests
         if: ${{ env.RUN_TESTS != 'true' }}
         run: |
-          echo "::notice::Skipping UI tests because RUN_WEB='${RUN_WEB}'."
+          echo "::notice::Skipping UI tests because RUN_TESTS='${RUN_TESTS}'."
           # Create empty JUnit so downstream parsers don't complain
           mkdir -p reports/junit
           printf '<testsuite name="ui" tests="0" failures="0" errors="0" skipped="0"/>\n' > reports/junit/playwright.xml

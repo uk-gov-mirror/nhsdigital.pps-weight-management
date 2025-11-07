@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>PPS Weight Management</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+  </head>
+  <body>
+    <h1>Hello World!</h1>
+
+    <button id="btn-public-ping" type="button">Public Ping</button>
+    <pre id="out"></pre>
+
+    <script>
+      const btn = document.getElementById('btn-public-ping');
+      const out = document.getElementById('out');
+      btn?.addEventListener('click', async () => {
+        try {
+          const resp = await fetch('/public/api/ping', { method: 'GET' });
+          const text = await resp.text();
+          out.textContent = text;
+        } catch (e) {
+          out.textContent = 'error';
+        }
+      });
+    </script>
+  </body>
+</html>

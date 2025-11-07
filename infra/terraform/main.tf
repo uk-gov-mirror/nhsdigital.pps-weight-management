@@ -14,50 +14,26 @@
 # 
 # Infrastrcuture created
 # 
-#               +--------------------------+
-#               |    AWS WAFv2 Web ACL     |
-#               |   (Global Protection)    |
-#               +------------+-------------+
-#                            |
-#                            v
-# +----------------------------------------------------------------+
-# |            AWS CloudFront (CDN Distribution)                   |
-# |                                                                |
-# |  +------------------+ +--------------------------------------+ |
-# |  |  Static Content  | |          API Requests                | |
-# |  |   (path: /*)     | | (paths: /public/api/*,/secure/api/*) | |
-# |  +------------------+ +--------------------------------------+ |
-# |           |                            |                       |
-# +----------------------------------------------------------------+
-#             |                            |
-#             v                            v
-#    +----------------+           +-----------------+
-#    |  S3 Bucket     |           |   API Gateway   |
-#    | (Static Site)  |           |   (HTTP API)    |
-#    +----------------+           +-----------------+
-#                                          |
-#                                          |
-#                          +---------------+-------------+
-#                          |  Public API   | Secure API  |
-#                          |  (No Auth)    | (JWT Auth)  |
-#                          +---------------+-------------+
-#                                  |       |   Cognito   |
-#   +------------------+           |       |  User Pool  |
-#   | Event Scheduler  |           |       +-------------+
-#   |                  |           |             |
-#   +--------+---------+           +-------------+
-#            |                             |
-#            v                             v
-#   +--------+---------+         +------------------+
-#   |    AWS Lambda    |         |    AWS Lambda    |
-#   |    (Daily Job)   |         |   (API Backend)  |
-#   +------------------+         +--------+---------+
-#                                         |
-#                                         v
-#                                +------------------+
-#                                |  AWS DynamoDB    |
-#                                | (Data Storage)   |
-#                                +------------------+
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
 # 
 # Version History:
 #
@@ -65,6 +41,7 @@
 # -----------+----------------------------------------------------
 # 2025-09-05 | Initial version
 # 2025-09-14 | Added Event Scheduler
+# 2025-11-05 | Refactored to switch to Jinja/Django/Postgres
 #
 ####################################################################
 
@@ -74,29 +51,36 @@
 # Defines the required Terraform version and providers.
 # Configure the S3 backend for remote state management,
 # which is crucial for collaborative development.
-# Relates to: Terraform, S3, DynamoDB (via use_lockfile)
+############################################
+
 terraform {
   required_version = ">= 1.6"
+
   required_providers {
     aws = {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.6"
+    }
   }
 
   backend "s3" {
-    bucket         = "nhse-pps-wm-terraform-state-bucket"
-    use_lockfile   = true
-    encrypt        = true
+    bucket       = "nhse-pps-wm-terraform-state-bucket"
+    use_lockfile = true
+    encrypt      = true
+    # key/region configured via -backend-config in init command
   }
 }
 
-# Configures the primary AWS provider for the main region.
-# This provider is used for all resources not explicitly tied to a different region.
-# Relates to: AWS
+############################
+# Providers
+############################
+
 provider "aws" {
   region = var.region
-  # This block will automatically apply the 'Project' tag to all supported resources.
   default_tags {
     tags = {
       Project = "${var.project}-${var.env}"
@@ -104,13 +88,10 @@ provider "aws" {
   }
 }
 
-# Configures a second AWS provider for the `us-east-1` region.
-# This is a requirement for CloudFront and WAF resources.
-# Relates to: AWS, CloudFront, WAF
+# CloudFront/WAF live in us-east-1
 provider "aws" {
   alias  = "us-east-1"
   region = "us-east-1"
-  # This block will automatically apply the 'Project' tag to all supported resources.
   default_tags {
     tags = {
       Project = "${var.project}-${var.env}"
@@ -118,113 +99,349 @@ provider "aws" {
   }
 }
 
-############################################
-# Data Sources
-############################################
-# Fetches the account ID of the current AWS user.
-# Relates to: AWS
-data "aws_caller_identity" "current" {}
+############################
+# VPC (terraform-aws-modules/vpc)
+############################
 
-# Fetches the name of the current AWS region.
-# Relates to: AWS
+module "vpc" {
+  source  = "terraform-aws-modules/vpc/aws"
+  version = "~> 5.0"
+
+  name = "${var.project}-${var.env}-vpc"
+  cidr = var.vpc_cidr
+  azs  = var.azs
+
+  public_subnets  = var.public_subnet_cidrs
+  private_subnets = var.private_subnet_cidrs
+
+  enable_dns_hostnames = true
+  enable_dns_support   = true
+
+  manage_default_network_acl = false
+  manage_default_security_group = false
+
+  enable_nat_gateway = true
+  single_nat_gateway = true
+
+  public_subnet_tags = {
+    "kubernetes.io/role/elb" = "1"
+  }
+
+  private_subnet_tags = {
+    "kubernetes.io/role/internal-elb" = "1"
+  }
+}
+
+############################
+# Data sources
+############################
+
+data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
 
-# Fetches a managed CloudFront policy that forwards all viewer request
-# headers, cookies, and query strings to the origin, except for the
-# `Host` header. This is a best practice for API integrations.
-# Relates to: CloudFront, API Gateway
-data "aws_cloudfront_origin_request_policy" "managed_all_viewer_except_host_header" {
-  name = "Managed-AllViewerExceptHostHeader"
+############################################
+# ECR for Django image
+############################################
+
+resource "aws_ecr_repository" "django" {
+  name                 = "${var.project}-${var.env}-django"
+  image_tag_mutability = "MUTABLE"
+  image_scanning_configuration { scan_on_push = true }
 }
 
 ############################################
-# S3 Site Bucket
+# Security groups
 ############################################
-# The S3 bucket that hosts the static website files. It's configured to be
-# completely private, with access only allowed via CloudFront.
-# Relates to: S3, CloudFront
-resource "aws_s3_bucket" "site" {
-  bucket        = "${var.project}-${var.env}-site"
-  force_destroy = true
+
+# CloudFront origin-facing IPv4 managed prefix list
+data "aws_ec2_managed_prefix_list" "cloudfront_origin" {
+  name = "com.amazonaws.global.cloudfront.origin-facing"
 }
 
-# Prevents public access to the S3 bucket, ensuring it can only be accessed
-# through the CloudFront distribution.
-# Relates to: S3
-resource "aws_s3_bucket_public_access_block" "site" {
-  bucket = aws_s3_bucket.site.id
+# ALB -> public 80 (switch to 443 once you add ACM/TLS on ALB)
+resource "aws_security_group" "alb" {
+  name        = "${var.project}-${var.env}-alb-sg"
+  description = "ALB ingress"
+  vpc_id      = module.vpc.vpc_id
 
-  block_public_acls       = true
-  block_public_policy     = true
-  ignore_public_acls      = true
-  restrict_public_buckets = true
-}
-
-# Enables versioning for the S3 bucket, providing a way to recover
-# from accidental deletions or overwrites.
-# Relates to: S3
-resource "aws_s3_bucket_versioning" "site" {
-  bucket = aws_s3_bucket.site.id
-
-  versioning_configuration {
-    status = "Enabled"
+  ingress {
+    description     = "Only CloudFront to ALB (HTTP)"
+    from_port       = 80
+    to_port         = 80
+    protocol        = "tcp"
+    prefix_list_ids = [data.aws_ec2_managed_prefix_list.cloudfront_origin.id]
+  }
+  egress  { 
+    from_port   = 0  
+	to_port     = 0  
+	protocol    = "-1"  
+	cidr_blocks = ["0.0.0.0/0"] 
   }
 }
 
-# Creates an Origin Access Control (OAC) to secure the connection
-# between CloudFront and the S3 bucket, ensuring only CloudFront can
-# access the files.
-# Relates to: CloudFront, S3
-resource "aws_cloudfront_origin_access_control" "oac" {
-  name                              = "${var.project}-${var.env}-oac"
-  origin_access_control_origin_type = "s3"
-  signing_behavior                  = "always"
-  signing_protocol                  = "sigv4"
+# Service SG (only ALB may call it)
+resource "aws_security_group" "svc" {
+  name        = "${var.project}-${var.env}-svc-sg"
+  description = "ECS service ingress from ALB"
+  vpc_id      = module.vpc.vpc_id
+
+  ingress {
+    from_port       = var.django_container_port
+    to_port         = var.django_container_port
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb.id]
+  }
+  egress  { 
+    from_port   = 0 
+	to_port     = 0 
+	protocol    = "-1" 
+	cidr_blocks = ["0.0.0.0/0"] 
+  }
 }
 
-# Defines the IAM policy document that grants CloudFront permission to read
-# objects from the S3 bucket via the OAC.
-# Relates to: S3, IAM, CloudFront
-data "aws_iam_policy_document" "site_policy" {
+# DB SG (only app service may connect)
+resource "aws_security_group" "db" {
+  name        = "${var.project}-${var.env}-db-sg"
+  description = "PostgreSQL ingress from app"
+  vpc_id      = module.vpc.vpc_id
+
+  ingress {
+    from_port       = 5432
+    to_port         = 5432
+    protocol        = "tcp"
+    security_groups = [aws_security_group.svc.id]
+  }
+  egress  { 
+    from_port   = 0 
+	to_port     = 0 
+	protocol    = "-1" 
+	cidr_blocks = ["0.0.0.0/0"] 
+  }
+}
+
+############################################
+# RDS PostgreSQL
+############################################
+
+resource "aws_db_subnet_group" "pg" {
+  name       = "${var.project}-${var.env}-pg-subnets"
+  subnet_ids = module.vpc.private_subnets
+}
+
+resource "random_password" "db_password" {
+  length      = 24
+  special     = false
+  min_upper   = 1
+  min_lower   = 1
+  min_numeric = 1
+}
+
+resource "aws_ssm_parameter" "db_username" {
+  name  = "/${var.project}/${var.env}/db/username"
+  type  = "String"
+  value = var.db_username
+}
+
+resource "aws_ssm_parameter" "db_password" {
+  name  = "/${var.project}/${var.env}/db/password"
+  type  = "SecureString"
+  value = random_password.db_password.result
+}
+
+resource "aws_db_instance" "pg" {
+  identifier       = "${var.project}-${var.env}-pg"
+
+  engine           = "postgres"
+  engine_version   = var.db_engine_version # 17.6
+  instance_class   = var.db_instance_class # db.t4g.micro
+
+  # storage profile
+  storage_type        = "gp2"
+  allocated_storage   = 20
+  publicly_accessible = false
+  backup_retention_period = 1
+
+  # encryption + KMS
+  storage_encrypted   = true
+  kms_key_id          = var.kms_key_id
+
+  # Performance Insights (often enforced)
+  performance_insights_enabled           = true
+  performance_insights_kms_key_id        = var.kms_key_id
+  performance_insights_retention_period  = 7
+
+  # networking
+  db_subnet_group_name   = aws_db_subnet_group.pg.name
+  vpc_security_group_ids = [aws_security_group.db.id]
+
+  # credentials
+  db_name   = var.db_name
+  username  = var.db_username
+  password  = random_password.db_password.result
+
+  # lifecycle
+  deletion_protection  = false
+  skip_final_snapshot  = true
+
+  # If your org enforces request-time tags, uncomment and adjust:
+  # tags = {
+  #   Project     = "${var.project}-${var.env}"
+  #   Environment = var.env
+  #   Owner       = "YourTeam"
+  # }
+}
+
+############################################
+# ECS Fargate (Django)
+############################################
+
+resource "aws_ecs_cluster" "app" {
+  name = "${var.project}-${var.env}-ecs"
+}
+
+resource "aws_cloudwatch_log_group" "django" {
+  name              = "/ecs/${var.project}-${var.env}-django"
+  retention_in_days = 30
+}
+
+# Task/execution roles
+data "aws_iam_policy_document" "ecs_task_assume" {
   statement {
-    actions   = ["s3:GetObject"]
-    resources = ["${aws_s3_bucket.site.arn}/*"]
-
-    principals {
-      type        = "Service"
-      identifiers = ["cloudfront.amazonaws.com"]
-    }
-
-    condition {
-      test     = "StringEquals"
-      variable = "AWS:SourceArn"
-      values   = [aws_cloudfront_distribution.cdn.arn]
-    }
+    actions = ["sts:AssumeRole"]
+    principals { 
+	  type = "Service" 
+	  identifiers = ["ecs-tasks.amazonaws.com"] 
+	}
   }
 }
 
-# Attaches the policy to the S3 bucket, granting CloudFront read access.
-# Relates to: S3, IAM
-resource "aws_s3_bucket_policy" "site" {
-  bucket = aws_s3_bucket.site.id
-  policy = data.aws_iam_policy_document.site_policy.json
+resource "aws_iam_role" "ecs_task_execution" {
+  name               = "${var.project}-${var.env}-ecs-exec"
+  assume_role_policy = data.aws_iam_policy_document.ecs_task_assume.json
+}
+
+resource "aws_iam_role_policy_attachment" "ecs_exec_policy" {
+  role       = aws_iam_role.ecs_task_execution.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+}
+
+resource "aws_iam_role" "ecs_task" {
+  name               = "${var.project}-${var.env}-ecs-task"
+  assume_role_policy = data.aws_iam_policy_document.ecs_task_assume.json
+}
+
+# Web task definition
+resource "aws_ecs_task_definition" "django" {
+  family                   = "${var.project}-${var.env}-django"
+  requires_compatibilities = ["FARGATE"]
+  network_mode             = "awsvpc"
+  cpu                      = var.ecs_web_cpu
+  memory                   = var.ecs_web_memory
+  execution_role_arn       = aws_iam_role.ecs_task_execution.arn
+  task_role_arn            = aws_iam_role.ecs_task.arn
+
+  container_definitions = jsonencode([
+    {
+      name      = "web"
+      image     = "${aws_ecr_repository.django.repository_url}:${var.django_image_tag}"
+      essential = true
+      portMappings = [{ containerPort = var.django_container_port, hostPort = var.django_container_port, protocol = "tcp" }]
+      environment = [
+        { name = "DATABASE_HOST",         value = aws_db_instance.pg.address },
+        { name = "DATABASE_PORT",         value = "5432" },
+        { name = "DATABASE_NAME",         value = var.db_name },
+        { name = "DATABASE_USER",         value = var.db_username },
+		
+      ]
+      secrets = [
+        { name = "DATABASE_PASSWORD"   , valueFrom = aws_ssm_parameter.db_password.arn },
+        { name = "COGNITO_CLIENT_ID"   , valueFrom = aws_ssm_parameter.cognito_client_id.arn },
+        { name = "COGNITO_USER_POOL_ID", valueFrom = aws_ssm_parameter.cognito_user_pool_id.arn },
+        { name = "AWS_REGION"          , valueFrom = aws_ssm_parameter.aws_region.arn }
+      ]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = "/ecs/${var.project}-${var.env}-django"
+          awslogs-region        = "eu-west-2"
+          awslogs-stream-prefix = "web"
+        }
+      }
+    }
+  ])
+}
+
+# ALB + target group + listener
+resource "aws_lb" "app" {
+  name               = "${var.project}-${var.env}-alb"
+  load_balancer_type = "application"
+  internal           = false
+  subnets            = module.vpc.public_subnets
+  security_groups    = [aws_security_group.alb.id]
+}
+
+resource "aws_lb_target_group" "app" {
+  name        = "${var.project}-${var.env}-tg"
+  port        = var.django_container_port
+  protocol    = "HTTP"
+  vpc_id      = module.vpc.vpc_id
+  target_type = "ip"
+
+  health_check {
+    path                = "/health"
+    matcher             = "200-399"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 2
+    unhealthy_threshold = 5
+  }
+}
+
+resource "aws_lb_listener" "http" {
+  load_balancer_arn = aws_lb.app.arn
+  port              = 80
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.app.arn
+  }
+}
+
+resource "aws_ecs_service" "web" {
+  name            = "${var.project}-${var.env}-web"
+  cluster         = aws_ecs_cluster.app.id
+  task_definition = aws_ecs_task_definition.django.arn
+  desired_count   = 2
+  launch_type     = "FARGATE"
+
+  network_configuration {
+    assign_public_ip = false
+    subnets          = module.vpc.private_subnets
+    security_groups  = [aws_security_group.svc.id]
+  }
+
+  load_balancer {
+    target_group_arn = aws_lb_target_group.app.arn
+    container_name   = "web"
+    container_port   = var.django_container_port
+  }
+
+  depends_on = [aws_lb_listener.http]
 }
 
 ############################################
-# WAF (Web Application Firewall)
+# CloudFront (retargeted to ALB) + WAF
 ############################################
-# Creates a Web Application Firewall (WAF) to protect the website. This WAF
-# includes a common rule set to protect against attacks like
-# cross-site scripting (XSS) and SQL injection.
-# Relates to: WAF, CloudFront
+
 resource "aws_wafv2_web_acl" "site_waf" {
   provider    = aws.us-east-1
   name        = "${var.project}-${var.env}-waf"
   description = "WAF for the website"
   scope       = "CLOUDFRONT"
 
-  default_action {
-    allow {}
+  default_action { 
+    allow {} 
   }
 
   visibility_config {
@@ -234,135 +451,79 @@ resource "aws_wafv2_web_acl" "site_waf" {
   }
 
   rule {
-    name     = "AWS-Managed-CoreRuleSet"
+    name     = "AWS-AWSManagedRulesCommonRuleSet"
     priority = 1
-
-    override_action {
-      none {}
-    }
-
     statement {
       managed_rule_group_statement {
         vendor_name = "AWS"
         name        = "AWSManagedRulesCommonRuleSet"
       }
     }
-
+    override_action { 
+	  none {} 
+	}
+	
     visibility_config {
       cloudwatch_metrics_enabled = true
-      metric_name                = "AWSManagedRulesCommonRuleSet"
-      sampled_requests_enabled   = true
-    }
-  }
-
-  rule {
-    name     = "AWS-Managed-SQLi"
-    priority = 2
-
-    override_action {
-      none {}
-    }
-
-    statement {
-      managed_rule_group_statement {
-        vendor_name = "AWS"
-        name        = "AWSManagedRulesSQLiRuleSet"
-      }
-    }
-
-    visibility_config {
-      cloudwatch_metrics_enabled = true
-      metric_name                = "AWSManagedRulesSQLiRuleSet"
+      metric_name                = "${var.project}-${var.env}-waf-common"
       sampled_requests_enabled   = true
     }
   }
 }
 
-############################################
-# CloudFront Distribution
-############################################
-# Generates a random string that is used as a shared secret between
-# CloudFront and the API Gateway origin. This prevents direct access to the
-# API Gateway from anywhere but the CloudFront distribution.
-# Relates to: CloudFront, API Gateway, Lambda
-resource "random_string" "origin_secret" {
-  length  = 32
-  upper   = false
-  numeric = true
-  special = false
-}
-
-resource "aws_ssm_parameter" "origin_secret" {
-  name  = "/${var.project}/${var.env}/origin-secret"
-  type  = "SecureString"
-  value = random_string.origin_secret.result
-}
-
-# Deploys the static web assets and API. This is the public-facing
-# entry point, providing caching, security (via the WAF), and SSL/TLS.
-# Relates to: CloudFront, S3, API Gateway, WAF
 resource "aws_cloudfront_distribution" "cdn" {
+  provider            = aws.us-east-1
   enabled             = true
   price_class         = "PriceClass_100"
-  default_root_object = "index.html"
   wait_for_deployment = true
   web_acl_id          = aws_wafv2_web_acl.site_waf.arn
 
-  # S3 origin (site)
   origin {
-    domain_name              = aws_s3_bucket.site.bucket_regional_domain_name
-    origin_id                = "s3-site"
-    origin_access_control_id = aws_cloudfront_origin_access_control.oac.id
-  }
-
-  # API origin (API Gateway)
-  origin {
-    domain_name = replace(replace(aws_apigatewayv2_api.http_api.api_endpoint, "https://", ""), "http://", "")
-    origin_id   = "api-origin"
-
-    # Custom header used by WAF to allow only CloudFront
-    custom_header {
-      name  = "X-Origin-Secret"
-      value = random_string.origin_secret.result
-    }
+    domain_name = aws_lb.app.dns_name
+    origin_id   = "alb-origin"
 
     custom_origin_config {
       http_port              = 80
       https_port             = 443
-      origin_protocol_policy = "https-only"
+      origin_protocol_policy = "http-only" # switch to https-only if ALB has TLS
       origin_ssl_protocols   = ["TLSv1.2"]
     }
   }
 
-  # Default behavior: static site
-  default_cache_behavior {
-    target_origin_id       = "s3-site"
-    viewer_protocol_policy = "redirect-to-https"
-    allowed_methods        = ["GET", "HEAD"]
+  ordered_cache_behavior {
+    path_pattern     = "/secure/api/*"
+    target_origin_id = "alb-origin"
+
+    allowed_methods        = ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"]
     cached_methods         = ["GET", "HEAD"]
-    cache_policy_id        = "658327ea-f89d-4fab-a63d-7e88639e58f6" # AWS: CachingOptimized
-    compress               = true
+    viewer_protocol_policy = "redirect-to-https"
+
+    # Do NOT cache authenticated API responses
+    min_ttl     = 0
+    default_ttl = 0
+    max_ttl     = 0
+
+    forwarded_values {
+      query_string = true
+      headers      = ["Authorization", "Host", "Origin"]
+      cookies { forward = "all" }
+    }
   }
 
-  # Public API (no caching, don't forward Host)
-  ordered_cache_behavior {
-    path_pattern             = "/public/api/*"
-    target_origin_id         = "api-origin"
-    viewer_protocol_policy   = "https-only"
-    allowed_methods          = ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"]
-    cached_methods           = ["GET", "HEAD", "OPTIONS"]
-    cache_policy_id          = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad"
-    origin_request_policy_id = data.aws_cloudfront_origin_request_policy.managed_all_viewer_except_host_header.id
-  }
+  default_cache_behavior {
+    allowed_methods  = ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"]
+    cached_methods   = ["GET", "HEAD"]
+    target_origin_id = "alb-origin"
 
-  ordered_cache_behavior {
-    path_pattern             = "/secure/api/*"
-    target_origin_id         = "api-origin"
-    viewer_protocol_policy   = "https-only"
-    allowed_methods          = ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"]
-    cached_methods           = ["GET", "HEAD", "OPTIONS"]
-    cache_policy_id          = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad"
-    origin_request_policy_id = data.aws_cloudfront_origin_request_policy.managed_all_viewer_except_host_header.id
+    viewer_protocol_policy = "redirect-to-https"
+
+    forwarded_values {
+      query_string = true
+      headers      = ["Authorization", "Host", "Origin"]
+      cookies { 
+	    forward = "all" 
+	  }
+    }
   }
 
   restrictions {
@@ -378,150 +539,13 @@ resource "aws_cloudfront_distribution" "cdn" {
 }
 
 ############################################
-# DynamoDB Table
+# Cognito
 ############################################
-# Creates the DynamoDB table for the API to store data. It's configured
-# for on-demand billing and includes point-in-time recovery for backup.
-# Relates to: DynamoDB, Lambda
-resource "aws_dynamodb_table" "items" {
-  name         = "${var.project}-${var.env}-items"
-  billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "pk"
-  range_key    = "sk"
 
-  attribute {
-    name = "pk"
-    type = "S"
-  }
-
-  attribute {
-    name = "sk"
-    type = "S"
-  }
-
-  point_in_time_recovery {
-    enabled = true
-  }
-
-  server_side_encryption {
-    enabled = true
-  }
-}
-
-############################################
-# Lambda Function and IAM Role
-############################################
-# Defines the trust policy that allows the Lambda service to assume the role.
-# This is a prerequisite for a Lambda function to be able to use the role's
-# permissions.
-# Relates to: IAM, Lambda
-data "aws_iam_policy_document" "lambda_assume" {
-  statement {
-    actions = ["sts:AssumeRole"]
-
-    principals {
-      type        = "Service"
-      identifiers = ["lambda.amazonaws.com"]
-    }
-  }
-}
-
-# Creates the IAM role for the Lambda function, which defines the permissions
-# that the function will have.
-# Relates to: IAM, Lambda
-resource "aws_iam_role" "lambda" {
-  name               = "${var.project}-${var.env}-lambda-role"
-  assume_role_policy = data.aws_iam_policy_document.lambda_assume.json
-}
-
-# Defines the IAM policy document that grants the Lambda function read/write
-# access to the DynamoDB table.
-# Relates to: IAM, DynamoDB, Lambda
-data "aws_iam_policy_document" "lambda_ddb" {
-  statement {
-    actions = [
-      "dynamodb:GetItem",
-      "dynamodb:PutItem",
-      "dynamodb:UpdateItem",
-      "dynamodb:Query",
-      "dynamodb:DeleteItem"
-    ]
-    resources = [
-      aws_dynamodb_table.items.arn,
-      "${aws_dynamodb_table.items.arn}/index/*"
-    ]
-  }
-}
-
-# Creates the DynamoDB access policy from the policy document.
-# Relates to: IAM, DynamoDB
-resource "aws_iam_policy" "ddb" {
-  name   = "${var.project}-${var.env}-ddb-policy"
-  policy = data.aws_iam_policy_document.lambda_ddb.json
-}
-
-# Attaches the DynamoDB policy to the Lambda IAM role.
-# Relates to: IAM, DynamoDB
-resource "aws_iam_role_policy_attachment" "ddb_attach" {
-  role       = aws_iam_role.lambda.name
-  policy_arn = aws_iam_policy.ddb.arn
-}
-
-# Attaches the AWS-managed basic execution role policy to the Lambda IAM role,
-# which allows the function to write logs to CloudWatch.
-# Relates to: IAM, Lambda, CloudWatch Logs
-resource "aws_iam_role_policy_attachment" "logs_attach" {
-  role       = aws_iam_role.lambda.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-}
-
-locals {
-  api_zip = abspath(
-    var.api_zip_path != "" ? var.api_zip_path : "${path.module}/../../api.zip"
-  )
-
-  # Safe for destroy: if the file isn't present, return null
-  api_zip_hash = fileexists(local.api_zip) ? filebase64sha256(local.api_zip) : null
-}
-
-# Creates a CloudWatch log group for the REST API logs.
-resource "aws_cloudwatch_log_group" "api" {
-  name              = "/aws/lambda/${var.project}-${var.env}-api"
-  retention_in_days = 14
-}
-
-# Lambda function for REST API
-resource "aws_lambda_function" "api" {
-  function_name = "${var.project}-${var.env}-api"
-  role          = aws_iam_role.lambda.arn
-  handler       = "handler.handler"
-  runtime       = "nodejs20.x"
-
-  filename         = local.api_zip
-  source_code_hash = local.api_zip_hash
-
-  environment {
-    variables = {
-      TABLE_NAME    = aws_dynamodb_table.items.name
-      ORIGIN_SECRET = random_string.origin_secret.result
-    }
-  }
-
-  timeout = 10
-}
-
-############################################
-# Cognito User Pool
-############################################
-# Creates a Cognito User Pool for user authentication and management.
-# Relates to: Cognito, API Gateway
 resource "aws_cognito_user_pool" "up" {
   name = "${var.project}-${var.env}-users"
 }
 
-# Creates a client for the user pool, allowing single-page applications (SPA)
-# to authenticate with the user pool.
-# Relates to: Cognito
 resource "aws_cognito_user_pool_client" "spa" {
   name                                 = "${var.project}-${var.env}-spa"
   user_pool_id                         = aws_cognito_user_pool.up.id
@@ -529,17 +553,29 @@ resource "aws_cognito_user_pool_client" "spa" {
   allowed_oauth_flows                  = ["code"]
   allowed_oauth_scopes                 = ["openid", "email", "profile"]
   allowed_oauth_flows_user_pool_client = true
-  callback_urls                        = ["https://example.com/callback"] # TODO: Change this
-  logout_urls                          = ["https://example.com"]          # TODO: Change this
+  callback_urls                        = ["https://${aws_cloudfront_distribution.cdn.domain_name}/"]
+  logout_urls                          = ["https://${aws_cloudfront_distribution.cdn.domain_name}/"]
   supported_identity_providers         = ["COGNITO"]
 }
 
-# Creates a domain for the Cognito user pool, which is needed for the
-# hosted UI and JWT issuer URL.
-# Relates to: Cognito
-resource "aws_cognito_user_pool_domain" "domain" {
-  domain       = "${var.project}-${var.env}-auth"
+
+# ALB/OIDC client (confidential client, has a secret)
+resource "aws_cognito_user_pool_client" "alb" {
+  name         = "${var.project}-${var.env}-alb-client"
   user_pool_id = aws_cognito_user_pool.up.id
+
+  generate_secret = true
+
+  # OIDC config used by ALB
+  allowed_oauth_flows_user_pool_client = true
+  allowed_oauth_flows                  = ["code"]
+  allowed_oauth_scopes                 = ["openid", "email", "profile"]
+  supported_identity_providers         = ["COGNITO"]
+
+  callback_urls = ["https://${aws_cloudfront_distribution.cdn.domain_name}/oauth2/idpresponse"]
+  logout_urls = ["https://${aws_cloudfront_distribution.cdn.domain_name}"]
+
+  prevent_user_existence_errors = "ENABLED"
 }
 
 # App client used ONLY by CI to get tokens with USER_PASSWORD_AUTH
@@ -568,148 +604,16 @@ resource "aws_cognito_user_pool_client" "ci" {
   }
 }
 
-############################################
-# API Gateway
-############################################
-# Creates the API Gateway HTTP API, which acts as a front door for the
-# Lambda function. It handles routing requests and manages security.
-# Relates to: API Gateway, Lambda, Cognito
-resource "aws_apigatewayv2_api" "http_api" {
-  name          = "${var.project}-${var.env}-http"
-  protocol_type = "HTTP"
-
-  cors_configuration {
-    allow_origins = ["*"]
-    allow_methods = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
-    allow_headers = ["*"]
-  }
-}
-
-# Creates a new API Gateway integration that links the API with the Lambda function.
-# Relates to: API Gateway, Lambda
-resource "aws_apigatewayv2_integration" "lambda_proxy" {
-  api_id                 = aws_apigatewayv2_api.http_api.id
-  integration_type       = "AWS_PROXY"
-  integration_uri        = aws_lambda_function.api.arn
-  payload_format_version = "2.0"
-}
-
-# Grants API Gateway permission to invoke the Lambda function.
-# Relates to: API Gateway, Lambda
-resource "aws_lambda_permission" "apigw_invoke" {
-  statement_id  = "AllowInvokeFromAPIGW"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.api.function_name
-  principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_apigatewayv2_api.http_api.execution_arn}/*/*"
-}
-
-# Creates a JWT authorizer for the API Gateway, which uses Cognito
-# to authenticate and authorize requests to secure paths.
-# Relates to: API Gateway, Cognito
-resource "aws_apigatewayv2_authorizer" "jwt" {
-  api_id           = aws_apigatewayv2_api.http_api.id
-  name             = "cognito-jwt"
-  authorizer_type  = "JWT"
-  identity_sources = ["$request.header.Authorization"]
-
-  jwt_configuration {
-    issuer   = "https://cognito-idp.${data.aws_region.current.name}.amazonaws.com/${aws_cognito_user_pool.up.id}"
-    audience = [
-      aws_cognito_user_pool_client.spa.id,  # browser client
-      aws_cognito_user_pool_client.ci.id    # CI client (USER_PASSWORD_AUTH)
-    ]
-  }
-}
-
-# Defines the API route for public (unauthenticated) requests.
-# Relates to: API Gateway
-resource "aws_apigatewayv2_route" "public_ping" {
-  api_id             = aws_apigatewayv2_api.http_api.id
-  route_key          = "GET /public/api/ping"
-  target             = "integrations/${aws_apigatewayv2_integration.lambda_proxy.id}"
-  authorization_type = "NONE"
-  authorizer_id      = null
-}
-
-# Defines a catch-all API route for public (unauthenticated) requests.
-# Relates to: API Gateway
-resource "aws_apigatewayv2_route" "public_proxy" {
-  api_id             = aws_apigatewayv2_api.http_api.id
-  route_key          = "ANY /public/api/{proxy+}"
-  target             = "integrations/${aws_apigatewayv2_integration.lambda_proxy.id}"
-  authorization_type = "NONE"
-  authorizer_id      = null
-}
-
-# Defines a catch-all API route for secure (authenticated) requests.
-# It is linked to the JWT authorizer for security.
-# Relates to: API Gateway, Cognito
-resource "aws_apigatewayv2_route" "secured_proxy" {
-  api_id             = aws_apigatewayv2_api.http_api.id
-  route_key          = "ANY /secure/api/{proxy+}"
-  target             = "integrations/${aws_apigatewayv2_integration.lambda_proxy.id}"
-  authorization_type = "JWT"
-  authorizer_id      = aws_apigatewayv2_authorizer.jwt.id
-}
-
-# Creates a CloudWatch log group for the API Gateway access logs.
-# Relates to: API Gateway, CloudWatch
-resource "aws_cloudwatch_log_group" "apigateway" {
-  name              = "/aws/apigateway/${var.project}-${var.env}-apigateway"
-  retention_in_days = 14
-}
-
-# Creates the default API Gateway stage, which automatically deploys the API.
-# It also configures detailed access logging for monitoring.
-# Relates to: API Gateway, CloudWatch
-resource "aws_apigatewayv2_stage" "default" {
-  api_id      = aws_apigatewayv2_api.http_api.id
-  name        = "$default"
-  auto_deploy = true
-
-  access_log_settings {
-    destination_arn = aws_cloudwatch_log_group.apigateway.arn
-    format = jsonencode({
-      requestId               = "$context.requestId"
-      ip                      = "$context.identity.sourceIp"
-      requestTime             = "$context.requestTime"
-      httpMethod              = "$context.httpMethod"
-      path                    = "$context.path"
-      status                  = "$context.status"
-      protocol                = "$context.protocol"
-      responseLength          = "$context.responseLength"
-      authorizerStatus        = "$context.authorizer.status"
-      authorizerError         = "$context.authorizer.error"
-      integrationStatus       = "$context.integration.status"
-      integrationErrorMessage = "$context.integration.error"
-    })
-  }
-
-  default_route_settings {
-    detailed_metrics_enabled = true
-    throttling_burst_limit   = 5000
-    throttling_rate_limit    = 10000
-    logging_level            = "INFO"
-    data_trace_enabled       = true
-  }
+resource "aws_cognito_user_pool_domain" "domain" {
+  domain       = "${var.project}-${var.env}-auth"
+  user_pool_id = aws_cognito_user_pool.up.id
 }
 
 ############################################
-# IAM Role for GitHub Actions OIDC
+# GitHub OIDC 
 ############################################
-# Configures the IAM OpenID Connect (OIDC) provider for GitHub Actions.
-# This is the identity provider that GitHub will use to authenticate with AWS.
-# Relates to: IAM, GitHub Actions
 
-# resource "aws_iam_openid_connect_provider" "github" {...} is created in a bootsrap script as it is only created once per AWS Account
-# It is referenced here
-
-# Defines the IAM trust policy that allows GitHub's OIDC provider to assume the role.
-# This policy securely delegates permissions to GitHub Actions without
-# using long-lived credentials.
-# Relates to: IAM, GitHub Actions
-data "aws_iam_policy_document" "oidc_trust" {
+data "aws_iam_policy_document" "gh_oidc_assume" {
   statement {
     effect = "Allow"
     actions = ["sts:AssumeRoleWithWebIdentity"]
@@ -734,183 +638,443 @@ data "aws_iam_policy_document" "oidc_trust" {
   }
 }
 
-# The IAM role with the assume role policy (the trust policy) for GitHub Actions.
-# Relates to: IAM, GitHub Actions
 resource "aws_iam_role" "gh_oidc" {
-  name               = "${var.project}-${var.env}-github-oidc"
-  assume_role_policy = data.aws_iam_policy_document.oidc_trust.json
+  name               = "${var.project}-${var.env}-gh-oidc"
+  assume_role_policy = data.aws_iam_policy_document.gh_oidc_assume.json
 }
 
-# The IAM policy that grants the required permissions to the role for deployment.
-# Relates to: IAM, GitHub Actions
 resource "aws_iam_policy" "deploy_policy" {
-  name = "${var.project}-${var.env}-github-oidc-policy"
+  name   = "${var.project}-${var.env}-deploy"
   policy = jsonencode({
-    Version = "2012-10-17"
+    Version = "2012-10-17",
     Statement = [
       {
-        Effect = "Allow"
+        Effect = "Allow",
         Action = [
-          "s3:*",
+          # CloudFront / Route53 / S3 / Cognito / DynamoDB / CloudWatch Logs
           "cloudfront:*",
           "route53:*",
-          "lambda:*",
-          "dynamodb:*",
+          "s3:*",
           "cognito-idp:*",
           "cognito-identity:*",
-          "wafv2:*",
+          "dynamodb:*",
           "logs:*",
-          "logs:ListTagsForResource",
-          "logs:DescribeLogGroups",
-		  "apigateway:TagResource",
-          "apigateway:GET",
-          "apigateway:PATCH",
-		  "apigateway:DELETE",
-		  "apigateway:POST",
-          "iam:GetPolicyVersion",
-          "iam:GetOpenIDConnectProvider",
-          "iam:PassRole",
-          "iam:CreatePolicy",
-          "iam:AttachRolePolicy",
-          "iam:ListRolePolicies",
-          "iam:ListAttachedRolePolicies",
-          "iam:GetPolicy",
-          "iam:PutRolePolicy",
-          "iam:CreatePolicy",
-          "iam:UpdateAssumeRolePolicy",
-          "iam:DeleteRolePolicy",
-          "iam:DeleteRole",
-          "iam:DetachRolePolicy",
-          "iam:GetRole",
-          "iam:TagPolicy",
-		  "iam:DeletePolicyVersion",
-		  "iam:CreateRole",
-		  "iam:CreateOpenIDConnectProvider",
-		  "iam:ListPolicyVersions",
-		  "iam:TagRole",
-		  "iam:TagOpenIDConnectProvider",
-		  "iam:CreatePolicyVersion",
-		  "iam:ListOpenIDConnectProviders",
-		  "iam:ListInstanceProfilesForRole",
-		  "iam:GetRolePolicy",
-		  "iam:DeletePolicy",
+
+          # ECR
+          "ecr:GetAuthorizationToken",
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:CompleteLayerUpload",
+          "ecr:InitiateLayerUpload",
+          "ecr:UploadLayerPart",
+          "ecr:PutImage",
+          "ecr:BatchGetImage",
+          "ecr:DescribeRepositories",
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:ListImages",
+          "ecr:CreateRepository",
+          "ecr:SetRepositoryPolicy",
+          "ecr:PutLifecyclePolicy",
+          "ecr:TagResource",
+          "ecr:ListTagsForResource",
+          "ecr:DeleteRepository", 
+
+          # ECS
+          "ecs:DescribeClusters",
+          "ecs:DescribeServices",
+          "ecs:DescribeTaskDefinition",
+          "ecs:RegisterTaskDefinition",
+          "ecs:UpdateService",
+          "ecs:DescribeTasks",
+          "ecs:DescribeTaskSets",
+          "ecs:CreateCluster",
+          "ecs:DeleteCluster",
+          "ecs:TagResource",
+		  "ecs:CreateService",
+		  "ecs:RunTask",
+		  "ecs:ListTasks",
+		  "ecs:DeregisterTaskDefinition",
+
+          # EC2 / VPC
+          "ec2:CreateVpc",
+          "ec2:ModifyVpcAttribute",
+          "ec2:DescribeVpcs",
+          "ec2:DescribeSubnets",
+          "ec2:DescribeSecurityGroups",
+          "ec2:DescribeRouteTables",
+          "ec2:DescribeInternetGateways",
+          "ec2:DescribeNatGateways",
+          "ec2:DescribeAvailabilityZones",
+          "ec2:DescribeVpcEndpoints",
+          "ec2:DescribeNetworkInterfaces",
+          "ec2:DescribeAccountAttributes",
+          "ec2:DescribeTags",
+          "ec2:DescribeManagedPrefixLists",
+          "ec2:GetManagedPrefixListEntries",
+          "ec2:DescribeLaunchTemplates",
+          "ec2:DescribeLaunchTemplateVersions",
+          "ec2:CreateTags",
+          "ec2:DeleteTags",
+		  "ec2:DescribeVpcAttribute",
+	      "ec2:DeleteVpc",
+          "ec2:CreateSecurityGroup",
+          "ec2:CreateSubnet",
+          "ec2:CreateRouteTable",
+          "ec2:CreateInternetGateway",
+          "ec2:DescribeSecurityGroupRules",
+          "ec2:RevokeSecurityGroupEgress",
+          "ec2:AssociateRouteTable",
+          "ec2:AttachInternetGateway",
+          "ec2:DeleteSecurityGroup",
+          "ec2:DeleteInternetGateway",
+          "ec2:AllocateAddress",
+          "ec2:CreateRoute",
+          "ec2:AuthorizeSecurityGroupIngress",
+          "ec2:DescribeAddresses",
+          "ec2:AuthorizeSecurityGroupEgress",
+		  "ec2:DescribeAddressesAttribute",
+		  "ec2:ReleaseAddress",
+		  "ec2:CreateNatGateway",
+
+          # Scheduler
+          "scheduler:CreateSchedule",
 		  "scheduler:GetSchedule",
-		  "scheduler:CreateSchedule",
 		  "scheduler:DeleteSchedule",
-		  "ssm:AddTagsToResource",
-		  "ssm:GetParameters",
-		  "ssm:DeleteParameter",
-		  "ssm:GetParameter",
-		  "ssm:DescribeParameters",
-		  "ssm:ListTagsForResource",
-		  "ssm:PutParameter"
-        ]
+
+          # RDS
+          "rds:DeleteDBInstance",
+          "rds:DescribeDBInstances",
+          "rds:ListTagsForResource",
+		  "rds:CreateDBSubnetGroup",
+          "rds:ModifyDBSubnetGroup",
+		  "rds:DeleteDBSubnetGroup",
+		  "rds:DescribeDBSubnetGroups",
+          "rds:AddTagsToResource",
+		  "rds:CreateDBInstance",
+		  
+          # Elastic Load Balancing (ECS services with ALB/NLB)
+          "elasticloadbalancing:CreateListener",
+		  "elasticloadbalancing:DeleteListener",
+		  "elasticloadbalancing:DescribeListenerAttributes",
+          "elasticloadbalancing:DeleteLoadBalancer",
+          "elasticloadbalancing:ModifyLoadBalancerAttributes",
+          "elasticloadbalancing:DeleteTargetGroup",
+		  "elasticloadbalancing:CreateLoadBalancer",
+          "elasticloadbalancing:DescribeLoadBalancers",
+          "elasticloadbalancing:DescribeLoadBalancerAttributes",
+          "elasticloadbalancing:DescribeTargetGroups",
+          "elasticloadbalancing:DescribeTargetGroupAttributes",
+          "elasticloadbalancing:DescribeTargetHealth",
+          "elasticloadbalancing:DescribeListeners",
+          "elasticloadbalancing:DescribeRules",
+          "elasticloadbalancing:CreateTargetGroup",
+		  "elasticloadbalancing:AddTags",
+          "elasticloadbalancing:ModifyTargetGroupAttributes",
+		  "elasticloadbalancing:DescribeTags",
+
+          # Application Auto Scaling / ASG
+          "application-autoscaling:DescribeScalableTargets",
+          "application-autoscaling:DescribeScalingPolicies",
+          "application-autoscaling:DescribeScheduledActions",
+          "autoscaling:DescribeAutoScalingGroups",
+          "autoscaling:DescribeScalingActivities",
+          "autoscaling:DescribeLaunchConfigurations",
+          "autoscaling:DescribeAutoScalingInstances",
+
+          # Cloud Map / Service Discovery
+          "servicediscovery:ListNamespaces",
+          "servicediscovery:ListServices",
+          "servicediscovery:GetNamespace",
+          "servicediscovery:GetService",
+
+          # Secrets Manager
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:DescribeSecret",
+          "secretsmanager:ListSecrets",
+
+          # KMS
+          "kms:Decrypt",
+          "kms:DescribeKey",
+
+          # WAFv2
+          "wafv2:CreateWebACL",
+          "wafv2:UpdateWebACL",
+          "wafv2:DeleteWebACL",
+          "wafv2:GetWebACL",
+          "wafv2:ListWebACLs",
+          "wafv2:AssociateWebACL",
+          "wafv2:DisassociateWebACL",
+          "wafv2:TagResource",
+          "wafv2:ListTagsForResource",
+
+          # IAM
+          "iam:CreateServiceLinkedRole",
+          "iam:AttachRolePolicy",
+          "iam:CreateOpenIDConnectProvider",
+          "iam:CreatePolicy",
+          "iam:CreatePolicyVersion",
+          "iam:CreateRole",
+          "iam:DeletePolicy",
+          "iam:DeletePolicyVersion",
+          "iam:DeleteRole",
+          "iam:DeleteRolePolicy",
+          "iam:DetachRolePolicy",
+          "iam:GetOpenIDConnectProvider",
+          "iam:GetPolicy",
+          "iam:GetPolicyVersion",
+          "iam:GetRole",
+          "iam:GetRolePolicy",
+          "iam:ListAttachedRolePolicies",
+          "iam:ListInstanceProfilesForRole",
+          "iam:ListOpenIDConnectProviders",
+          "iam:ListPolicyVersions",
+          "iam:ListRolePolicies",
+          "iam:PassRole",
+          "iam:PutRolePolicy",
+          "iam:TagOpenIDConnectProvider",
+          "iam:TagPolicy",
+          "iam:TagRole",
+          "iam:UpdateAssumeRolePolicy",
+
+          # SSM Parameter Store
+          "ssm:AddTagsToResource",
+          "ssm:DeleteParameter",
+          "ssm:DescribeParameters",
+          "ssm:GetParameter",
+          "ssm:GetParameters",
+          "ssm:ListTagsForResource",
+          "ssm:PutParameter",
+        ],
         Resource = "*"
-      },
+      }
     ]
   })
 }
 
-# Attaches the deployment policy to the GitHub Actions IAM role.
-# Relates to: IAM, GitHub Actions
 resource "aws_iam_role_policy_attachment" "attach_deploy_policy" {
   role       = aws_iam_role.gh_oidc.name
   policy_arn = aws_iam_policy.deploy_policy.arn
 }
 
-###############################################################################
-# Daily scheduled Lambda (timezone-aware via EventBridge Scheduler)
-# - Runs every day at HH:MM
-###############################################################################
-# Creates a lambda function and an EventBridge Scheduler to trigger it on a schedule
-# Relates to: EventBridge Scheduler, Lambda
+############################################
+# Daily job: EventBridge Scheduler -> ECS RunTask
+############################################
 
-locals {
-  daily_zip = abspath(
-    var.daily_zip_path != "" ? var.daily_zip_path : "${path.module}/../../daily.zip"
-  )
+# Separate task definition for the scheduled job (reuse the same image)
+resource "aws_ecs_task_definition" "cron" {
+  family                   = "${var.project}-${var.env}-cron"
+  requires_compatibilities = ["FARGATE"]
+  network_mode             = "awsvpc"
+  cpu                      = var.ecs_cron_cpu
+  memory                   = var.ecs_cron_memory
+  execution_role_arn       = aws_iam_role.ecs_task_execution.arn
+  task_role_arn            = aws_iam_role.ecs_task.arn
 
-  # Safe for destroy: if the file isn't present, return null
-  daily_zip_hash = fileexists(local.daily_zip) ? filebase64sha256(local.daily_zip) : null
+  container_definitions = jsonencode([
+    {
+      name      = "job",
+      image     = "${aws_ecr_repository.django.repository_url}:${var.django_image_tag}",
+      essential = true,
+      environment = [
+        { name = "DATABASE_HOST", value = aws_db_instance.pg.address },
+        { name = "DATABASE_PORT", value = "5432" },
+        { name = "DATABASE_NAME", value = var.db_name },
+        { name = "DATABASE_USER", value = var.db_username }
+      ],
+      secrets = [
+        { name = "DATABASE_PASSWORD", valueFrom = aws_ssm_parameter.db_password.arn }
+      ],
+      logConfiguration = {
+        logDriver = "awslogs",
+        options = {
+          awslogs-group         = aws_cloudwatch_log_group.django.name,
+          awslogs-region        = var.region,
+          awslogs-stream-prefix = "cron"
+        }
+      },
+      # EXAMPLE: call a Django management command
+      command = ["python", "manage.py", "daily_job"]
+    }
+  ])
 }
 
-# Lambda function for daily job
-resource "aws_lambda_function" "daily" {
-  function_name = "${var.project}-${var.env}-daily-job"
-  role          = aws_iam_role.lambda.arn
-
-  runtime = "nodejs20.x"
-  handler = "daily.handler"
-
-  filename         = local.daily_zip  
-  source_code_hash = local.daily_zip_hash
-
-  environment {
-    variables = {
-      PROJECT = var.project
-      ENV     = var.env
-    }
+# Role that allows EventBridge Scheduler to run the ECS task and pass roles
+data "aws_iam_policy_document" "scheduler_assume" {
+  statement {
+    actions = ["sts:AssumeRole"]
+    principals { 
+	  type = "Service"
+	  identifiers = ["scheduler.amazonaws.com"] 
+	}
   }
 }
 
-# Explicit log group for daily job
-resource "aws_cloudwatch_log_group" "daily" {
-  name              = "/aws/lambda/${aws_lambda_function.daily.function_name}"
-  retention_in_days = 14
+resource "aws_iam_role" "scheduler_run_ecs" {
+  name               = "${var.project}-${var.env}-scheduler-ecs"
+  assume_role_policy = data.aws_iam_policy_document.scheduler_assume.json
 }
 
-# Scheduler role that can invoke the daily Lambda
-resource "aws_iam_role" "scheduler_invoke_daily" {
-  name = "${var.project}-${var.env}-scheduler-invoke-daily"
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [{
-      Effect    = "Allow",
-      Principal = { Service = "scheduler.amazonaws.com" },
-      Action    = "sts:AssumeRole"
-    }]
-  })
+data "aws_iam_policy_document" "scheduler_run_ecs_doc" {
+  statement {
+    sid     = "RunTask"
+    effect  = "Allow"
+    actions = ["ecs:RunTask"]
+    resources = [aws_ecs_task_definition.cron.arn]
+    condition {
+      test     = "StringEquals"
+      variable = "ecs:cluster"
+      values   = [aws_ecs_cluster.app.arn]
+    }
+  }
+
+  statement {
+    sid     = "PassRoles"
+    effect  = "Allow"
+    actions = ["iam:PassRole"]
+    resources = [
+      aws_iam_role.ecs_task_execution.arn,
+      aws_iam_role.ecs_task.arn
+    ]
+  }
 }
 
-# Scheduler role policy using the scheduler role that can invoke the daily Lambda
-resource "aws_iam_role_policy" "scheduler_invoke_daily" {
-  name = "${var.project}-${var.env}-scheduler-invoke-daily-policy"
-  role = aws_iam_role.scheduler_invoke_daily.id
-  policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [{
-      Effect   = "Allow",
-      Action   = "lambda:InvokeFunction",
-      Resource = aws_lambda_function.daily.arn
-    }]
-  })
+resource "aws_iam_role_policy" "scheduler_run_ecs_policy" {
+  name   = "${var.project}-${var.env}-scheduler-ecs"
+  role   = aws_iam_role.scheduler_run_ecs.id
+  policy = data.aws_iam_policy_document.scheduler_run_ecs_doc.json
 }
 
-# Daily schedule timezone
-variable "daily_schedule_timezone" {
-  description = "IANA timezone for the daily schedule (DST handled)"
-  type        = string
-  default     = "Europe/London"
-}
-
-# EventBridge Scheduler to run the daily job run at a fixed local time every day
+# EventBridge Scheduler that triggers the ECS task once per day
 resource "aws_scheduler_schedule" "daily" {
-  name                         = "${var.project}-${var.env}-daily-schedule"
-  description                  = "Run daily job once per day at a fixed local time"
+  name                         = "${var.project}-${var.env}-daily-ecs"
+  description                  = "Run daily Django job as ECS task"
   schedule_expression          = "cron(${var.schedule_minute} ${var.schedule_hour} * * ? *)"
   schedule_expression_timezone = var.daily_schedule_timezone
 
   flexible_time_window { mode = "OFF" }
 
   target {
-    arn      = aws_lambda_function.daily.arn
-    role_arn = aws_iam_role.scheduler_invoke_daily.arn
-    input    = jsonencode({ run = "daily", project = var.project, env = var.env })
+    arn      = aws_ecs_cluster.app.arn
+    role_arn = aws_iam_role.scheduler_run_ecs.arn
 
-    # Reasonable retry defaults; tune as needed
-    retry_policy {
-      maximum_event_age_in_seconds = 3600
-      maximum_retry_attempts       = 3
+    ecs_parameters {
+      task_definition_arn = aws_ecs_task_definition.cron.arn
+      launch_type         = "FARGATE"
+      platform_version    = "LATEST"
+      network_configuration {
+        assign_public_ip = false
+        subnets          = module.vpc.private_subnets
+        security_groups  = [aws_security_group.svc.id]
+      }
+      task_count = 1
     }
   }
+}
+
+resource "aws_iam_role_policy" "ecs_exec_ssm_params" {
+  name = "ecs-exec-ssm-params"
+  role = aws_iam_role.ecs_task_execution.name   # attach to your existing role
+
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Sid      = "AllowReadSSMParameters"
+        Effect   = "Allow"
+        Action   = [
+          "ssm:GetParameter",
+          "ssm:GetParameters"
+        ]
+        Resource = "arn:aws:ssm:eu-west-2:${data.aws_caller_identity.current.account_id}:parameter/${var.project}/${var.env}/*"
+      },
+      {
+        Sid      = "AllowKMSDecryptForSecureStrings"
+        Effect   = "Allow"
+        Action   = ["kms:Decrypt"]
+        Resource = "*"  # or restrict to your KMS key if you prefer
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "ecs_exec_base" {
+  role       = aws_iam_role.ecs_task_execution.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+}
+
+resource "aws_cloudwatch_log_group" "ecs_web" {
+  name              = "/ecs/${var.project}-${var.env}-django"
+  retention_in_days = 14
+}
+
+resource "aws_ssm_parameter" "cognito_client_id" {
+  name        = "/${var.project}/${var.env}/cognito/client_id"
+  description = "Cognito App Client ID"
+  type        = "String"
+  value       = aws_cognito_user_pool_client.ci.id
+  overwrite   = true
+  tags = {
+    Project = var.project
+    Env     = var.env
+  }
+}
+
+resource "aws_ssm_parameter" "cognito_user_pool_id" {
+  name        = "/${var.project}/${var.env}/cognito/user_pool_id"
+  description = "Cognito User Pool ID"
+  type        = "String"
+  value       = aws_cognito_user_pool.up.id
+  overwrite   = true
+  tags = {
+    Project = var.project
+    Env     = var.env
+  }
+}
+
+resource "aws_ssm_parameter" "aws_region" {
+  name        = "/${var.project}/${var.env}/region"
+  description = "AWS region for this deployment"
+  type        = "String"
+  value       = var.region
+  overwrite   = true
+  tags = {
+    Project = var.project
+    Env     = var.env
+  }
+}
+
+# Execution role needs to read SSM params for ECS "secrets" injection
+data "aws_iam_policy_document" "ecs_exec_ssm_read" {
+  statement {
+    actions = [
+      "ssm:GetParameter",
+      "ssm:GetParameters",
+    ]
+    resources = [
+      aws_ssm_parameter.cognito_client_id.arn,
+      aws_ssm_parameter.cognito_user_pool_id.arn,
+      aws_ssm_parameter.aws_region.arn,
+      aws_ssm_parameter.db_password.arn, # you already inject this too
+    ]
+  }
+
+  # Needed if any injected parameter is SecureString
+  statement {
+    actions   = ["kms:Decrypt"]
+    resources = ["*"]
+    condition {
+      test     = "StringEquals"
+      variable = "kms:ViaService"
+      values   = ["ssm.${var.region}.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_policy" "ecs_exec_ssm_read" {
+  name   = "${var.project}-${var.env}-ecs-exec-ssm-read"
+  policy = data.aws_iam_policy_document.ecs_exec_ssm_read.json
+}
+
+resource "aws_iam_role_policy_attachment" "ecs_exec_ssm_read" {
+  role       = aws_iam_role.ecs_task_execution.name
+  policy_arn = aws_iam_policy.ecs_exec_ssm_read.arn
 }

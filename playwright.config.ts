@@ -1,10 +1,7 @@
 // playwright.config.ts
 import { defineConfig, devices } from '@playwright/test';
 
-const BASE_URL = process.env.WEB_BASE_URL ?? 'http://localhost:3000';
-// Change this to whatever actually starts your app.
-// If your start script needs no flags, just use: 'npm start'
-const WEB_CMD  = process.env.PW_WEBSERVER_CMD || 'npm start -- --port 3000 --host';
+const BASE_URL = process.env.DJANGO_BASE_URL ?? 'http://127.0.0.1:8000';
 
 export default defineConfig({
   // Only look at UI tests
@@ -13,16 +10,6 @@ export default defineConfig({
   testMatch: ['**/*.spec.@(ts|js)'],
   // Explicitly ignore the API folder
   testIgnore: ['**/tests/api/**'],
-
-  // Start a local server when using the localhost fallback
-  webServer: BASE_URL.startsWith('http://localhost:')
-    ? {
-        command: WEB_CMD,
-        url: BASE_URL,
-        reuseExistingServer: !process.env.CI,
-        timeout: 120_000,
-      }
-    : undefined,
 
   use: {
     baseURL: BASE_URL,               // ← makes page.goto('/') valid

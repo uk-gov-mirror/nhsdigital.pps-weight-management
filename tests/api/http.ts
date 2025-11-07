@@ -2,7 +2,7 @@
 import axios, { AxiosInstance, AxiosHeaders } from 'axios';
 
 function cleanBase(url?: string): string {
-  if (!url) throw new Error('WEB_BASE_URL is required');
+  if (!url) throw new Error('DJANGO_BASE_URL is required');
   return url.replace(/\/+$/, '');
 }
 function cleanPrefix(prefix: string | undefined, fallback: string): string {
@@ -17,7 +17,7 @@ function buildClient(
   fallbackPrefix: string,
   opts?: Opts
 ): AxiosInstance {
-  const base = cleanBase(process.env.WEB_BASE_URL);
+  const base = cleanBase(process.env.DJANGO_BASE_URL);
   const prefix = cleanPrefix(process.env[prefixEnv], fallbackPrefix);
   const origin = base;
 
@@ -50,7 +50,7 @@ function buildClient(
 }
 
 export function makeSecureApiClient(bearer: string): AxiosInstance {
-  const base = (process.env.WEB_BASE_URL || '').replace(/\/+$/, '');
+  const base = (process.env.DJANGO_BASE_URL || '').replace(/\/+$/, '');
   const prefix = (process.env.API_PREFIX_SECURE || '/secure/api').replace(/^([^/])/, '/$1');
   const origin = base;
 
