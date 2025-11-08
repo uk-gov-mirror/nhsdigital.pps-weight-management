@@ -14,26 +14,7 @@
 # 
 # Infrastrcuture created
 # 
-# 
-# 
-# 
-# 
-# 
-# 
-# 
-# 
-# 
-# 
-# 
-# 
-# 
-# 
-# 
-# 
-# 
-# 
-# 
-# 
+#                 TODO
 # 
 # Version History:
 #
@@ -999,11 +980,6 @@ resource "aws_iam_role_policy" "ecs_exec_ssm_params" {
 resource "aws_iam_role_policy_attachment" "ecs_exec_base" {
   role       = aws_iam_role.ecs_task_execution.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
-}
-
-resource "aws_cloudwatch_log_group" "ecs_web" {
-  name              = "/ecs/${var.project}-${var.env}-django"
-  retention_in_days = 14
 }
 
 resource "aws_ssm_parameter" "cognito_client_id" {

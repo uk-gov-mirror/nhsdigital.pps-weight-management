@@ -19,6 +19,7 @@ RUN python -m pip install --upgrade pip setuptools wheel \
  && pip install --no-cache-dir gunicorn
 
 COPY . .
+RUN python manage.py collectstatic --noinput
 
 USER appuser
 EXPOSE 8000
