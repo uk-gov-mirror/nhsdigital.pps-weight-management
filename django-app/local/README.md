@@ -4,15 +4,18 @@ This repository includes a Docker Compose setup for running the Django app and P
 
 ## Quick Start
 
-1. Create a `.env` file in the same folder as `docker-compose.local.yml`:
-   ```env
-   POSTGRES_DB=app
-   POSTGRES_USER=app
-   POSTGRES_PASSWORD=app
-   POSTGRES_HOST=db
-   POSTGRES_PORT=5432
-   DJANGO_DEBUG=True
-   DJANGO_SECRET_KEY=local-secret-key
+1. Create a `.env` file in the same folder as `docker-compose.local.yml` using the terraform output for the variables
+   ```bash
+   $env:AWS_PROFILE = 'admin-pps-wm'
+   $env:AWS_REGION  = 'eu-west-2'
+   $env:AWS_SDK_LOAD_CONFIG = '1'
+
+   aws sso login --profile admin-pps-wm
+
+   cd infra/terraform
+   terraform init -reconfigure -backend-config="bucket=nhse-pps-wm-terraform-state-bucket" -backend-config="key={env}/terraform.tfstate" -backend-config="region=eu-west-2"
+   terraform output -raw cognito_client_id_ci
+   terraform output -raw cognito_user_pool_id
    ```
 
 2. Build and start the containers:
@@ -21,12 +24,17 @@ This repository includes a Docker Compose setup for running the Django app and P
    docker compose -p local -f local/docker-compose.local.yml up --build -d web
    ```
 
-3. Visit the app:
+3. Run DB update script
+   ```bash
+   docker compose -f local/docker-compose.local.yml exec web python manage.py update_db
+   ```
+
+4. Visit the app:
    - Django site → http://localhost:8000  
    - Health check → http://localhost:8000/health/
    - Public API → http://localhost:8000/public/api/ping
 
-4. Stop containers:
+5. Stop containers:
    ```bash
    docker compose -p local -f local\docker-compose.local.yml stop web db
    ```
@@ -39,7 +47,6 @@ This repository includes a Docker Compose setup for running the Django app and P
 | View all logs | `docker compose -f local/docker-compose.local.yml logs -f` |
 | View web logs | `docker compose -f local/docker-compose.local.yml logs -f web` |
 | View DB logs | `docker compose -f local/docker-compose.local.yml logs -f db` |
-| Run DB update script | `docker compose -f local/docker-compose.local.yml exec web python manage.py update_db` |
 
 ## Database Access
 
