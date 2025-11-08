@@ -126,6 +126,7 @@ data "aws_region" "current" {}
 
 resource "aws_ecr_repository" "django" {
   name                 = "${var.project}-${var.env}-django"
+  force_delete = true
   image_tag_mutability = "MUTABLE"
   image_scanning_configuration { scan_on_push = true }
 }
@@ -658,6 +659,7 @@ resource "aws_iam_policy" "deploy_policy" {
           "ecr:TagResource",
           "ecr:ListTagsForResource",
           "ecr:DeleteRepository", 
+          "ec2:DisassociateRouteTable",
 
           # ECS
           "ecs:DescribeClusters",
@@ -674,6 +676,7 @@ resource "aws_iam_policy" "deploy_policy" {
 		  "ecs:RunTask",
 		  "ecs:ListTasks",
 		  "ecs:DeregisterTaskDefinition",
+          "ecs:DeleteService",
 
           # EC2 / VPC
           "ec2:CreateVpc",
@@ -715,7 +718,9 @@ resource "aws_iam_policy" "deploy_policy" {
 		  "ec2:DescribeAddressesAttribute",
 		  "ec2:ReleaseAddress",
 		  "ec2:CreateNatGateway",
-
+          "ec2:DisassociateRouteTable",
+          "ec2:DeleteRoute",
+		  
           # Scheduler
           "scheduler:CreateSchedule",
 		  "scheduler:GetSchedule",
