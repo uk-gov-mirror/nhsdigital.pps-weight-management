@@ -20,6 +20,7 @@ This repository includes a Docker Compose setup for running the Django app and P
 
 2. Build and start the containers:
    ```bash
+   cd django-app
    docker build -t ppswm:local .
    docker compose -p local -f local/docker-compose.local.yml up --build -d web
    ```
