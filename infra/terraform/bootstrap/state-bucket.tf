@@ -18,6 +18,7 @@
 # to work on the same infrastructure without conflicts.
 resource "aws_s3_bucket" "terraform_state" {
   bucket = "nhse-pps-wm-terraform-state-bucket"
+  force_destroy = true
 
   # Enable versioning to keep a history of the state files,
   # which is crucial for disaster recovery and undoing bad changes.
