@@ -625,220 +625,50 @@ resource "aws_iam_role" "gh_oidc" {
   assume_role_policy = data.aws_iam_policy_document.gh_oidc_assume.json
 }
 
-resource "aws_iam_policy" "deploy_policy" {
-  name   = "${var.project}-${var.env}-deploy"
-  policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [
-      {
-        Effect = "Allow",
-        Action = [
-          # CloudFront / Route53 / S3 / Cognito / DynamoDB / CloudWatch Logs
-          "cloudfront:*",
-          "route53:*",
-          "s3:*",
-          "cognito-idp:*",
-          "cognito-identity:*",
-          "dynamodb:*",
-          "logs:*",
+# Build the policy document
+data "aws_iam_policy_document" "deploy_policy" {
+  # Broad rights in eu-west-2 and us-east-1 (covers EC2/VPC/ELB/ECR/RDS/etc.)
+  statement {
+    sid       = "AllowEverythingInDeploymentRegions"
+    effect    = "Allow"
+    actions   = ["*"]
+    resources = ["*"]
 
-          # ECR
-          "ecr:GetAuthorizationToken",
-          "ecr:BatchCheckLayerAvailability",
-          "ecr:CompleteLayerUpload",
-          "ecr:InitiateLayerUpload",
-          "ecr:UploadLayerPart",
-          "ecr:PutImage",
-          "ecr:BatchGetImage",
-          "ecr:DescribeRepositories",
-          "ecr:GetDownloadUrlForLayer",
-          "ecr:ListImages",
-          "ecr:CreateRepository",
-          "ecr:SetRepositoryPolicy",
-          "ecr:PutLifecyclePolicy",
-          "ecr:TagResource",
-          "ecr:ListTagsForResource",
-          "ecr:DeleteRepository", 
-          "ec2:DisassociateRouteTable",
+    condition {
+      test     = "StringEquals"
+      variable = "aws:RequestedRegion"
+      values   = ["eu-west-2", "us-east-1"]
+    }
+  }
 
-          # ECS
-          "ecs:DescribeClusters",
-          "ecs:DescribeServices",
-          "ecs:DescribeTaskDefinition",
-          "ecs:RegisterTaskDefinition",
-          "ecs:UpdateService",
-          "ecs:DescribeTasks",
-          "ecs:DescribeTaskSets",
-          "ecs:CreateCluster",
-          "ecs:DeleteCluster",
-          "ecs:TagResource",
-		  "ecs:CreateService",
-		  "ecs:RunTask",
-		  "ecs:ListTasks",
-		  "ecs:DeregisterTaskDefinition",
-          "ecs:DeleteService",
+  # Global services that don't send a region (needed for your stack)
+  statement {
+    sid       = "AllowGlobalServices"
+    effect    = "Allow"
+    actions   = [
+      # CloudFront/WAF (global control plane lives behind us-east-1 endpoints)
+      "cloudfront:*",
+      "wafv2:*",
 
-          # EC2 / VPC
-          "ec2:CreateVpc",
-          "ec2:ModifyVpcAttribute",
-          "ec2:DescribeVpcs",
-          "ec2:DescribeSubnets",
-          "ec2:DescribeSecurityGroups",
-          "ec2:DescribeRouteTables",
-          "ec2:DescribeInternetGateways",
-          "ec2:DescribeNatGateways",
-          "ec2:DescribeAvailabilityZones",
-          "ec2:DescribeVpcEndpoints",
-          "ec2:DescribeNetworkInterfaces",
-          "ec2:DescribeAccountAttributes",
-          "ec2:DescribeTags",
-          "ec2:DescribeManagedPrefixLists",
-          "ec2:GetManagedPrefixListEntries",
-          "ec2:DescribeLaunchTemplates",
-          "ec2:DescribeLaunchTemplateVersions",
-          "ec2:CreateTags",
-          "ec2:DeleteTags",
-		  "ec2:DescribeVpcAttribute",
-	      "ec2:DeleteVpc",
-          "ec2:CreateSecurityGroup",
-          "ec2:CreateSubnet",
-          "ec2:CreateRouteTable",
-          "ec2:CreateInternetGateway",
-          "ec2:DescribeSecurityGroupRules",
-          "ec2:RevokeSecurityGroupEgress",
-          "ec2:AssociateRouteTable",
-          "ec2:AttachInternetGateway",
-          "ec2:DeleteSecurityGroup",
-          "ec2:DeleteInternetGateway",
-          "ec2:AllocateAddress",
-          "ec2:CreateRoute",
-          "ec2:AuthorizeSecurityGroupIngress",
-          "ec2:DescribeAddresses",
-          "ec2:AuthorizeSecurityGroupEgress",
-		  "ec2:DescribeAddressesAttribute",
-		  "ec2:ReleaseAddress",
-		  "ec2:CreateNatGateway",
-          "ec2:DisassociateRouteTable",
-          "ec2:DeleteRoute",
-		  "ec2:DeleteNatGateway",
-		  "ec2:DeleteRouteTable",
-		  "ec2:DeleteSubnet",
-          "ec2:DisassociateAddress",
-          "ec2:DetachInternetGateway",
-		  
-          # Scheduler
-          "scheduler:CreateSchedule",
-		  "scheduler:GetSchedule",
-		  "scheduler:DeleteSchedule",
+      # Route53 is global (hosted zones, records, health checks)
+      "route53:*",
 
-          # RDS
-          "rds:DeleteDBInstance",
-          "rds:DescribeDBInstances",
-          "rds:ListTagsForResource",
-		  "rds:CreateDBSubnetGroup",
-          "rds:ModifyDBSubnetGroup",
-		  "rds:DeleteDBSubnetGroup",
-		  "rds:DescribeDBSubnetGroups",
-          "rds:AddTagsToResource",
-		  "rds:CreateDBInstance",
-		  
-          # Elastic Load Balancing (ECS services with ALB/NLB)
-          "elasticloadbalancing:CreateListener",
-		  "elasticloadbalancing:DeleteListener",
-		  "elasticloadbalancing:DescribeListenerAttributes",
-          "elasticloadbalancing:DeleteLoadBalancer",
-          "elasticloadbalancing:ModifyLoadBalancerAttributes",
-          "elasticloadbalancing:DeleteTargetGroup",
-		  "elasticloadbalancing:CreateLoadBalancer",
-          "elasticloadbalancing:DescribeLoadBalancers",
-          "elasticloadbalancing:DescribeLoadBalancerAttributes",
-          "elasticloadbalancing:DescribeTargetGroups",
-          "elasticloadbalancing:DescribeTargetGroupAttributes",
-          "elasticloadbalancing:DescribeTargetHealth",
-          "elasticloadbalancing:DescribeListeners",
-          "elasticloadbalancing:DescribeRules",
-          "elasticloadbalancing:CreateTargetGroup",
-		  "elasticloadbalancing:AddTags",
-          "elasticloadbalancing:ModifyTargetGroupAttributes",
-		  "elasticloadbalancing:DescribeTags",
+      # IAM reads + PassRole for service roles your stack uses
+      "iam:Get*",
+      "iam:List*",
+      "iam:PassRole",
 
-          # Application Auto Scaling / ASG
-          "application-autoscaling:DescribeScalableTargets",
-          "application-autoscaling:DescribeScalingPolicies",
-          "application-autoscaling:DescribeScheduledActions",
-          "autoscaling:DescribeAutoScalingGroups",
-          "autoscaling:DescribeScalingActivities",
-          "autoscaling:DescribeLaunchConfigurations",
-          "autoscaling:DescribeAutoScalingInstances",
-
-          # Cloud Map / Service Discovery
-          "servicediscovery:ListNamespaces",
-          "servicediscovery:ListServices",
-          "servicediscovery:GetNamespace",
-          "servicediscovery:GetService",
-
-          # Secrets Manager
-          "secretsmanager:GetSecretValue",
-          "secretsmanager:DescribeSecret",
-          "secretsmanager:ListSecrets",
-
-          # KMS
-          "kms:Decrypt",
-          "kms:DescribeKey",
-
-          # WAFv2
-          "wafv2:CreateWebACL",
-          "wafv2:UpdateWebACL",
-          "wafv2:DeleteWebACL",
-          "wafv2:GetWebACL",
-          "wafv2:ListWebACLs",
-          "wafv2:AssociateWebACL",
-          "wafv2:DisassociateWebACL",
-          "wafv2:TagResource",
-          "wafv2:ListTagsForResource",
-
-          # IAM
-          "iam:CreateServiceLinkedRole",
-          "iam:AttachRolePolicy",
-          "iam:CreateOpenIDConnectProvider",
-          "iam:CreatePolicy",
-          "iam:CreatePolicyVersion",
-          "iam:CreateRole",
-          "iam:DeletePolicy",
-          "iam:DeletePolicyVersion",
-          "iam:DeleteRole",
-          "iam:DeleteRolePolicy",
-          "iam:DetachRolePolicy",
-          "iam:GetOpenIDConnectProvider",
-          "iam:GetPolicy",
-          "iam:GetPolicyVersion",
-          "iam:GetRole",
-          "iam:GetRolePolicy",
-          "iam:ListAttachedRolePolicies",
-          "iam:ListInstanceProfilesForRole",
-          "iam:ListOpenIDConnectProviders",
-          "iam:ListPolicyVersions",
-          "iam:ListRolePolicies",
-          "iam:PassRole",
-          "iam:PutRolePolicy",
-          "iam:TagOpenIDConnectProvider",
-          "iam:TagPolicy",
-          "iam:TagRole",
-          "iam:UpdateAssumeRolePolicy",
-
-          # SSM Parameter Store
-          "ssm:AddTagsToResource",
-          "ssm:DeleteParameter",
-          "ssm:DescribeParameters",
-          "ssm:GetParameter",
-          "ssm:GetParameters",
-          "ssm:ListTagsForResource",
-          "ssm:PutParameter",
-        ],
-        Resource = "*"
-      }
+      # Handy diagnostics for failed auth messages
+      "sts:DecodeAuthorizationMessage"
     ]
-  })
+    resources = ["*"]
+  }
+}
+
+resource "aws_iam_policy" "deploy_policy" {
+  name        = "${var.project}-${var.env}-deploy-policy"
+  description = "Broad CI policy limited to eu-west-2 & us-east-1 plus required global services"
+  policy      = data.aws_iam_policy_document.deploy_policy.json
 }
 
 resource "aws_iam_role_policy_attachment" "attach_deploy_policy" {
