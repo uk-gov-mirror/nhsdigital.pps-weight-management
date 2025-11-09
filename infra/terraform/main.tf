@@ -720,6 +720,9 @@ resource "aws_iam_policy" "deploy_policy" {
 		  "ec2:CreateNatGateway",
           "ec2:DisassociateRouteTable",
           "ec2:DeleteRoute",
+		  "ec2:DeleteNatGateway",
+		  "ec2:DeleteRouteTable",
+		  "ec2:DeleteSubnet",
 		  
           # Scheduler
           "scheduler:CreateSchedule",
