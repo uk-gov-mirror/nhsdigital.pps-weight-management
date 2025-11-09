@@ -724,6 +724,7 @@ resource "aws_iam_policy" "deploy_policy" {
 		  "ec2:DeleteRouteTable",
 		  "ec2:DeleteSubnet",
           "ec2:DisassociateAddress",
+          "ec2:DetachInternetGateway",
 		  
           # Scheduler
           "scheduler:CreateSchedule",
