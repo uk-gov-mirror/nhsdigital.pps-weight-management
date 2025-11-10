@@ -64,6 +64,8 @@ jobs:
                 echo "Invalid custom environment: must start with 'dev-'. Got '${{ inputs.custom_environment }}'." >&2
                 exit 1
               fi
+              echo "deploy_env=${{ inputs.custom_environment }}" >> "$GITHUB_OUTPUT"
+              echo "gh_env=poc" >> "$GITHUB_OUTPUT"
           else
               echo "deploy_env=${{ inputs.environment }}" >> "$GITHUB_OUTPUT"
               echo "gh_env=${{ inputs.environment }}"     >> "$GITHUB_OUTPUT"
