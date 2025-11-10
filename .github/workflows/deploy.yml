@@ -14,8 +14,12 @@ on:
         description: "Target environment"
         type: choice
         required: true
-        options: [poc]
-
+        options: [poc,other]
+      custom_environment:
+        description: 'If you chose "other", enter the environment name'
+        type: string
+        required: false
+        
 permissions:
   id-token: write
   contents: read
@@ -50,8 +54,20 @@ jobs:
       - id: outs
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "deploy_env=${{ inputs.environment }}" >> "$GITHUB_OUTPUT"
-            echo "gh_env=${{ inputs.environment }}"     >> "$GITHUB_OUTPUT"
+            if [ "${{ inputs.environment }}" = "other" ]; then
+              if [ -z "${{ inputs.custom_environment }}" ]; then
+                echo "You selected 'other' but didn't provide a name in 'custom_environment'." >&2
+                exit 1
+              fi
+              # Require it to start with "dev-"
+              if [[ ! "${{ inputs.custom_environment }}" =~ ^dev- ]]; then
+                echo "Invalid custom environment: must start with 'dev-'. Got '${{ inputs.custom_environment }}'." >&2
+                exit 1
+              fi
+          else
+              echo "deploy_env=${{ inputs.environment }}" >> "$GITHUB_OUTPUT"
+              echo "gh_env=${{ inputs.environment }}"     >> "$GITHUB_OUTPUT"
+            fi            
           elif [ "${{ github.event_name }}" = "pull_request" ]; then
             if [ "${{ github.event.action }}" = "closed" ] && [ "${{ github.event.pull_request.merged }}" = "true" ]; then
               echo "deploy_env=poc" >> "$GITHUB_OUTPUT"
