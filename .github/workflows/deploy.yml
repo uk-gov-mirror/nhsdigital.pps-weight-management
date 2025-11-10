@@ -76,7 +76,12 @@ jobs:
             fi
             echo "gh_env=poc" >> "$GITHUB_OUTPUT"
           fi
-
+      - name: Show derived environment values
+        run: |
+          echo "### Derived Environment Values" >> "$GITHUB_STEP_SUMMARY"
+          echo "- deploy_env: ${{ steps.outs.outputs.deploy_env }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- gh_env: ${{ steps.outs.outputs.gh_env }}" >> "$GITHUB_STEP_SUMMARY"
+    
   changes:
     needs: prepare
     runs-on: ubuntu-latest
