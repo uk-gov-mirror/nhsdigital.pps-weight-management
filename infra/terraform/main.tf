@@ -894,3 +894,76 @@ resource "aws_iam_role_policy_attachment" "ecs_exec_ssm_read" {
   role       = aws_iam_role.ecs_task_execution.name
   policy_arn = aws_iam_policy.ecs_exec_ssm_read.arn
 }
+
+# --- SSM bastion SG (no inbound, all outbound) ---
+resource "aws_security_group" "ssm_bastion" {
+  name   = "${var.project}-${var.env}-ssm-bastion-sg"
+  vpc_id = module.vpc.vpc_id
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = { Name = "${var.project}-${var.env}-ssm-bastion-sg" }
+}
+
+# --- Permit the bastion to reach Postgres on the existing DB SG ---
+resource "aws_security_group_rule" "db_ingress_from_bastion" {
+  type                     = "ingress"
+  from_port                = 5432
+  to_port                  = 5432
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.db.id           
+  source_security_group_id = aws_security_group.ssm_bastion.id  
+}
+
+# --- IAM role/profile for SSM on the EC2 instance ---
+data "aws_iam_policy_document" "bastion_assume" {
+  statement {
+    actions = ["sts:AssumeRole"]
+    principals {
+      type        = "Service"
+      identifiers = ["ec2.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "bastion_role" {
+  name               = "${var.project}-${var.env}-ssm-bastion-role"
+  assume_role_policy = data.aws_iam_policy_document.bastion_assume.json
+}
+
+resource "aws_iam_role_policy_attachment" "bastion_ssm_core" {
+  role       = aws_iam_role.bastion_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+resource "aws_iam_instance_profile" "bastion_profile" {
+  name = "${var.project}-${var.env}-ssm-bastion-profile"
+  role = aws_iam_role.bastion_role.name
+}
+
+# --- Amazon Linux 2023 AMI (has SSM Agent) ---
+data "aws_ami" "al2023" {
+  most_recent = true
+  owners      = ["amazon"]
+  filter {
+    name   = "name"
+    values = ["al2023-ami-*-x86_64"]
+  }
+}
+
+# --- EC2 bastion in a PRIVATE subnet (no public IP) ---
+resource "aws_instance" "ssm_bastion" {
+  ami                         = data.aws_ami.al2023.id
+  instance_type               = "t3.nano"
+  subnet_id                   = module.vpc.private_subnets[0]
+  associate_public_ip_address = false
+  iam_instance_profile        = aws_iam_instance_profile.bastion_profile.name
+  vpc_security_group_ids      = [aws_security_group.ssm_bastion.id]
+
+  tags = { Name = "${var.project}-${var.env}-ssm-bastion" }
+}

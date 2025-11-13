@@ -5,7 +5,7 @@ FROM python:${PYTHON_VERSION}-slim AS base
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    DJANGO_SETTINGS_MODULE=helloworld.settings.prod
+    DJANGO_SETTINGS_MODULE=wm_django.settings.prod
 
 RUN adduser --disabled-password --gecos "" appuser
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -24,4 +24,4 @@ RUN python manage.py collectstatic --noinput
 USER appuser
 EXPOSE 8000
 
-CMD ["gunicorn", "helloworld.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3"]
+CMD ["gunicorn", "wm_django.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3"]

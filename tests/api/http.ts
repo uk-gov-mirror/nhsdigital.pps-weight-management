@@ -13,7 +13,7 @@ function cleanPrefix(prefix: string | undefined, fallback: string): string {
 type Opts = { bearer?: string; apiKey?: string; originSecret?: string };
 
 function buildClient(
-  prefixEnv: 'API_PREFIX_PUBLIC' | 'API_PREFIX_SECURE',
+  prefixEnv: 'API_PREFIX_SECURE',
   fallbackPrefix: string,
   opts?: Opts
 ): AxiosInstance {
@@ -73,10 +73,6 @@ export function makeSecureApiClient(bearer: string): AxiosInstance {
 
   return inst;
 }
-
-export const publicApi = buildClient('API_PREFIX_PUBLIC', '/public/api', {
-  originSecret: process.env.CF_ORIGIN_SECRET,
-});
 
 export const secureApi = buildClient('API_PREFIX_SECURE', '/secure/api', {
   originSecret: process.env.CF_ORIGIN_SECRET,

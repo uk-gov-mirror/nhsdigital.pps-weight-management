@@ -7,3 +7,5 @@ psycopg[binary]==3.2.1
 Jinja2==3.1.6
 django-jinja==2.11.0
 whitenoise
+djangorestframework==3.15.2
+drf-spectacular==0.27.2

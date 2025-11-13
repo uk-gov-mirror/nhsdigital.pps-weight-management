@@ -60,3 +60,8 @@ output "ssm_db_password_param" {
 output "scheduler_name" {
   value = aws_scheduler_schedule.daily.name
 }
+
+output "bastion_instance_id" {
+  description = "Instance ID for SSM port-forward"
+  value       = aws_instance.ssm_bastion.id
+}

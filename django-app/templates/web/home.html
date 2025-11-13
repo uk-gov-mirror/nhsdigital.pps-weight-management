@@ -10,15 +10,15 @@
 	
     <h1>Hello World!</h1>
 
-    <button id="btn-public-ping" type="button">Public Ping</button>
+    <button id="btn-helath-check" type="button">Health Check</button>
     <pre id="out"></pre>
 
     <script>
-      const btn = document.getElementById('btn-public-ping');
+      const btn = document.getElementById('btn-helath-check');
       const out = document.getElementById('out');
       btn?.addEventListener('click', async () => {
         try {
-          const resp = await fetch('/public/api/ping', { method: 'GET' });
+          const resp = await fetch('/health', { method: 'GET' });
           const text = await resp.text();
           out.textContent = text;
         } catch (e) {

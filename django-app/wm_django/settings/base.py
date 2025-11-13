@@ -18,6 +18,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    "rest_framework",
+    "drf_spectacular",
     'core',
     'web',
     'api',
@@ -36,7 +38,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-ROOT_URLCONF = 'helloworld.urls'
+ROOT_URLCONF = 'wm_django.urls'
 
 TEMPLATES = [
     {
@@ -44,7 +46,7 @@ TEMPLATES = [
         'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
-            'environment': 'helloworld.jinja2_env.environment',
+            'environment': 'wm_django.jinja2_env.environment',
         },
     },
     {
@@ -62,7 +64,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'helloworld.wsgi.application'
+WSGI_APPLICATION = 'wm_django.wsgi.application'
 
 DATABASES = {
     'default': {
@@ -103,3 +105,13 @@ if os.getenv("DJANGO_SIMPLE_LOGGING", "true").lower() == "true":
             'level': os.getenv('DJANGO_LOG_LEVEL', 'INFO'),
         },
     }
+
+REST_FRAMEWORK = {
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+}
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Weight Management API",
+    "DESCRIPTION": "API documentation for all Weight Management API versions.",
+    "SERVE_INCLUDE_SCHEMA": False,
+}
