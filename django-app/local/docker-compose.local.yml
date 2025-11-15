@@ -20,7 +20,7 @@ services:
     profiles: ["dev","default"]     # runs by default; also when using --profile dev
     env_file: .env
     environment:
-      DJANGO_SETTINGS_MODULE: helloworld.settings.dev
+      DJANGO_SETTINGS_MODULE: wm_django.settings.dev
       DATABASE_URL: postgres://app:app@db:5432/app
     depends_on:
       db:

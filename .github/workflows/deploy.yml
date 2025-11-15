@@ -273,6 +273,7 @@ jobs:
     name: Django -> ${{ needs.prepare.outputs.deploy_env }}
     needs: [prepare, changes, expose_env_vars, decide, infra]
     runs-on: ubuntu-latest
+    environment: ${{ needs.prepare.outputs.gh_env }}
     concurrency:
       group: django-${{ needs.prepare.outputs.deploy_env }}
       cancel-in-progress: false
@@ -373,12 +374,44 @@ jobs:
         id: patch
         if: ${{ env.RUN_DJANGO == 'true' }}
         run: |
+          set -euo pipefail
           NEW_IMAGE="${{ steps.meta.outputs.tag_sha }}"
-          # Replace the image of the container named "web" (Terraform uses container name 'web')
-          cat td.json | jq --arg IMG "$NEW_IMAGE" '
-            .containerDefinitions |= (map(if .name=="web" then .image=$IMG else . end)) |
-            del(.taskDefinitionArn,.revision,.status,.requiresAttributes,.compatibilities,.registeredAt,.registeredBy)
-          ' > td_patched.json
+          GH_ENV="${{ env.GH_ENV }}"
+
+          # Map gh_env -> Django settings
+          if [ "$GH_ENV" = "poc" ]; then
+            DJANGO_SETTINGS="wm_django.settings.dev"
+            DJANGO_ENV="dev"
+          else
+            DJANGO_SETTINGS="wm_django.settings.prod"
+            DJANGO_ENV="prod"
+          fi
+
+          echo "Using DJANGO_SETTINGS_MODULE=$DJANGO_SETTINGS (DJANGO_ENV=$DJANGO_ENV) for gh_env=$GH_ENV"
+
+          # Patch the "web" container: set image + inject/override env vars
+          jq \
+            --arg IMG "$NEW_IMAGE" \
+            --arg SETTINGS "$DJANGO_SETTINGS" \
+            --arg DJENV "$DJANGO_ENV" \
+            '
+            .containerDefinitions |=
+              ( map(
+                  if .name == "web" then
+                    .image = $IMG
+                    | .environment = (
+                        # keep existing env, but ensure these two are set/overwritten
+                        [ .environment[] | select(.name != "DJANGO_SETTINGS_MODULE" and .name != "DJANGO_ENV") ] 
+                        + [
+                            {"name":"DJANGO_SETTINGS_MODULE","value":$SETTINGS},
+                            {"name":"DJANGO_ENV","value":$DJENV}
+                          ]
+                      )
+                  else . end
+                ))
+            | del(.taskDefinitionArn,.revision,.status,.requiresAttributes,.compatibilities,.registeredAt,.registeredBy)
+            ' td.json > td_patched.json
+
           echo "patched=$PWD/td_patched.json" >> "$GITHUB_OUTPUT"
 
       - name: Register new task definition revision
@@ -412,7 +445,7 @@ jobs:
           echo "sgs=$SGS" >> "$GITHUB_OUTPUT"
 
       # Create Update DB Task
-      - name: Make DB job task definition
+      - name: Create Update DB task definition
         id: make_dbjob
         run: |
           set -euo pipefail
@@ -431,7 +464,7 @@ jobs:
           echo "dbjob=$DST" >> "$GITHUB_OUTPUT"
 
       # Run Update DB Task
-      - name: Run DB update (one-off ECS task)
+      - name: Run Update DB Task (one-off ECS task)
         if: ${{ env.RUN_DJANGO == 'true' }}
         uses: aws-actions/amazon-ecs-deploy-task-definition@v2
         timeout-minutes: 20
@@ -448,32 +481,64 @@ jobs:
           enable-ecs-managed-tags: true
           run-task-tags: '[{"key":"ci","value":"db-update"}]'
 
-      # Check Udpate DB Task outcome
-      - name: Diagnose DB update task (on failure)
-        if: failure() && env.RUN_DJANGO == 'true'
-        env:
-          CLUSTER: ${{ env.ECS_CLUSTER }}
-          REGION: ${{ env.AWS_DEFAULT_REGION }}
-        run: |
-          set -euo pipefail
-          STARTED_BY="db-update-${{ github.run_id }}"
-      
-          TASK_ARN=$(aws ecs list-tasks --cluster "$CLUSTER" --desired-status STOPPED --started-by "$STARTED_BY" --query 'taskArns[-1]' --output text)
-          echo "Task: $TASK_ARN"
-
-          aws ecs describe-tasks --cluster "$CLUSTER" --tasks "$TASK_ARN" \
-            --query 'tasks[0].{stoppedReason:stoppedReason, containers:containers[].{name:name,exitCode:exitCode,reason:reason,log:logStreamName}}' \
-            --output table
-
-          LOG_STREAM=$(aws ecs describe-tasks --cluster "$CLUSTER" --tasks "$TASK_ARN" --query 'tasks[0].containers[0].logStreamName' --output text)
-          if [ "$LOG_STREAM" != "None" ] && [ -n "$LOG_STREAM" ]; then
-            echo "---- Last 200 log lines ----"
-            aws logs get-log-events --region "$REGION" --log-group-name "/ecs/${{ env.ECS_TASK_FAMILY }}" --log-stream-name "$LOG_STREAM" --limit 200 --query 'events[].message' --output text || true
-            echo "----------------------------"
-          else
-            echo "No CloudWatch Logs stream found for the container."
-          fi
-    
+      # Run Django migrations (core apps)
+      - name: Run Django migrations (one-off ECS task)
+        if: ${{ env.RUN_DJANGO == 'true' }}
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        timeout-minutes: 10
+        with:
+          task-definition: ${{ steps.patch.outputs.patched }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          run-task: true
+          run-task-launch-type: FARGATE
+          wait-for-task-stopped: true
+          run-task-subnets: ${{ steps.net.outputs.subnets }}
+          run-task-security-groups: ${{ steps.net.outputs.sgs }}
+          run-task-assign-public-IP: DISABLED
+          run-task-started-by: django-migrate-${{ github.run_id }}
+          enable-ecs-managed-tags: true
+          run-task-tags: '[{"key":"ci","value":"django-migrate"}]'
+          run-task-container-overrides: |
+            [
+              {
+                "name": "web",
+                "command": ["bash","-lc","python3 manage.py migrate --noinput"]
+              }
+            ]
+          
+      # Ensure Django superuser exists
+      - name: Ensure Django superuser exists (one-off ECS task)
+        if: ${{ env.RUN_DJANGO == 'true' }}
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        timeout-minutes: 10
+        with:
+          task-definition: ${{ steps.patch.outputs.patched }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          run-task: true
+          run-task-launch-type: FARGATE
+          wait-for-task-stopped: true
+          run-task-subnets: ${{ steps.net.outputs.subnets }}
+          run-task-security-groups: ${{ steps.net.outputs.sgs }}
+          run-task-assign-public-IP: DISABLED
+          run-task-started-by: su-bootstrap-${{ github.run_id }}
+          enable-ecs-managed-tags: true
+          run-task-tags: '[{"key":"ci","value":"su-bootstrap"}]'
+          run-task-container-overrides: |
+            [
+              {
+                "name": "web",
+                "environment": [
+                  {"name": "SU_USER",  "value": "${{ secrets.DJANGO_SUPERUSER_USERNAME }}"},
+                  {"name": "SU_EMAIL", "value": "${{ secrets.DJANGO_SUPERUSER_EMAIL }}"},
+                  {"name": "SU_PASS",  "value": "${{ secrets.DJANGO_SUPERUSER_PASSWORD }}"}
+                ],
+                "command": [
+                  "bash","-lc",
+                  "python3 manage.py shell <<'PY'\nfrom django.contrib.auth import get_user_model\nimport os\nU=get_user_model()\nusername=os.environ.get('SU_USER')\nemail=os.environ.get('SU_EMAIL','')\npassword=os.environ.get('SU_PASS')\nassert username and password, 'SU_USER and SU_PASS must be set'\nu,created=U.objects.get_or_create(username=username, defaults={'email': email})\nu.is_staff=True; u.is_superuser=True; u.email=email\nu.set_password(password); u.save()\nprint('created' if created else 'updated')\nPY"
+                ]
+              }
+            ]
+            
       - name: Update ECS service
         if: ${{ env.RUN_DJANGO == 'true' }}
         run: |

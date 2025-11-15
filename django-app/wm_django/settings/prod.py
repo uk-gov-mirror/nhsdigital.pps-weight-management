@@ -1,3 +1,3 @@
 from .base import *  # noqa
-DEBUG = False
+DEBUG = True
 # Add stricter production defaults here as needed

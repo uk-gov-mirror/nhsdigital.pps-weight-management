@@ -3,56 +3,155 @@ from django.db import models
 class V1_HelpsWith(models.Model):
     id = models.AutoField(primary_key=True)
     benefit = models.CharField(max_length=120)
-    class Meta: db_table = "V1_HELPS_WITH"; app_label = "api"
+    class Meta:
+        db_table = "V1_HELPS_WITH"
+        app_label = "api"
+        managed = False
+    def __str__(self):
+        for attr in ('name', 'title', 'label', 'description'):
+            if hasattr(self, attr) and getattr(self, attr):
+                return str(getattr(self, attr))
+        return f"V1_HelpsWith #{getattr(self, 'id', '-') }"
+
 
 class V1_WhoFor(models.Model):
     id = models.AutoField(primary_key=True)
     target = models.CharField(max_length=120)
-    class Meta: db_table = "V1_WHO_FOR"; app_label = "api"
+    class Meta:
+        db_table = "V1_WHO_FOR"
+        app_label = "api"
+        managed = False
+    def __str__(self):
+        for attr in ('name', 'title', 'label', 'description'):
+            if hasattr(self, attr) and getattr(self, attr):
+                return str(getattr(self, attr))
+        return f"V1_WhoFor #{getattr(self, 'id', '-') }"
+
 
 class V1_WhoNotFor(models.Model):
     id = models.AutoField(primary_key=True)
     target = models.CharField(max_length=120)
-    class Meta: db_table = "V1_WHO_NOT_FOR"; app_label = "api"
+    class Meta:
+        db_table = "V1_WHO_NOT_FOR"
+        app_label = "api"
+        managed = False
+    def __str__(self):
+        for attr in ('name', 'title', 'label', 'description'):
+            if hasattr(self, attr) and getattr(self, attr):
+                return str(getattr(self, attr))
+        return f"V1_WhoNotFor #{getattr(self, 'id', '-') }"
+
 
 class V1_Mitigations(models.Model):
     id = models.AutoField(primary_key=True)
     type = models.CharField(max_length=120)
-    class Meta: db_table = "V1_MITIGATIONS"; app_label = "api"
+    class Meta:
+        db_table = "V1_MITIGATIONS"
+        app_label = "api"
+        managed = False
+    def __str__(self):
+        for attr in ('name', 'title', 'label', 'description'):
+            if hasattr(self, attr) and getattr(self, attr):
+                return str(getattr(self, attr))
+        return f"V1_Mitigations #{getattr(self, 'id', '-') }"
+
 
 class V1_TimeRequired(models.Model):
     id = models.AutoField(primary_key=True)
     required = models.CharField(max_length=120)
-    class Meta: db_table = "V1_TIME_REQUIRED"; app_label = "api"
+    class Meta:
+        db_table = "V1_TIME_REQUIRED"
+        app_label = "api"
+        managed = False
+    def __str__(self):
+        for attr in ('name', 'title', 'label', 'description'):
+            if hasattr(self, attr) and getattr(self, attr):
+                return str(getattr(self, attr))
+        return f"V1_TimeRequired #{getattr(self, 'id', '-') }"
+
 
 class V1_Access(models.Model):
     id = models.AutoField(primary_key=True)
     type = models.CharField(max_length=120)
-    class Meta: db_table = "V1_ACCESS"; app_label = "api"
+    class Meta:
+        db_table = "V1_ACCESS"
+        app_label = "api"
+        managed = False
+    def __str__(self):
+        for attr in ('name', 'title', 'label', 'description'):
+            if hasattr(self, attr) and getattr(self, attr):
+                return str(getattr(self, attr))
+        return f"V1_Access #{getattr(self, 'id', '-') }"
+
 
 class V1_Costs(models.Model):
     id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=120)
-    class Meta: db_table = "V1_COSTS"; app_label = "api"
+    class Meta:
+        db_table = "V1_COSTS"
+        app_label = "api"
+        managed = False
+    def __str__(self):
+        for attr in ('name', 'title', 'label', 'description'):
+            if hasattr(self, attr) and getattr(self, attr):
+                return str(getattr(self, attr))
+        return f"V1_Costs #{getattr(self, 'id', '-') }"
+
 
 class V1_ActionType(models.Model):
     id = models.AutoField(primary_key=True)
     type = models.CharField(max_length=120)
-    class Meta: db_table = "V1_ACTION_TYPE"; app_label = "api"
+    class Meta:
+        db_table = "V1_ACTION_TYPE"
+        app_label = "api"
+        managed = False
+    def __str__(self):
+        for attr in ('name', 'title', 'label', 'description'):
+            if hasattr(self, attr) and getattr(self, attr):
+                return str(getattr(self, attr))
+        return f"V1_ActionType #{getattr(self, 'id', '-') }"
+
 
 class V1_ServiceType(models.Model):
     id = models.AutoField(primary_key=True)
     type = models.CharField(max_length=120)
-    class Meta: db_table = "V1_SERVICE_TYPE"; app_label = "api"
+    class Meta:
+        db_table = "V1_SERVICE_TYPE"
+        app_label = "api"
+        managed = False
+    def __str__(self):
+        for attr in ('name', 'title', 'label', 'description'):
+            if hasattr(self, attr) and getattr(self, attr):
+                return str(getattr(self, attr))
+        return f"V1_ServiceType #{getattr(self, 'id', '-') }"
+
 
 class V1_Taxonomy(models.Model):
     id = models.AutoField(primary_key=True)
     term = models.CharField(max_length=120)
-    class Meta: db_table = "V1_TAXONOMY"; app_label = "api"
+    class Meta:
+        db_table = "V1_TAXONOMY"
+        app_label = "api"
+        managed = False
+    def __str__(self):
+        for attr in ('name', 'title', 'label', 'description'):
+            if hasattr(self, attr) and getattr(self, attr):
+                return str(getattr(self, attr))
+        return f"V1_Taxonomy #{getattr(self, 'id', '-') }"
+
 
 
 class V1_Service(models.Model):
-    class Meta: db_table = "V1_SERVICE"; app_label = "api"
+    class Meta:
+        db_table = "V1_SERVICE"
+        app_label = "api"
+        managed = False
+    def __str__(self):
+        for attr in ('name', 'title', 'label', 'description'):
+            if hasattr(self, attr) and getattr(self, attr):
+                return str(getattr(self, attr))
+        return f"V1_Service #{getattr(self, 'id', '-') }"
+
 
     id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=120)
@@ -90,41 +189,113 @@ class V1_Service(models.Model):
 
 # Through tables with prefixed names
 class V1_Service_HelpsWith(models.Model):
-    class Meta: db_table = "V1_SERVICE_HELPS_WITH"; app_label = "api"
+    class Meta:
+        db_table = "V1_SERVICE_HELPS_WITH"
+        app_label = "api"
+        managed = False
     service = models.ForeignKey(V1_Service, on_delete=models.CASCADE)
     helpswith = models.ForeignKey(V1_HelpsWith, on_delete=models.CASCADE, db_column="helpswith_id")
+    def __str__(self):
+        for attr in ('name', 'title', 'label', 'description'):
+            if hasattr(self, attr) and getattr(self, attr):
+                return str(getattr(self, attr))
+        return f"V1_Service_HelpsWith #{getattr(self, 'id', '-') }"
+
 
 class V1_Service_WhoFor(models.Model):
-    class Meta: db_table = "V1_SERVICE_WHO_FOR"; app_label = "api"
+    class Meta:
+        db_table = "V1_SERVICE_WHO_FOR"
+        app_label = "api"
+        managed = False
     service = models.ForeignKey(V1_Service, on_delete=models.CASCADE)
     who_for = models.ForeignKey(V1_WhoFor, on_delete=models.CASCADE)
+    def __str__(self):
+        for attr in ('name', 'title', 'label', 'description'):
+            if hasattr(self, attr) and getattr(self, attr):
+                return str(getattr(self, attr))
+        return f"V1_Service_WhoFor #{getattr(self, 'id', '-') }"
+
 
 class V1_Service_WhoNotFor(models.Model):
-    class Meta: db_table = "V1_SERVICE_WHO_NOT_FOR"; app_label = "api"
+    class Meta:
+        db_table = "V1_SERVICE_WHO_NOT_FOR"
+        app_label = "api"
+        managed = False
     service = models.ForeignKey(V1_Service, on_delete=models.CASCADE)
     who_not_for = models.ForeignKey(V1_WhoNotFor, on_delete=models.CASCADE)
+    def __str__(self):
+        for attr in ('name', 'title', 'label', 'description'):
+            if hasattr(self, attr) and getattr(self, attr):
+                return str(getattr(self, attr))
+        return f"V1_Service_WhoNotFor #{getattr(self, 'id', '-') }"
+
 
 class V1_Service_Mitigation(models.Model):
-    class Meta: db_table = "V1_SERVICE_MITIGATIONS"; app_label = "api"
+    class Meta:
+        db_table = "V1_SERVICE_MITIGATIONS"
+        app_label = "api"
+        managed = False
     service = models.ForeignKey(V1_Service, on_delete=models.CASCADE)
     mitigation = models.ForeignKey(V1_Mitigations, on_delete=models.CASCADE)
+    def __str__(self):
+        for attr in ('name', 'title', 'label', 'description'):
+            if hasattr(self, attr) and getattr(self, attr):
+                return str(getattr(self, attr))
+        return f"V1_Service_Mitigation #{getattr(self, 'id', '-') }"
+
 
 class V1_Service_TimeRequired(models.Model):
-    class Meta: db_table = "V1_SERVICE_TIME_REQUIRED"; app_label = "api"
+    class Meta:
+        db_table = "V1_SERVICE_TIME_REQUIRED"
+        app_label = "api"
+        managed = False
     service = models.ForeignKey(V1_Service, on_delete=models.CASCADE)
     time = models.ForeignKey(V1_TimeRequired, on_delete=models.CASCADE, db_column="time_id")
+    def __str__(self):
+        for attr in ('name', 'title', 'label', 'description'):
+            if hasattr(self, attr) and getattr(self, attr):
+                return str(getattr(self, attr))
+        return f"V1_Service_TimeRequired #{getattr(self, 'id', '-') }"
+
 
 class V1_Service_Access(models.Model):
-    class Meta: db_table = "V1_SERVICE_ACCESS"; app_label = "api"
+    class Meta:
+        db_table = "V1_SERVICE_ACCESS"
+        app_label = "api"
+        managed = False
     service = models.ForeignKey(V1_Service, on_delete=models.CASCADE)
     access = models.ForeignKey(V1_Access, on_delete=models.CASCADE)
+    def __str__(self):
+        for attr in ('name', 'title', 'label', 'description'):
+            if hasattr(self, attr) and getattr(self, attr):
+                return str(getattr(self, attr))
+        return f"V1_Service_Access #{getattr(self, 'id', '-') }"
+
 
 class V1_Service_Cost(models.Model):
-    class Meta: db_table = "V1_SERVICE_COSTS"; app_label = "api"
+    class Meta:
+        db_table = "V1_SERVICE_COSTS"
+        app_label = "api"
+        managed = False
     service = models.ForeignKey(V1_Service, on_delete=models.CASCADE)
     cost = models.ForeignKey(V1_Costs, on_delete=models.CASCADE, db_column="cost_id")
+    def __str__(self):
+        for attr in ('name', 'title', 'label', 'description'):
+            if hasattr(self, attr) and getattr(self, attr):
+                return str(getattr(self, attr))
+        return f"V1_Service_Cost #{getattr(self, 'id', '-') }"
+
 
 class V1_Service_Taxonomy(models.Model):
-    class Meta: db_table = "V1_SERVICE_TAXONOMY"; app_label = "api"
+    class Meta:
+        db_table = "V1_SERVICE_TAXONOMY"
+        app_label = "api"
+        managed = False
     service = models.ForeignKey(V1_Service, on_delete=models.CASCADE)
     taxonomy = models.ForeignKey(V1_Taxonomy, on_delete=models.CASCADE)
+    def __str__(self):
+        for attr in ('name', 'title', 'label', 'description'):
+            if hasattr(self, attr) and getattr(self, attr):
+                return str(getattr(self, attr))
+        return f"V1_Service_Taxonomy #{getattr(self, 'id', '-') }"
+

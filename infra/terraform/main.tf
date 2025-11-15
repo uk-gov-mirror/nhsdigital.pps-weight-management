@@ -332,8 +332,7 @@ resource "aws_ecs_task_definition" "django" {
         { name = "DATABASE_HOST",         value = aws_db_instance.pg.address },
         { name = "DATABASE_PORT",         value = "5432" },
         { name = "DATABASE_NAME",         value = var.db_name },
-        { name = "DATABASE_USER",         value = var.db_username },
-		
+        { name = "DATABASE_USER",         value = var.db_username }
       ]
       secrets = [
         { name = "DATABASE_PASSWORD"   , valueFrom = aws_ssm_parameter.db_password.arn },
