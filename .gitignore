@@ -16,3 +16,4 @@ override.tf
 /test-results/
 /reports/
 .env
+__pycache__

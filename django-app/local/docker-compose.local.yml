@@ -22,6 +22,9 @@ services:
     environment:
       DJANGO_SETTINGS_MODULE: wm_django.settings.dev
       DATABASE_URL: postgres://app:app@db:5432/app
+      DJANGO_SUPERUSER_USERNAME: admin
+      DJANGO_SUPERUSER_EMAIL: admin@example.com
+      DJANGO_SUPERUSER_PASSWORD: admin123
     depends_on:
       db:
         condition: service_healthy

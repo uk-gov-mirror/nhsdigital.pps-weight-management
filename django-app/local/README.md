@@ -22,7 +22,9 @@ This repository includes a Docker Compose setup for running the Django app and P
    ```bash
    cd django-app
    docker build -t ppswm:local .
-   docker compose -p local -f local/docker-compose.local.yml up --build -d web
+   docker compose -p local -f local/docker-compose.local.yml up -d web
+   docker compose -f local/docker-compose.local.yml exec web python manage.py migrate
+   docker compose -f local/docker-compose.local.yml exec web python manage.py createsuperuser --noinput
    ```
 
 3. Run DB update script
@@ -33,7 +35,7 @@ This repository includes a Docker Compose setup for running the Django app and P
 4. Visit the app:
    - Django site → http://localhost:8000  
    - Health check → http://localhost:8000/health/
-   - Public API → http://localhost:8000/public/api/ping
+   - REST API → http://localhost:8000/apidocs
 
 5. Stop containers:
    ```bash
