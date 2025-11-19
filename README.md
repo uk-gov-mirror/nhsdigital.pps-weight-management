@@ -1,8 +1,5 @@
 # PPS Weight Management
 
-## Status
-**Under development** Currently testing and developing the no-regrets tech stack, CICD pipelines, and AWS resources needed. The website deployed is a simple "Hello World" app using Django for testing the infrastrcuture.
-
 ##Project Structure
 ```
 .
