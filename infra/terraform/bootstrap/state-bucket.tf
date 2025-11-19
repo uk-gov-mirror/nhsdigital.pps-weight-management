@@ -26,20 +26,20 @@ resource "aws_s3_bucket" "terraform_state" {
     enabled = true
   }
 
-  # Enforce server-side encryption for all objects in the bucket
-  # to secure the state file at rest.
-  server_side_encryption_configuration {
-    rule {
-      apply_server_side_encryption_by_default {
-        sse_algorithm = "AES256"
-      }
-    }
-  }
-
   # Add a tag to easily identify the bucket's purpose.
   tags = {
     Name    = "Terraform State Bucket"
 	Project = "nhse-pps-wm"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "terraform_state" {
+  bucket = aws_s3_bucket.terraform_state.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
   }
 }
 

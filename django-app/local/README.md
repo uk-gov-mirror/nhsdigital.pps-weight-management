@@ -13,7 +13,7 @@ This repository includes a Docker Compose setup for running the Django app and P
    aws sso login --profile admin-pps-wm
 
    cd infra/terraform
-   terraform init -reconfigure -backend-config="bucket=nhse-pps-wm-terraform-state-bucket" -backend-config="key={env}/terraform.tfstate" -backend-config="region=eu-west-2"
+   terraform init -reconfigure -backend-config="bucket=nhse-pps-wm-terraform-state-bucket" -backend-config="key=poc/terraform.tfstate" -backend-config="region=eu-west-2"
    terraform output -raw cognito_client_id_ci
    terraform output -raw cognito_user_pool_id
    ```
@@ -21,6 +21,7 @@ This repository includes a Docker Compose setup for running the Django app and P
 2. Build and start the containers:
    ```bash
    cd django-app
+   # Start Docker Desktop
    docker build -t ppswm:local .
    docker compose -p local -f local/docker-compose.local.yml up -d web
    docker compose -f local/docker-compose.local.yml exec web python manage.py migrate

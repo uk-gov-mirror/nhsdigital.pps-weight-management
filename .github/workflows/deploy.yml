@@ -282,10 +282,10 @@ jobs:
       GH_ENV:          ${{ needs.prepare.outputs.gh_env }}
       RUN_DJANGO:      ${{ needs.decide.outputs.run_django }}
       AWS_ACCOUNT_ID:  ${{ needs.expose_env_vars.outputs.env_account_id }}
-      ECS_CLUSTER:     ${{ format('{0}-{1}-ecs', vars.PROJECT, needs.prepare.outputs.deploy_env) }}
+      ECS_CLUSTER:     ${{ format('{0}-ecs', vars.PROJECT) }}
       ECS_SERVICE:     ${{ format('{0}-{1}-web', vars.PROJECT, needs.prepare.outputs.deploy_env) }}
       ECS_TASK_FAMILY: ${{ format('{0}-{1}-django', vars.PROJECT, needs.prepare.outputs.deploy_env) }}
-      ECR_REPO_NAME:   ${{ format('{0}-{1}-django', vars.PROJECT, needs.prepare.outputs.deploy_env) }}
+      ECR_REPO_NAME:   ${{ format('{0}-django', vars.PROJECT) }}
     steps:
       - uses: actions/checkout@v4
 

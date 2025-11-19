@@ -1,0 +1,17 @@
+{# Weight management base template #}
+{% extends "nhsuk/template.jinja" %}
+
+{# Override assetPath to use Django static() #}
+{% set assetPath = static('assets') %}
+
+{# Add CSS for all pages #}
+{% block head %}
+    {{ super() }}
+    <link rel="stylesheet" href="{{ static('nhsuk-frontend.min.css') }}">
+{% endblock %}
+
+{# Add JS for all pages #}
+{% block bodyEnd %}
+    {{ super() }}
+    <script src="{{ static('nhsuk-frontend.min.js') }}"></script>
+{% endblock %}

@@ -1,29 +1,40 @@
-# helloworld — Django project (web, api, core, scheduler, templates)
+# Weight Management Site — Django project (Web, REST API, Scheduler, Admin)
 
-## Apps & responsibilities
-- **core**: health endpoint and utilities
-- **web**: Jinja2 server-rendered pages (Hello World)
-- **api**: REST endpoints (`/public/api/*` public, `/secure/api/*` protected by ALB+Cognito)
-- **scheduler**: background jobs; includes `daily_job.py`
-- **templates**: shared templates (plus app-specific templates under `templates/web/...`)
+## Project Structure
+```
+django-app/
+  ├── api/                          # REST API
+  ├── core/                         # Core fucntions
+  ├── local/                        # For local testing on Docker Desktop
+  ├── scheduler/                    # Scheduled task
+  ├── static/                       # Static files (e.g. images)
+  ├── templates/                    # Jinja2 templates
+  ├── web/                          # Website
+  ├── wm-django/                    # App settings
+  ├── Dockerfile
+  ├── manage.py
+  ├── README.md
+  └── requirements.txt
+```
+## Jinja2 Templates
+Jinja2 Templates https://github.com/NHSDigital/nhsuk-frontend-jinja
 
-## Endpoints
-- `/` → Hello World page (Jinja2)
+## NHS UK Styling
+NHS UK Frontend https://github.com/nhsuk/nhsuk-frontend
+
+## Web Endpoints
+- `/` → returns Website
+- `/apidocs` → returns Swagger UI
+- `/admin` → returns Admin site
+
+## REST API Endpoints
 - `/health` → returns `ok` (for ALB health checks)
-- `/public/api/ping` → returns `pong`
-- `/secure/api/items` → GET list, POST create
-- `/secure/api/items/<id>` → GET one
+- `/v1/services` → returns subset of details of services matching search criteria
+- `/v1/service/{id}` → returns Full details of a sepcific service
+- `/v2/services` → returns subset of details of services matching search criteria
+- `/v2/service/{id}` → returns Full details of a sepcific service
 
-> `/secure/api/*` should be protected at the **ALB** using a Cognito authentication rule, but we have no domain or certificate so cannot implement https which is needed. As a temp workaround token parsing is implemented in Django.
-
-## Run locally
-```
-python -m venv .venv
-source .venv\Scripts\activate
-pip install -r requirements.txt
-python manage.py migrate
-python manage.py runserver 0.0.0.0:8000
-```
+More information: https://nhsd-confluence.digital.nhs.uk/spaces/PPP/pages/1226685095/REST+API
 
 ## Run locally in Docker Desktop
 See /local

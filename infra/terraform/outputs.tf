@@ -23,11 +23,11 @@ output "cognito_client_id_spa" {
 }
 
 output "ecr_repository_url" {
-  value = aws_ecr_repository.django.repository_url
+  value = data.terraform_remote_state.bootstrap.outputs.ecr_repository_url
 }
 
 output "ecs_cluster_name" {
-  value = aws_ecs_cluster.app.name
+  value = data.terraform_remote_state.bootstrap.outputs.ecs_cluster_name
 }
 
 output "ecs_service_name" {

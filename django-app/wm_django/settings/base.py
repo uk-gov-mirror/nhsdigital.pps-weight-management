@@ -18,6 +18,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'nhsuk_frontend_jinja',
     "rest_framework",
     "drf_spectacular",
     'core',

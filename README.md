@@ -8,15 +8,7 @@
 .
 ├── .github/
 │   └── workflows/                    # GitHub Actions
-├── django-app/
-│   ├── api/                          # REST API
-│   ├── core/                         # Core fucntions
-│   ├── helloworld/                   # App settings
-│   ├── local/                        # For local testing on Docker Desktop
-│   ├── scheduler/                    # Scheduled task
-│   ├── static/                       # Static files (e.g. images)
-│   ├── templates/                    # Jinja2 templates
-│   └── web/                          # Website
+├── django-app/                       # Django app
 ├── docs/                             # Documentation
 ├── infra/
 │   └── terraform/

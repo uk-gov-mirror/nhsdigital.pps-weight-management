@@ -502,13 +502,43 @@ function Remove-VPCEndpointsAndNAT {
       if (-not $WhatIf) { [void](Invoke-Aws @("ec2","delete-vpc-endpoints","--vpc-endpoint-ids",$ep.VpcEndpointId)) }
     }
   }
+  
+  $deletedNatGws = @()
   if ($ngwJson) {
     foreach ($ng in (($ngwJson | ConvertFrom-Json).NatGateways)) {
+      if ($ng.State -in @("deleted","deleting")) { 
+        Write-Host "NAT Gateway already deleting/deleted: $($ng.NatGatewayId)"
+        continue 
+      }
       $any = $true
       Write-Host "NAT Gateway delete: $($ng.NatGatewayId)"
-      if (-not $WhatIf) { [void](Invoke-Aws @("ec2","delete-nat-gateway","--nat-gateway-id",$ng.NatGatewayId)) }
+      if (-not $WhatIf) { 
+        [void](Invoke-Aws @("ec2","delete-nat-gateway","--nat-gateway-id",$ng.NatGatewayId))
+        $deletedNatGws += $ng.NatGatewayId
+      }
     }
   }
+  
+  # Wait for NAT Gateways to be fully deleted so EIPs are released
+  if ($Wait -and $deletedNatGws.Count -gt 0) {
+    Write-Host "Waiting for NAT Gateway(s) to be deleted (this can take 1-2 minutes)..."
+    foreach ($ngId in $deletedNatGws) {
+      Write-Host "  Waiting for $ngId..."
+      # Poll until deleted
+      for ($i=1; $i -le 60; $i++) {
+        Start-Sleep -Seconds 5
+        $chk = Invoke-Aws @("ec2","describe-nat-gateways","--nat-gateway-ids",$ngId)
+        if (-not $chk) { break }
+        $cDoc = $chk | ConvertFrom-Json
+        if (-not $cDoc.NatGateways -or $cDoc.NatGateways.Count -eq 0) { break }
+        if ($cDoc.NatGateways[0].State -eq 'deleted') { 
+          Write-Host "  $ngId deleted"
+          break 
+        }
+      }
+    }
+  }
+  
   if (-not $any) { Write-Host "No VPC endpoints or NAT gateways with Project=$ProjectValue" }
 }
 
@@ -523,66 +553,37 @@ function Remove-EIPs {
     $assoc = if ($a.PSObject.Properties.Match('AssociationId').Count -gt 0) { $a.AssociationId } else { $null }
     $domain = if ($a.PSObject.Properties.Match('Domain').Count -gt 0) { $a.Domain } else { $null }
 
-    # 1) Try to disassociate (if any)
+    # Check if this EIP is attached to a NAT Gateway
+    # NAT Gateway EIPs are automatically released when the NAT Gateway is deleted
+    $natOwned = $false
+    if ($a.PSObject.Properties.Match('NetworkInterfaceOwnerId').Count -gt 0 -and $a.NetworkInterfaceOwnerId) {
+      if ($a.NetworkInterfaceOwnerId -eq "amazon-aws" -or $a.NetworkInterfaceOwnerId -match "amazon-elb") {
+        Write-Host "EIP skip (NAT Gateway or AWS-managed): $pub ($alloc) - will be auto-released"
+        $natOwned = $true
+      }
+    }
+    
+    if ($natOwned) { continue }
+
+    # Disassociate if attached to something
     if ($assoc) {
       Write-Host "EIP disassociate: $pub ($assoc)"
       if (-not $WhatIf) {
-        $raw = Invoke-Aws @("ec2","disassociate-address","--association-id",$assoc)
-        if (-not $raw) {
-          Write-Warning "Disassociate failed or returned empty output; will check for NAT Gateway bindings."
-        }
+        [void](Invoke-Aws @("ec2","disassociate-address","--association-id",$assoc))
       }
     } elseif ($domain -eq "standard" -and $pub) {
       Write-Host "EIP disassociate (classic): $pub"
       if (-not $WhatIf) { [void](Invoke-Aws @("ec2","disassociate-address","--public-ip",$pub)) }
     }
 
-    # 2) Attempt to release
-    $needNatCheck = $false
+    # Release the EIP
     if ($alloc) {
       Write-Host "EIP release: $alloc"
       if (-not $WhatIf) {
-        $out = & aws @("ec2","release-address","--allocation-id",$alloc) @("--region",$Region) @(if($Profile){"--profile",$Profile}) 2>&1
-        if ($LASTEXITCODE -ne 0) {
-          $txt = ($out | Out-String)
-          Write-Warning $txt.Trim()
-          if ($txt -match "AuthFailure") { $needNatCheck = $true }
-        }
+        [void](Invoke-Aws @("ec2","release-address","--allocation-id",$alloc))
       }
     } else {
       Write-Warning "EIP $pub has no AllocationId; skipping release."
-    }
-
-    # 3) If AuthFailure, check for NAT GW holding this EIP (only delete if NAT is tagged for this Project)
-    if ($needNatCheck -and $alloc) {
-      $natJson = Invoke-Aws @("ec2","describe-nat-gateways","--filter","Name=nat-gateway-address.allocation-id,Values=$alloc")
-      $nats = @()
-      if ($natJson) { try { $nats = ($natJson | ConvertFrom-Json).NatGateways } catch {} }
-      foreach ($ng in $nats) {
-        $tags = @(); if ($ng.PSObject.Properties.Match('Tags').Count -gt 0) { $tags = $ng.Tags }
-        if (-not (Has-TagKV $tags "Project" $ProjectValue)) {
-          Write-Host "Found NAT GW $($ng.NatGatewayId) using $alloc but it is not tagged Project=$ProjectValue — skipping destructive action."
-          continue
-        }
-        Write-Host "Deleting NAT Gateway $($ng.NatGatewayId) that holds EIP $alloc (tagged for this Project)."
-        if (-not $WhatIf) {
-          [void](Invoke-Aws @("ec2","delete-nat-gateway","--nat-gateway-id",$ng.NatGatewayId))
-          if ($Wait) { [void](Invoke-Aws @("ec2","wait","nat-gateway-available","--nat-gateway-ids",$ng.NatGatewayId)) } # best-effort; state model varies
-          # Now retry release
-          Write-Host "Retry EIP release: $alloc"
-          [void](Invoke-Aws @("ec2","release-address","--allocation-id",$alloc))
-        }
-      }
-
-      if (-not $nats -or $nats.Count -eq 0) {
-        Write-Warning "AuthFailure persisted, and no NAT GW found using $alloc. This is likely a cross-account ownership or SCP deny."
-        if ($AccountId -and $Profile) {
-          Write-Host "To diagnose IAM/SCP, run:" -ForegroundColor Yellow
-          Write-Host ("aws iam get-user --profile {0} 2>$null | jq -r '.Arn' ; " -f $Profile) -NoNewline
-          Write-Host "aws sts get-caller-identity --profile $Profile"
-          Write-Host ("aws iam simulate-principal-policy --policy-source-arn <YOUR_ROLE_OR_USER_ARN> --action-names ec2:DisassociateAddress ec2:ReleaseAddress --resource-arns '*' --context-entries ContextKeyName=ec2:AllocationId,ContextKeyValues=$alloc,ContextKeyType=string --profile $Profile") -ForegroundColor DarkYellow
-        }
-      }
     }
   }
 }
@@ -783,19 +784,28 @@ function Remove-CloudWatchLogs {
   if (-not $lgJson) { return }
   $found = $false
   foreach ($lg in (($lgJson | ConvertFrom-Json).logGroups)) {
+    $match = $false
+    
+    # First try tag matching
     $arn = $lg.arn
     if ($arn -match ':\*$') { $arn = $arn -replace ':\*$', '' }
     if (-not $arn -and $AccountId) { $arn = "arn:aws:logs:${Region}:${AccountId}:log-group:$($lg.logGroupName)" }
     $tagsJson = Invoke-Aws @("logs","list-tags-for-resource","--resource-arn",$arn)
-    if (-not $tagsJson) { continue }
-    $tagsObj  = ($tagsJson | ConvertFrom-Json).tags
-    $pairs    = ConvertTo-TagPairs $tagsObj
-    if (-not (Has-TagKV $pairs "Project" $ProjectValue)) { continue }
+    if ($tagsJson) {
+      $tagsObj  = ($tagsJson | ConvertFrom-Json).tags
+      $pairs    = ConvertTo-TagPairs $tagsObj
+      if (Has-TagKV $pairs "Project" $ProjectValue) { $match = $true }
+    }
+    
+    # Fallback to name pattern matching
+    if (-not $match -and $lg.logGroupName -like "*$Env*") { $match = $true }
+    
+    if (-not $match) { continue }
     $found = $true
     Write-Host "CloudWatch LogGroup delete: $($lg.logGroupName)"
     if (-not $WhatIf) { [void](Invoke-Aws @("logs","delete-log-group","--log-group-name",$lg.logGroupName)) }
   }
-  if (-not $found) { Write-Host "No CloudWatch Log Groups with Project=$ProjectValue" }
+  if (-not $found) { Write-Host "No CloudWatch Log Groups with Project=$ProjectValue or matching '$Env'" }
 }
 
 function Remove-SSMParams {
@@ -901,6 +911,82 @@ function Remove-Cognito {
     if (-not $WhatIf) { [void](Invoke-Aws @("cognito-idp","delete-user-pool","--user-pool-id",$p.Id)) }
   }
   if (-not $found) { Write-Host "No Cognito user pools with Project/Env" }
+}
+
+function Remove-EventBridgeScheduler {
+  # List schedule groups first to find schedules
+  $groupsJson = Invoke-Aws @("scheduler","list-schedule-groups")
+  $groups = @("default") # Always check default group
+  if ($groupsJson) {
+    $groupsDoc = $groupsJson | ConvertFrom-Json
+    if ($groupsDoc.PSObject.Properties.Match('ScheduleGroups').Count -gt 0) {
+      foreach ($g in $groupsDoc.ScheduleGroups) {
+        if ($g.Name -like "*$Env*") { $groups += $g.Name }
+      }
+    }
+  }
+
+  $found = $false
+  foreach ($groupName in $groups) {
+    $schedulesJson = Invoke-Aws @("scheduler","list-schedules","--group-name",$groupName)
+    if (-not $schedulesJson) { continue }
+    $doc = $schedulesJson | ConvertFrom-Json
+    if (-not $doc.PSObject.Properties.Match('Schedules').Count -gt 0) { continue }
+    
+    foreach ($sched in $doc.Schedules) {
+      # Match by name pattern
+      if ($sched.Name -notlike "*$Env*") { continue }
+      $found = $true
+      Write-Host "EventBridge Scheduler delete: $($sched.Name) (group: $groupName)"
+      if (-not $WhatIf) {
+        [void](Invoke-Aws @("scheduler","delete-schedule","--name",$sched.Name,"--group-name",$groupName))
+      }
+    }
+  }
+  
+  if (-not $found) { Write-Host "No EventBridge Schedules matching '$Env'" }
+}
+
+function Remove-IAMInstanceProfiles {
+  $profilesJson = Invoke-Aws @("iam","list-instance-profiles")
+  if (-not $profilesJson) { return }
+  $doc = $profilesJson | ConvertFrom-Json
+  $profiles = if ($doc.PSObject.Properties.Match('InstanceProfiles').Count -gt 0) { $doc.InstanceProfiles } else { @() }
+
+  $found = $false
+  foreach ($prof in $profiles) {
+    # Check tags
+    $tagsRaw = Invoke-Aws @("iam","list-instance-profile-tags","--instance-profile-name",$prof.InstanceProfileName)
+    $pairs = @()
+    if ($tagsRaw) {
+      $tagsDoc = $null; try { $tagsDoc = $tagsRaw | ConvertFrom-Json } catch {}
+      if ($tagsDoc -and $tagsDoc.PSObject.Properties.Match('Tags').Count -gt 0) {
+        $pairs = ConvertTo-TagPairs $tagsDoc.Tags
+      }
+    }
+
+    $match = $false
+    if (Has-TagKV $pairs "Project" $ProjectValue) { $match = $true }
+    if (-not $match -and $prof.InstanceProfileName -like "*$Env*") { $match = $true }
+    if (-not $match) { continue }
+
+    $found = $true
+    
+    # Remove roles from instance profile
+    foreach ($role in $prof.Roles) {
+      Write-Host "IAM remove role from instance profile: $($prof.InstanceProfileName) <- $($role.RoleName)"
+      if (-not $WhatIf) {
+        [void](Invoke-Aws @("iam","remove-role-from-instance-profile","--instance-profile-name",$prof.InstanceProfileName,"--role-name",$role.RoleName))
+      }
+    }
+
+    Write-Host "IAM delete instance profile: $($prof.InstanceProfileName)"
+    if (-not $WhatIf) {
+      [void](Invoke-Aws @("iam","delete-instance-profile","--instance-profile-name",$prof.InstanceProfileName))
+    }
+  }
+  
+  if (-not $found) { Write-Host "No IAM Instance Profiles with Project=$ProjectValue or matching '$Env'" }
 }
 
 function Remove-CloudFrontAndWAF {
@@ -1058,7 +1144,47 @@ function Remove-CloudFrontAndWAF {
           }
         }
 
-        if (-not (Has-TagKV $pairs "Project" $ProjectValue)) { continue }
+        if (-not (Has-TagKV $pairs "Project" $ProjectValue)) { 
+          # Fallback to name matching
+          if ($w.Name -notlike "*$Env*") { continue }
+        }
+        
+        # For CloudFront WAFs, we need to check all CloudFront distributions
+        # and disassociate any that use this WAF
+        $cfDistsRaw = Invoke-AwsGlobal @("cloudfront","list-distributions")
+        if ($cfDistsRaw) {
+          $cfDoc = $null; try { $cfDoc = $cfDistsRaw | ConvertFrom-Json } catch {}
+          if ($cfDoc -and $cfDoc.PSObject.Properties.Match('DistributionList').Count -gt 0) {
+            $dlist = $cfDoc.DistributionList
+            if ($dlist -and $dlist.PSObject.Properties.Match('Items').Count -gt 0 -and $dlist.Items) {
+              foreach ($dist in $dlist.Items) {
+                # Check if this distribution uses our WAF
+                if ($dist.WebACLId -eq $webAclArn) {
+                  Write-Host "WAFv2 disassociate from CloudFront: $($dist.Id)"
+                  if (-not $WhatIf) {
+                    # Get current distribution config
+                    $distCfgRaw = Invoke-AwsGlobal @("cloudfront","get-distribution-config","--id",$dist.Id)
+                    if ($distCfgRaw) {
+                      $distCfg = $null; try { $distCfg = $distCfgRaw | ConvertFrom-Json } catch {}
+                      if ($distCfg) {
+                        $cfg = $distCfg.DistributionConfig
+                        $etag = $distCfg.ETag
+                        # Remove WAF association
+                        $cfg.WebACLId = ""
+                        $cfgJson = $cfg | ConvertTo-Json -Depth 32
+                        $tmp = [System.IO.Path]::GetTempFileName()
+                        [System.IO.File]::WriteAllText($tmp, $cfgJson, [System.Text.UTF8Encoding]::new($false))
+                        [void](Invoke-AwsGlobal @("cloudfront","update-distribution","--id",$dist.Id,"--if-match",$etag,"--distribution-config","file://$tmp"))
+                        Remove-Item $tmp -Force -ErrorAction SilentlyContinue
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        
         Write-Host "WAFv2 WebACL (CloudFront) delete: $($w.Name)"
         if (-not $WhatIf) {
           [void](Invoke-AwsGlobal @("wafv2","delete-web-acl","--scope","CLOUDFRONT","--id",$w.Id,"--name",$w.Name,"--lock-token",$lockToken))
@@ -1091,7 +1217,28 @@ function Remove-CloudFrontAndWAF {
           }
         }
 
-        if (-not (Has-TagKV $pairs "Project" $ProjectValue)) { continue }
+        if (-not (Has-TagKV $pairs "Project" $ProjectValue)) { 
+          # Fallback to name matching
+          if ($w.Name -notlike "*$Env*") { continue }
+        }
+        
+        # List and disassociate all resources using this WAF (ALB, API Gateway, etc.)
+        # Try different resource types
+        foreach ($resType in @("APPLICATION_LOAD_BALANCER","API_GATEWAY","APPSYNC","COGNITO_USER_POOL")) {
+          $resourcesRaw = Invoke-Aws @("wafv2","list-resources-for-web-acl","--web-acl-arn",$webAclArn,"--resource-type",$resType)
+          if ($resourcesRaw) {
+            $resourcesDoc = $null; try { $resourcesDoc = $resourcesRaw | ConvertFrom-Json } catch {}
+            if ($resourcesDoc -and $resourcesDoc.PSObject.Properties.Match('ResourceArns').Count -gt 0) {
+              foreach ($resArn in $resourcesDoc.ResourceArns) {
+                Write-Host "WAFv2 disassociate from: $resArn"
+                if (-not $WhatIf) {
+                  [void](Invoke-Aws @("wafv2","disassociate-web-acl","--resource-arn",$resArn))
+                }
+              }
+            }
+          }
+        }
+        
         Write-Host "WAFv2 WebACL (Regional) delete: $($w.Name)"
         if (-not $WhatIf) {
           [void](Invoke-Aws @("wafv2","delete-web-acl","--scope","REGIONAL","--id",$w.Id,"--name",$w.Name,"--lock-token",$lockToken))
@@ -1113,22 +1260,127 @@ function Remove-VPCStacks {
     $vpcId = $vpc.VpcId
     Write-Host "VPC teardown: $vpcId"
 
+    # 1. Network Interfaces - CRITICAL: Detach and delete before anything else
     $eniJson = Invoke-Aws @("ec2","describe-network-interfaces","--filters","Name=vpc-id,Values=$vpcId")
     $enis = if ($eniJson) { ($eniJson | ConvertFrom-Json).NetworkInterfaces } else { @() }
     foreach ($eni in $enis) {
-      if ($eni.Status -eq "in-use") { continue }
+      # Skip interfaces managed by AWS services that will auto-delete
+      if ($eni.InterfaceType -in @("vpc_endpoint","nat_gateway","lambda","interface")) {
+        Write-Host "  ENI skipping (managed): $($eni.NetworkInterfaceId) [$($eni.InterfaceType)]"
+        continue
+      }
+      # Detach if attached
+      if ($eni.Attachment -and $eni.Attachment.AttachmentId -and $eni.Status -eq "in-use") {
+        Write-Host "  ENI detach: $($eni.NetworkInterfaceId)"
+        if (-not $WhatIf) {
+          [void](Invoke-Aws @("ec2","detach-network-interface","--attachment-id",$eni.Attachment.AttachmentId,"--force"))
+          Start-Sleep -Seconds 2
+        }
+      }
       Write-Host "  ENI delete: $($eni.NetworkInterfaceId)"
       if (-not $WhatIf) { [void](Invoke-Aws @("ec2","delete-network-interface","--network-interface-id",$eni.NetworkInterfaceId)) }
     }
 
+    # 2. Security Groups - Remove rules first, then delete groups
     $sgJson = Invoke-Aws @("ec2","describe-security-groups","--filters","Name=vpc-id,Values=$vpcId")
     $sgs = if ($sgJson) { ($sgJson | ConvertFrom-Json).SecurityGroups } else { @() }
+    
+    # First pass: Remove all ingress and egress rules to break circular dependencies
+    foreach ($sg in $sgs) {
+      if ($sg.GroupName -eq "default") { continue }
+      
+      # Remove ingress rules one by one
+      if ($sg.IpPermissions -and $sg.IpPermissions.Count -gt 0) {
+        Write-Host "  SG clear ingress rules: $($sg.GroupId)"
+        foreach ($rule in $sg.IpPermissions) {
+          if (-not $WhatIf) {
+            # Build minimal JSON for this rule - only include properties that exist
+            $ruleObj = @{
+              IpProtocol = if ($rule.IpProtocol) { $rule.IpProtocol } else { "-1" }
+            }
+            if ($rule.PSObject.Properties.Match('FromPort').Count -gt 0 -and $null -ne $rule.FromPort) { 
+              $ruleObj.FromPort = [int]$rule.FromPort 
+            }
+            if ($rule.PSObject.Properties.Match('ToPort').Count -gt 0 -and $null -ne $rule.ToPort) { 
+              $ruleObj.ToPort = [int]$rule.ToPort 
+            }
+            if ($rule.IpRanges -and $rule.IpRanges.Count -gt 0) { $ruleObj.IpRanges = $rule.IpRanges }
+            if ($rule.Ipv6Ranges -and $rule.Ipv6Ranges.Count -gt 0) { $ruleObj.Ipv6Ranges = $rule.Ipv6Ranges }
+            if ($rule.PrefixListIds -and $rule.PrefixListIds.Count -gt 0) { $ruleObj.PrefixListIds = $rule.PrefixListIds }
+            if ($rule.UserIdGroupPairs -and $rule.UserIdGroupPairs.Count -gt 0) { $ruleObj.UserIdGroupPairs = $rule.UserIdGroupPairs }
+            
+            $ruleJson = $ruleObj | ConvertTo-Json -Depth 10 -Compress
+            $tmp = [System.IO.Path]::GetTempFileName()
+            [System.IO.File]::WriteAllText($tmp, "[$ruleJson]", [System.Text.UTF8Encoding]::new($false))
+            [void](Invoke-Aws @("ec2","revoke-security-group-ingress","--group-id",$sg.GroupId,"--ip-permissions","file://$tmp"))
+            Remove-Item $tmp -Force -ErrorAction SilentlyContinue
+          }
+        }
+      }
+      
+      # Remove egress rules one by one
+      if ($sg.IpPermissionsEgress -and $sg.IpPermissionsEgress.Count -gt 0) {
+        Write-Host "  SG clear egress rules: $($sg.GroupId)"
+        foreach ($rule in $sg.IpPermissionsEgress) {
+          if (-not $WhatIf) {
+            # Build minimal JSON for this rule - only include properties that exist
+            $ruleObj = @{
+              IpProtocol = if ($rule.IpProtocol) { $rule.IpProtocol } else { "-1" }
+            }
+            if ($rule.PSObject.Properties.Match('FromPort').Count -gt 0 -and $null -ne $rule.FromPort) { 
+              $ruleObj.FromPort = [int]$rule.FromPort 
+            }
+            if ($rule.PSObject.Properties.Match('ToPort').Count -gt 0 -and $null -ne $rule.ToPort) { 
+              $ruleObj.ToPort = [int]$rule.ToPort 
+            }
+            if ($rule.IpRanges -and $rule.IpRanges.Count -gt 0) { $ruleObj.IpRanges = $rule.IpRanges }
+            if ($rule.Ipv6Ranges -and $rule.Ipv6Ranges.Count -gt 0) { $ruleObj.Ipv6Ranges = $rule.Ipv6Ranges }
+            if ($rule.PrefixListIds -and $rule.PrefixListIds.Count -gt 0) { $ruleObj.PrefixListIds = $rule.PrefixListIds }
+            if ($rule.UserIdGroupPairs -and $rule.UserIdGroupPairs.Count -gt 0) { $ruleObj.UserIdGroupPairs = $rule.UserIdGroupPairs }
+            
+            $ruleJson = $ruleObj | ConvertTo-Json -Depth 10 -Compress
+            $tmp = [System.IO.Path]::GetTempFileName()
+            [System.IO.File]::WriteAllText($tmp, "[$ruleJson]", [System.Text.UTF8Encoding]::new($false))
+            [void](Invoke-Aws @("ec2","revoke-security-group-egress","--group-id",$sg.GroupId,"--ip-permissions","file://$tmp"))
+            Remove-Item $tmp -Force -ErrorAction SilentlyContinue
+          }
+        }
+      }
+    }
+    
+    # Second pass: Delete security groups
     foreach ($sg in $sgs) {
       if ($sg.GroupName -eq "default") { continue }
       Write-Host "  SG delete: $($sg.GroupId) ($($sg.GroupName))"
       if (-not $WhatIf) { [void](Invoke-Aws @("ec2","delete-security-group","--group-id",$sg.GroupId)) }
     }
 
+    # 3. VPC Peering Connections
+    $peerJson = Invoke-Aws @("ec2","describe-vpc-peering-connections","--filters","Name=requester-vpc-info.vpc-id,Values=$vpcId")
+    $peers = if ($peerJson) { ($peerJson | ConvertFrom-Json).VpcPeeringConnections } else { @() }
+    foreach ($peer in $peers) {
+      Write-Host "  VPC Peering delete: $($peer.VpcPeeringConnectionId)"
+      if (-not $WhatIf) { [void](Invoke-Aws @("ec2","delete-vpc-peering-connection","--vpc-peering-connection-id",$peer.VpcPeeringConnectionId)) }
+    }
+    $peerJson2 = Invoke-Aws @("ec2","describe-vpc-peering-connections","--filters","Name=accepter-vpc-info.vpc-id,Values=$vpcId")
+    $peers2 = if ($peerJson2) { ($peerJson2 | ConvertFrom-Json).VpcPeeringConnections } else { @() }
+    foreach ($peer in $peers2) {
+      Write-Host "  VPC Peering delete (accepter): $($peer.VpcPeeringConnectionId)"
+      if (-not $WhatIf) { [void](Invoke-Aws @("ec2","delete-vpc-peering-connection","--vpc-peering-connection-id",$peer.VpcPeeringConnectionId)) }
+    }
+
+    # 4. VPN Gateways
+    $vgwJson = Invoke-Aws @("ec2","describe-vpn-gateways","--filters","Name=attachment.vpc-id,Values=$vpcId")
+    $vgws = if ($vgwJson) { ($vgwJson | ConvertFrom-Json).VpnGateways } else { @() }
+    foreach ($vgw in $vgws) {
+      Write-Host "  VGW detach & delete: $($vgw.VpnGatewayId)"
+      if (-not $WhatIf) {
+        [void](Invoke-Aws @("ec2","detach-vpn-gateway","--vpn-gateway-id",$vgw.VpnGatewayId,"--vpc-id",$vpcId))
+        [void](Invoke-Aws @("ec2","delete-vpn-gateway","--vpn-gateway-id",$vgw.VpnGatewayId))
+      }
+    }
+
+    # 5. Route Tables
     $rtJson = Invoke-Aws @("ec2","describe-route-tables","--filters","Name=vpc-id,Values=$vpcId")
     $rts = if ($rtJson) { ($rtJson | ConvertFrom-Json).RouteTables } else { @() }
     foreach ($rt in $rts) {
@@ -1145,6 +1397,7 @@ function Remove-VPCStacks {
       if (-not $WhatIf) { [void](Invoke-Aws @("ec2","delete-route-table","--route-table-id",$rt.RouteTableId)) }
     }
 
+    # 6. Network ACLs
     $naclJson = Invoke-Aws @("ec2","describe-network-acls","--filters","Name=vpc-id,Values=$vpcId")
     $nacls = if ($naclJson) { ($naclJson | ConvertFrom-Json).NetworkAcls } else { @() }
     foreach ($nacl in $nacls) {
@@ -1153,6 +1406,7 @@ function Remove-VPCStacks {
       if (-not $WhatIf) { [void](Invoke-Aws @("ec2","delete-network-acl","--network-acl-id",$nacl.NetworkAclId)) }
     }
 
+    # 7. Subnets
     $subJson = Invoke-Aws @("ec2","describe-subnets","--filters","Name=vpc-id,Values=$vpcId")
     $subs = if ($subJson) { ($subJson | ConvertFrom-Json).Subnets } else { @() }
     foreach ($s in $subs) {
@@ -1160,6 +1414,7 @@ function Remove-VPCStacks {
       if (-not $WhatIf) { [void](Invoke-Aws @("ec2","delete-subnet","--subnet-id",$s.SubnetId)) }
     }
 
+    # 8. Internet Gateways
     $igwJson = Invoke-Aws @("ec2","describe-internet-gateways","--filters","Name=attachment.vpc-id,Values=$vpcId")
     $igws = if ($igwJson) { ($igwJson | ConvertFrom-Json).InternetGateways } else { @() }
     foreach ($igw in $igws) {
@@ -1170,9 +1425,64 @@ function Remove-VPCStacks {
       }
     }
 
+    # 9. Egress-Only Internet Gateways (IPv6)
+    $eigwJson = Invoke-Aws @("ec2","describe-egress-only-internet-gateways")
+    $eigws = if ($eigwJson) { ($eigwJson | ConvertFrom-Json).EgressOnlyInternetGateways } else { @() }
+    foreach ($eigw in $eigws) {
+      $attached = $false
+      if ($eigw.Attachments) {
+        foreach ($att in $eigw.Attachments) {
+          if ($att.VpcId -eq $vpcId) { $attached = $true; break }
+        }
+      }
+      if ($attached) {
+        Write-Host "  Egress-Only IGW delete: $($eigw.EgressOnlyInternetGatewayId)"
+        if (-not $WhatIf) { [void](Invoke-Aws @("ec2","delete-egress-only-internet-gateway","--egress-only-internet-gateway-id",$eigw.EgressOnlyInternetGatewayId)) }
+      }
+    }
+
+    # 10. DHCP Options - Only disassociate, don't delete (may be shared)
+    if ($vpc.DhcpOptionsId -and $vpc.DhcpOptionsId -ne "default") {
+      Write-Host "  DHCP Options disassociate: $($vpc.DhcpOptionsId)"
+      if (-not $WhatIf) {
+        # Associate with default - the custom DHCP option set will remain but VPC won't block deletion
+        [void](Invoke-Aws @("ec2","associate-dhcp-options","--dhcp-options-id","default","--vpc-id",$vpcId))
+      }
+    }
+
+    # 11. Finally delete the VPC
     Write-Host "VPC delete: $vpcId"
     if (-not $WhatIf) { [void](Invoke-Aws @("ec2","delete-vpc","--vpc-id",$vpcId)) }
   }
+}
+
+function Remove-OrphanedDHCPOptions {
+  # After VPCs are deleted, clean up any DHCP options that were disassociated
+  $dhcpJson = Invoke-Aws @("ec2","describe-dhcp-options")
+  if (-not $dhcpJson) { return }
+  $doc = $dhcpJson | ConvertFrom-Json
+  $dhcps = if ($doc.DhcpOptions) { $doc.DhcpOptions } else { @() }
+
+  $found = $false
+  foreach ($dhcp in $dhcps) {
+    # Check if it has the Project tag
+    if (-not (Has-TagKV $dhcp.Tags "Project" $ProjectValue)) { continue }
+    
+    # Check if it's associated with any VPC
+    $vpcJson = Invoke-Aws @("ec2","describe-vpcs","--filters","Name=dhcp-options-id,Values=$($dhcp.DhcpOptionsId)")
+    $vpcs = if ($vpcJson) { ($vpcJson | ConvertFrom-Json).Vpcs } else { @() }
+    
+    if ($vpcs.Count -eq 0) {
+      $found = $true
+      Write-Host "DHCP Options delete (orphaned): $($dhcp.DhcpOptionsId)"
+      if (-not $WhatIf) {
+        [void](Invoke-Aws @("ec2","delete-dhcp-options","--dhcp-options-id",$dhcp.DhcpOptionsId))
+      }
+    } else {
+      Write-Host "DHCP Options $($dhcp.DhcpOptionsId) still in use by $($vpcs.Count) VPC(s), skipping"
+    }
+  }
+  if (-not $found) { Write-Host "No orphaned DHCP Options with Project=$ProjectValue" }
 }
 
 function Remove-IAMPolicies {
@@ -1251,6 +1561,93 @@ function Remove-IAMPolicies {
   } while ($polNext)
 }
 
+function Remove-IAMRoles {
+  # IAM is global; region is ignored by AWS CLI. We still pass it for consistency.
+  $roleNext = $null
+  do {
+    $args = @("iam","list-roles")
+    if ($roleNext) { $args += @("--marker",$roleNext) }
+
+    $raw = Invoke-Aws $args
+    if (-not $raw) { break }
+
+    $doc = $null; try { $doc = $raw | ConvertFrom-Json } catch {}
+    if (-not $doc) { break }
+
+    $roles = if ($doc.PSObject.Properties.Match('Roles').Count -gt 0) { $doc.Roles } else { @() }
+
+    foreach ($r in $roles) {
+      # Check tags
+      $tagsRaw = Invoke-Aws @("iam","list-role-tags","--role-name",$r.RoleName)
+      $pairs = @()
+      if ($tagsRaw) {
+        $tagsDoc = $null; try { $tagsDoc = $tagsRaw | ConvertFrom-Json } catch {}
+        if ($tagsDoc -and $tagsDoc.PSObject.Properties.Match('Tags').Count -gt 0) {
+          $pairs = ConvertTo-TagPairs $tagsDoc.Tags
+        }
+      }
+
+      $match = $false
+      if (Has-TagKV $pairs "Project" $ProjectValue) { $match = $true }
+      if (-not $match -and $r.RoleName -like "*$Env*") { $match = $true }
+      if (-not $match) { continue }
+
+      # Detach all managed policies
+      $attachedRaw = Invoke-Aws @("iam","list-attached-role-policies","--role-name",$r.RoleName)
+      $attached = @()
+      if ($attachedRaw) {
+        $attachedDoc = $null; try { $attachedDoc = $attachedRaw | ConvertFrom-Json } catch {}
+        if ($attachedDoc -and $attachedDoc.PSObject.Properties.Match('AttachedPolicies').Count -gt 0) {
+          $attached = $attachedDoc.AttachedPolicies
+        }
+      }
+      foreach ($pol in $attached) {
+        Write-Host "IAM detach policy from role: $($r.RoleName) <- $($pol.PolicyName)"
+        if (-not $WhatIf) { [void](Invoke-Aws @("iam","detach-role-policy","--role-name",$r.RoleName,"--policy-arn",$pol.PolicyArn)) }
+      }
+
+      # Delete all inline policies
+      $inlineRaw = Invoke-Aws @("iam","list-role-policies","--role-name",$r.RoleName)
+      $inlinePolicies = @()
+      if ($inlineRaw) {
+        $inlineDoc = $null; try { $inlineDoc = $inlineRaw | ConvertFrom-Json } catch {}
+        if ($inlineDoc -and $inlineDoc.PSObject.Properties.Match('PolicyNames').Count -gt 0) {
+          $inlinePolicies = $inlineDoc.PolicyNames
+        }
+      }
+      foreach ($polName in $inlinePolicies) {
+        Write-Host "IAM delete inline policy from role: $($r.RoleName) / $polName"
+        if (-not $WhatIf) { [void](Invoke-Aws @("iam","delete-role-policy","--role-name",$r.RoleName,"--policy-name",$polName)) }
+      }
+
+      # Remove role from instance profiles
+      $profilesRaw = Invoke-Aws @("iam","list-instance-profiles-for-role","--role-name",$r.RoleName)
+      $profiles = @()
+      if ($profilesRaw) {
+        $profilesDoc = $null; try { $profilesDoc = $profilesRaw | ConvertFrom-Json } catch {}
+        if ($profilesDoc -and $profilesDoc.PSObject.Properties.Match('InstanceProfiles').Count -gt 0) {
+          $profiles = $profilesDoc.InstanceProfiles
+        }
+      }
+      foreach ($prof in $profiles) {
+        Write-Host "IAM remove role from instance profile: $($r.RoleName) <- $($prof.InstanceProfileName)"
+        if (-not $WhatIf) { [void](Invoke-Aws @("iam","remove-role-from-instance-profile","--instance-profile-name",$prof.InstanceProfileName,"--role-name",$r.RoleName)) }
+      }
+
+      # Now delete the role
+      Write-Host "IAM delete role: $($r.RoleName)"
+      if (-not $WhatIf) { [void](Invoke-Aws @("iam","delete-role","--role-name",$r.RoleName)) }
+    }
+
+    # Pagination
+    $roleNext = $null
+    if ($doc.PSObject.Properties.Match('IsTruncated').Count -gt 0 -and $doc.IsTruncated `
+        -and $doc.PSObject.Properties.Match('Marker').Count -gt 0 -and $doc.Marker) {
+      $roleNext = $doc.Marker
+    }
+  } while ($roleNext)
+}
+
 function Invoke-EcsDeleteTaskDefs {
   param([string[]]$Arns)
 
@@ -1295,7 +1692,6 @@ $steps = @(
   @{ Name = "Orphan Target Groups";          Action = { Remove-OrphanTargetGroups } },
   @{ Name = "API Gateway";                   Action = { Remove-ApiGateway } },
   @{ Name = "VPC Endpoints & NAT GW";        Action = { Remove-VPCEndpointsAndNAT } },
-  @{ Name = "Elastic IPs";                   Action = { Remove-EIPs } },
   @{ Name = "S3 Buckets";                    Action = { Remove-S3 } },
   @{ Name = "ECR Repositories";              Action = { Remove-ECR } },
   @{ Name = "RDS Instances/Subnet Groups";   Action = { Remove-RDS } },
@@ -1306,9 +1702,14 @@ $steps = @(
   @{ Name = "SSM Params (path prefix)";      Action = { Remove-SSMParamsByPathPrefix } },
   @{ Name = "EFS";                           Action = { Remove-EFS } },
   @{ Name = "Cognito";                       Action = { Remove-Cognito } },
+  @{ Name = "EventBridge Scheduler";         Action = { Remove-EventBridgeScheduler } },
   @{ Name = "CloudFront & WAFv2";            Action = { Remove-CloudFrontAndWAF } },
   @{ Name = "VPC Core";                      Action = { Remove-VPCStacks } },
-  @{ Name = "IAM Managed Policies";          Action = { Remove-IAMPolicies } }
+  @{ Name = "Elastic IPs";                   Action = { Remove-EIPs } },
+  @{ Name = "Orphaned DHCP Options";         Action = { Remove-OrphanedDHCPOptions } },
+  @{ Name = "IAM Managed Policies";          Action = { Remove-IAMPolicies } },
+  @{ Name = "IAM Roles";                     Action = { Remove-IAMRoles } },
+  @{ Name = "IAM Instance Profiles";         Action = { Remove-IAMInstanceProfiles } }
 )
 
 foreach ($s in $steps) {
