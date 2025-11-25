@@ -1,0 +1,31 @@
+
+.app-robo-mecc {
+  background-image: url('/images/bot/avatar-standard.svg');
+  background-size: 75px;
+  background-repeat: no-repeat;
+  padding-left: 100px;
+
+  & > div:first-child {
+    background-color: nhsuk-colour("white");
+    border-radius: nhsuk-spacing(2);
+    padding: nhsuk-spacing(4);
+    position: relative;
+    //display: inline-block;
+
+    &::before {
+      content: "";
+      position: absolute;
+      left: -16px; /* Place triangle outside the left edge */
+      top: 28px;   /* Vertically align, adjust as needed */
+      width: 0;
+      height: 0;
+      border-top: 8px solid transparent;
+      border-bottom: 8px solid transparent;
+      border-right: 16px solid nhsuk-colour("white");
+    }
+
+    & :last-child {
+      margin-bottom: 0;
+    }
+  }
+}

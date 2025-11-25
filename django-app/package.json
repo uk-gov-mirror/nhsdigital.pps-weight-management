@@ -1,0 +1,11 @@
+{
+  "name": "nhs-weight-management",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build-css": "sass static/assets/sass/main.scss static/assets/css/main.css --style=compressed"
+  },
+  "devDependencies": {
+    "sass": "^1.80.0"
+  }
+}

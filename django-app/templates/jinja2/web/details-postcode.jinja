@@ -1,0 +1,56 @@
+{% extends 'web/base.jinja' %}
+
+{% set pageName = "What is your home postcode?" %}
+
+{% block beforeContent %}
+  {{ backLink({
+    "href": "/",
+    "text": "Back"
+  }) }}
+{% endblock %}
+
+{% block content %}
+<div class="nhsuk-grid-row">
+  <div class="nhsuk-grid-column-two-thirds">
+
+    {% if error %}
+    {{ errorSummary({
+      "titleText": "There is a problem",
+      "errorList": [
+        {
+          "text": "Enter a postcode",
+          "href": "#details-postcode"
+        }
+      ]
+    }) }}
+    {% endif %}
+
+    <form method="post">
+      {{ csrf_input }}
+
+      {{ input({
+        "label": {
+          "text": "What is your home postcode?",
+          "classes": "nhsuk-label--l",
+          "isPageHeading": "true"
+        },
+        "hint": {
+          "text": "So we can show you stuff near your home"
+        },
+        "id": "details-postcode",
+        "name": "details-postcode",
+        "classes": "nhsuk-input--width-10",
+        "value": data["details-postcode"] if data["details-postcode"] else undefined,
+        "errorMessage": {
+          "text": "Enter a postcode"
+        } if error else undefined
+      }) }}
+
+      {{ button({
+        "text": "Continue"
+      }) }}
+
+    </form>
+  </div>
+</div>
+{% endblock %}

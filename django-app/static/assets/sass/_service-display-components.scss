@@ -1,0 +1,34 @@
+.app-roundel {
+
+  @include mq($until: desktop) {
+    width: 75px;
+  }
+
+  &.app-listing {
+    width: 75px;
+  }
+
+  &.app-detail {
+    width: 135px;
+    @include mq($until: desktop) {
+      width: 75px;
+    }
+  }
+
+  & > img {
+    display: block;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    border-radius: 25%;
+    border: 4px solid #d8dde0;
+  }
+}
+
+.app-u-definition-list {
+  margin: 0;
+
+  & > * {
+    display: block;
+    margin: 0;
+  }
+}

@@ -4,15 +4,18 @@ param(
 
     # Relative paths from base directory
     [string]$SrcRel  = "node_modules\nhsuk-frontend\dist\nhsuk",
-    [string]$DestRel = "django-app\static"
+    [string]$DestRel = "django-app\static",
+    [string]$ScssRel = "django-app\static\assets\sass\nhsuk-frontend"
 )
 
 $SrcRoot  = Join-Path $Base $SrcRel
 $DestRoot = Join-Path $Base $DestRel
+$ScssRoot = Join-Path $Base $ScssRel
 
 Write-Host "Working directory: $Base"
 Write-Host "Source          : $SrcRoot"
 Write-Host "Destination     : $DestRoot"
+Write-Host "SCSS            : $ScssRoot"
 Write-Host ""
 
 if (-not (Test-Path $SrcRoot)) {
@@ -53,3 +56,33 @@ Get-ChildItem -Path $SrcRoot -Recurse -File | Where-Object {
 
 Write-Host ""
 Write-Host "Done. Files copied to '$DestRoot' with structure preserved." -ForegroundColor Green
+
+# Allowed/deployable file types
+$allowedExtensions = @(
+    '.scss', '.sass'
+)
+
+# Ensure destination root exists
+if (-not (Test-Path $ScssRoot)) {
+    New-Item -ItemType Directory -Path $ScssRoot -Force | Out-Null
+}
+
+Write-Host "Copying nhsuk-frontend SCSS dist assets..." -ForegroundColor Cyan
+
+Get-ChildItem -Path $SrcRoot -Recurse -File | Where-Object {
+    $allowedExtensions -contains $_.Extension.ToLower()
+} | ForEach-Object {
+    $relativePath = $_.FullName.Substring($SrcRoot.Length).TrimStart('\','/')
+    $destPath     = Join-Path $ScssRoot $relativePath
+    $destDir      = Split-Path $destPath -Parent
+
+    if (-not (Test-Path $destDir)) {
+        New-Item -ItemType Directory -Path $destDir -Force | Out-Null
+    }
+
+    Write-Host "  -> $relativePath"
+    Copy-Item -Path $_.FullName -Destination $destPath -Force
+}
+
+Write-Host ""
+Write-Host "Done. SCSS files copied to '$ScssRoot' with structure preserved." -ForegroundColor Green

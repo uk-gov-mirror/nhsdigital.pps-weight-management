@@ -1,6 +1,13 @@
 {# Weight management base template #}
 {% extends "nhsuk/template.jinja" %}
 
+{% from "nhsuk/components/button/macro.jinja" import button %}
+{% from "nhsuk/components/back-link/macro.jinja" import backLink %}
+{% from "nhsuk/components/input/macro.jinja" import input %}
+{% from "nhsuk/components/error-summary/macro.jinja" import errorSummary %}
+{% from "nhsuk/components/checkboxes/macro.jinja" import checkboxes %}
+{% from "nhsuk/components/radios/macro.jinja" import radios %}
+
 {# Override assetPath to use Django static() #}
 {% set assetPath = static('assets') %}
 
@@ -8,10 +15,27 @@
 {% block head %}
     {{ super() }}
     <link rel="stylesheet" href="{{ static('nhsuk-frontend.min.css') }}">
+	<link rel="stylesheet" href="{{ static('assets/css/main.css') }}">
 {% endblock %}
 
-{# Add JS for all pages #}
+{% block header %}
+  {{ header({
+    "service": {
+      "text": serviceName,
+      "href": url('home')
+    }
+  }) }}
+{% endblock %}
+
+{% block footer %}
+  {{ super() }}
+{% endblock %}
+
 {% block bodyEnd %}
-    {{ super() }}
-    <script src="{{ static('nhsuk-frontend.min.js') }}"></script>
+  {{ super() }}
+  <script type="module">
+    import { initAll } from "{{ static('nhsuk-frontend.min.js') }}";
+    initAll();
+  </script>
+  <script src="{{ static('assets/javascript/main.js') }}"></script>
 {% endblock %}

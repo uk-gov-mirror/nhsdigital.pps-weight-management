@@ -1,0 +1,26 @@
+// Very app-specific print tweaks
+
+// 1. Utility classes:
+
+.app-util-only-print {
+  display: none;
+}
+@include nhsuk-media-query($media-type: print) {
+  .app-util-only-print {
+    display: inherit;
+  }
+  .app-util-suppress-print {
+    display: none;
+  }
+}
+
+// 2. Specific tweaks to existing elements:
+
+@include nhsuk-media-query($media-type: print) {
+  .nhsuk-header__logo {
+    display: none;
+  }
+  .nhsuk-header__service-name:before {
+    content: 'NHS ';
+  }
+}

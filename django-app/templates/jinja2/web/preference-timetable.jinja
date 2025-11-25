@@ -1,0 +1,71 @@
+{% extends 'web/base.jinja' %}
+
+{% set pageName = "Do you prefer to follow a plan or go at your own pace?" %}
+
+{% block beforeContent %}
+  {{ backLink({
+    "href": "/preference-who-with",
+    "text": "Back"
+  }) }}
+{% endblock %}
+
+{% block content %}
+<div class="nhsuk-grid-row">
+  <div class="nhsuk-grid-column-two-thirds">
+
+    {% if error %}
+    {{ errorSummary({
+      "titleText": "There is a problem",
+      "errorList": [
+        {
+          "text": "Please choose an option",
+          "href": "#timetable"
+        }
+      ]
+    }) }}
+    {% endif %}
+
+    <form method="post">
+      {{ csrf_input }}
+
+      {{ radios({
+        "idPrefix": "timetable",
+        "name": "timetable",
+        "errorMessage": {
+          "text": "Please choose an option"
+        } if error else undefined,
+        "fieldset": {
+          "legend": {
+            "text": "Do you prefer to follow a schedule or go at your own pace?",
+            "classes": "nhsuk-fieldset__legend--l",
+            "isPageHeading": "true"
+          }
+        },
+        "items": [
+          {
+            "value": "timetable.scheduled",
+            "text": "Follow a schedule"
+          },
+          {
+            "value": "timetable.self_paced_plan",
+            "text": "At my own pace"
+          },
+          {
+            "divider": "or"
+          },
+          {
+            "value": "dont_mind",
+            "text": "Don’t mind"
+          }
+        ],
+        "value": data.timetable if data.timetable else undefined
+      }) }}
+
+      {{ button({
+        "text": "Continue"
+      }) }}
+
+    </form>
+  </div>
+</div>
+{% endblock %}

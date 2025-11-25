@@ -1,0 +1,40 @@
+/* Filter toggling */
+.js-toggle-button {
+  display: none;
+}
+
+body.js-obfuscate {
+  overflow: hidden;
+  height: 100vh; /* full viewport height */
+}
+
+/* Small screen (≤768px) */
+@media (max-width: 768px) {
+  .js-toggle-button {
+    display: inline-block;
+  }
+
+  #js-listing-filters {
+    position: fixed; /* take it out of the DOM flow and fix it to the viewport */
+    top: 0;
+    left: 0;
+    width: 100vw; /* full viewport width */
+    height: 100vh; /* full viewport height */
+    z-index: 9999; /* ensure it's on top of everything */
+    overflow: auto; /* if content inside this needs scrolling */
+    background: nhsuk-colour("grey-4"); /* or any other background to cover page */
+    pointer-events: auto; /* allow interaction if needed */
+    transform: translateX(-100%); /* Start offscreen to the left */
+    transition: transform 0.25s ease-in-out;
+  }
+
+  #js-listing-filters.js-show {
+    transform: translateX(0);
+  }
+
+  .app-listing-filters-form {
+    position: relative;
+    display: block;
+    padding: nhsuk-spacing(4)
+  }
+}

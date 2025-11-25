@@ -1,0 +1,72 @@
+{% extends 'web/base.jinja' %}
+
+{% set pageName = "Can we use your basic information?" %}
+
+{% block beforeContent %}
+  {{ backLink({
+    "href": "/",
+    "text": "Back"
+  }) }}
+{% endblock %}
+
+{% block content %}
+<div class="nhsuk-grid-row">
+  <div class="nhsuk-grid-column-two-thirds">
+
+    {% if error %}
+    {{ errorSummary({
+      "titleText": "There is a problem",
+      "errorList": [
+        {
+          "text": "Please choose an option",
+          "href": "#can-we-use-your-basic-information"
+        }
+      ]
+    }) }}
+    {% endif %}
+
+    <h1>Can we use your basic information?</h1>
+
+    <p>As part of this test, we need to know a few details about you so we can:</p>
+    <ul>
+      <li>make suggestions that might work for you</li>
+      <li>check in with you to help you keep going</li>
+    </ul>
+
+    <p>To find out how we’ll use your information, <a href="#" target="_blank">read our privacy policy (opens in new tab).</a></p>
+
+    <form method="post">
+
+      {{ radios({
+        "idPrefix": "can-we-use-your-basic-information",
+        "name": "can-we-use-your-basic-information",
+        "errorMessage": {
+          "text": "Please choose an option"
+        } if error else undefined,
+        "fieldset": {
+          "legend": {
+            "text": "We’ll need your name, postcode and contact details. Is that OK?",
+            "classes": "nhsuk-fieldset__legend--m"
+          }
+        },
+        "items": [
+          {
+            "value": "yes",
+            "text": "Yes"
+          },
+          {
+            "value": "no",
+            "text": "No"
+          }
+        ],
+        "value": data["can-we-use-your-basic-information"] if data["can-we-use-your-basic-information"] else undefined
+      }) }}
+
+      {{ button({
+        "text": "Continue"
+      }) }}
+
+    </form>
+  </div>
+</div>
+{% endblock %}

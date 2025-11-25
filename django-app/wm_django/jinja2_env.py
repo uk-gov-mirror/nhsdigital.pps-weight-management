@@ -15,6 +15,7 @@ def environment(**options):
     env.globals.update({
         "static": staticfiles_storage.url,
         "url": reverse,
+        "serviceName": "Help to stay healthy",
     })
 
     return env

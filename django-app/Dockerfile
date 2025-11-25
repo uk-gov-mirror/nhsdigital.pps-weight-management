@@ -1,6 +1,17 @@
 # syntax=docker/dockerfile:1
 
 ARG PYTHON_VERSION=3.12
+
+# ---- Stage 1: build CSS ----
+FROM node:22-alpine AS assets
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci || npm install
+COPY . .
+RUN npm run build-css
+
+# ---- Stage 2: build Django app ----
 FROM python:${PYTHON_VERSION}-slim AS base
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -19,8 +30,11 @@ RUN python -m pip install --upgrade pip setuptools wheel \
  && pip install --no-cache-dir gunicorn
 
 COPY . .
-RUN python manage.py collectstatic --noinput
 
+COPY --from=assets /app/static/assets/css ./static/assets/css
+RUN python manage.py collectstatic --noinput \
+ && rm -rf static/assets/sass
+ 
 USER appuser
 EXPOSE 8000
 
