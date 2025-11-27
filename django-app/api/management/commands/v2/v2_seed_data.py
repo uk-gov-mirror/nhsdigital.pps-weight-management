@@ -2,8 +2,6 @@ from django.core.management.base import BaseCommand
 from django.db import connection, transaction
 import os, tempfile
 
-# Auto-generated from /wm_rest_api/instance/services_v2.db
-
 V2_ACTION_TYPE = [
     (1, 'app store'),
     (2, 'action link'),
@@ -114,7 +112,7 @@ V2_TAXONOMY = [
     (15, 'channel.digital'),
     (18, 'cost.permanent_discount'),
     (19, 'goals.exercise'),
-    (20, 'goals.healthy_eating'),
+    (20, 'goals.healthy_eating')
 ]
 V2_CATEGORY = [
     (1, 'exercise'),
@@ -126,19 +124,19 @@ V2_SERVICE = [
 """, """<p>Parkruns are free, local 5k runs that anyone can enter.</p>
 """, """<p>Parkruns usually happen at the same time and place, once a week. If you want your time to be recorded you&#39;ll need to register on the Parkrun website to get a personal ID. A volunteer will record your finishing time at the end.</p>
 """, """<p>Doing parkruns regularly could help you improve your physical and mental health, and help you connect with your local community too.</p>
-""", 'Free', 'Register Now', 'https://www.parkrun.org.uk/register/', None, None, 'https://www.parkrun.org.uk/', 'logo-parkrun.svg', None, 2, 1, 2.0),
+""", 'Free', 'Register Now', 'https://www.parkrun.org.uk/register/', None, None, 'https://www.parkrun.org.uk/', 'parkrun-logo.png', None, 2, 1, 2.0),
     (2, 'NHS Couch to 5k', """The NHS Couch to 5k app guides you from the couch to running 5km in just 9 weeks.
 """, """<p>Couch to 5k is a simple, free running plan for absolute beginners.</p>
 """, """<p>A trainer will guide you as you start with a mix of running and walking.</p>
 
 <p>In the first week, you&#39;ll start with 1 minute runs, followed by a 1 minute 30 second walk, going at a pace that feels right for you. Each week, you&#39;ll run a little more.</p>
 """, """<p>By the end, you&#39;ll be running 5k with confidence, no matter your starting fitness level or when you last exercised.</p>
-""", 'Free', None, None, 'https://play.google.com/store/apps/details?id=com.phe.couchto5K', 'https://itunes.apple.com/gb/app/one-you-couch-to-5k/id1082307672?mt=8', 'https://play.google.com/store/apps/details?id=com.phe.couchto5K', 'couch-to-5k-icon.png', 'couch-to-5k-promo.png', 1, 2, 1.0),
+""", 'Free', None, None, 'https://play.google.com/store/apps/details?id=com.phe.couchto5K', 'https://itunes.apple.com/gb/app/one-you-couch-to-5k/id1082307672?mt=8', 'https://play.google.com/store/apps/details?id=com.phe.couchto5K', 'couch-to-5k-logo.png', 'couch-to-5k-promo.png', 1, 2, 1.0),
     (3, 'Weight Watchers', """A personalised plan with live and on-demand coaching to help you lose weight and stay healthy.
 """, """<p>The Weight Watchers app provides a personalised nutrition plan, activity trackers and over 4,500 recipe ideas.</p>
 """, """<p>Choose between a core membership or a membership with workshops. Both memberships include a 30-day free trial and a customised nutrition plan, activity trackers and recipes.</p>
 """, """<p>If you&#39;re overweight, making small changes to what you are eating can drinking can help you lose weight. And it could help reduce the risk of developing health conditions like high blood pressure, heart disease and type 2 diabetes.</p>
-""", 'Free trial then from £6.50 a month', 'Start a 30-day free trial here', 'Start a 30-day free trial here', None, None, 'https://www.weightwatchers.com/uk/', 'weight-watchers-logo.svg', None, 2, 3, 2.0),
+""", 'Free trial then from £6.50 a month', 'Start a 30-day free trial here', 'Start a 30-day free trial here', None, None, 'https://www.weightwatchers.com/uk/', 'weight-watchers-logo.png', None, 2, 3, 2.0),
     (4, 'NHS Active 10', """The free NHS Active 10 app anonymously records every minute of walking you do.
 """, """<p>Active 10 is a free app that helps you fit short, brisk walks in to your day. Active 10 means 10 brisk minutes.</p>
 """, """<p>Track all your walking and how many brisk minutes you&#39;ve walked in the Active 10 app. The app&#39;s Pace Checker will help you learn what brisk walking feels like.</p>
@@ -147,14 +145,14 @@ V2_SERVICE = [
 """, """<p>Just 10 minutes of brisk walking every day can get your heart pumping and can make you feel more energetic, as well as lowering your risk of serious illnesses like heart disease and type 2 diabetes.</p>
 
 <p>Going for a brisk walk is a great way to clear your head and improve your mood. And it&#39;s easy to fit into your day, from taking the dog out to going for a lunchtime walk.</p>
-""", 'Free', None, None, 'https://play.google.com/store/apps/details?id=uk.ac.shef.oak.pheactiveten', 'https://itunes.apple.com/gb/app/one-you-active-10-walking-tracker/id1204295312?mt=8', 'https://www.nhs.uk/better-health/get-active/', 'active-10-icon.png', 'active-10-promo.png', 1, 2, 1.0),
+""", 'Free', None, None, 'https://play.google.com/store/apps/details?id=uk.ac.shef.oak.pheactiveten', 'https://itunes.apple.com/gb/app/one-you-active-10-walking-tracker/id1204295312?mt=8', 'https://www.nhs.uk/better-health/get-active/', 'active-10-logo.png', 'active-10-promo.png', 1, 2, 1.0),
     (5, 'NHS Digital Weight Management Programme', """A 12-week online behavioural and lifestyle programme.
 """, """<p>The NHS Digital Weight Management Programme supports adults living with obesity who also have a diagnosis of diabetes or hypertension to manage their weight and improve their health.</p>
 """, """<p>You need to speak to your GP or a local pharmacist who can refer you to the programme.</p>
 
 <p>You choose a weight management plan to help you develop healthier eating habits, be more active and lose weight. Each plan provides recipes and nutrition advice, wellbeing support and tips to boost your activity levels. As an online plan, you can do it anywhere in your own time.</p>
 """, """<p>This programme supports you to start building healthy habits so you can eat, sleep and feel better.</p>
-""", 'Free', None, None, None, None, 'https://www.england.nhs.uk/digital-weight-management/', 'logo-nhs.png', None, 3, 3, 2.1),
+""", 'Free', None, None, None, None, 'https://www.england.nhs.uk/digital-weight-management/', 'nhs-dwm-logo.png', None, 3, 3, 2.1),
     (6, 'NHS Weight Loss Plan', """An app to help you start eating more healthily, being more active, and losing weight.
 """, """<p>The NHS Weight Loss Plan gives you a 12-week plan that helps you:</p>
 
@@ -171,7 +169,7 @@ V2_SERVICE = [
 
 <p>Each weekly guide has actions, hints and tips for reaching your goal. To keep track of your progress you can log the food and calories you eat at each meal in the dairy, and you can record your weight each week to monitor your weight-loss.</p>
 """, """<p>If you&#39;re overweight, making small changes to what you are eating can drinking can help you lose weight. And it could help reduce the risk of developing health conditions like high blood pressure, heart disease and type 2 diabetes.</p>
-""", 'Free', None, None, 'https://play.google.com/store/apps/details?id=com.nhs.weightloss', 'https://apps.apple.com/gb/app/id1519208548', 'https://www.nhs.uk/better-health/lose-weight/', 'nhs-weightloss-app-logo.png', 'nhs-weightloss-app-promo.png', 1, 2, 1.0),
+""", 'Free', None, None, 'https://play.google.com/store/apps/details?id=com.nhs.weightloss', 'https://apps.apple.com/gb/app/id1519208548', 'https://www.nhs.uk/better-health/lose-weight/', 'weight-loss-app-logo.png', 'nhs-weightloss-app-promo.png', 1, 2, 1.0),
     (7, 'NHS Food Scanner', """A food scanning app to help you find healthier swaps for the next time you shop.
 """, """<p>The NHS Food Scanner lets you scan the barcode on a product&#39;s packaging using your phone&#39;s camera. The app will then tell you if there are any healthier options available.</p>
 """, """<p>The app will show you things like:</p>
@@ -182,7 +180,7 @@ V2_SERVICE = [
 	<li>the full list of every product you&#39;ve ever scanned</li>
 </ul>
 """, """<p>Making better food and drink choices could help you and your family stay healthy.</p>
-""", 'Free', None, None, 'https://play.google.com/store/apps/details?id=com.phe.c4lfoodsmart&hl=en_GB', 'https://apps.apple.com/gb/app/change4life-food-scanner/id1182946415', 'https://www.nhs.uk/healthier-families/food-facts/nhs-food-scanner-app/', 'nhs-food-scanner-app-logo.png', 'nhs-food-scanner-app-promo.png', 1, 2, 1.0),
+""", 'Free', None, None, 'https://play.google.com/store/apps/details?id=com.phe.c4lfoodsmart&hl=en_GB', 'https://apps.apple.com/gb/app/change4life-food-scanner/id1182946415', 'https://www.nhs.uk/healthier-families/food-facts/nhs-food-scanner-app/', 'food-scanner-logo.png', 'nhs-food-scanner-app-promo.png', 1, 2, 1.0),
     (8, 'Fit Fans', """A health programme that provides free, weekly sessions at your local football club.
 """, """<p>Football clubs across the country offer a free health programme for people who want to lose weight, get fitter and lead a healthier, more active life.</p>
 """, """<ul>
@@ -194,7 +192,7 @@ V2_SERVICE = [
 
 <p>&nbsp;</p>
 """, """<p>Making long-term improvements in weight loss, physical activity, diet and general wellbeing can help you stay healthy for longer.</p>
-""", 'Free', 'Find out more', 'https://eflinthecommunity.com/fitfans/', None, None, None, 'efl-fit-fans-logo.png', None, 2, 4, 2.0),
+""", 'Free', 'Find out more', 'https://eflinthecommunity.com/fitfans/', None, None, None, 'efl-community-logo.png', None, 2, 4, 2.0),
     (9, 'The Body Coach', """An app to help you improve your fitness with quick workouts for all abilities and simple, tasty recipes.
 """, """<p>The Body Coach app provides:</p>
 
@@ -210,7 +208,7 @@ V2_SERVICE = [
 
 <p>Every month, you&#39;ll get access to new workouts to help build on your fitness and strength, along with a set of new recipes so you keep making progress.</p>
 """, """<p>The programme is designed to help you improve your fitness, but it can also have a big impact on your energy, happiness and overall health.</p>
-""", 'Free trial then discounts. From £6.75 a month.', '10% offer', 'Free trial then discounts. From £6.75 a month.', None, None, 'https://www.thebodycoach.com/', 'the-body-coach-logo.svg', None, 2, 2, 2.0),
+""", 'Free trial then discounts. From £6.75 a month.', '10% offer', 'Free trial then discounts. From £6.75 a month.', None, None, 'https://www.thebodycoach.com/', 'the-body-coach-logo.png', None, 2, 2, 2.0),
     (10, 'Slimming World', """A weight-loss programme providing mindset-shifting, habit-changing support that will get you to your weight-loss target and help you stay there.
 """, """<p>You can choose a group or online membership to help you reach your weight-loss target. Both memberships offer:</p>
 
@@ -239,7 +237,7 @@ V2_SERVICE = [
 
 <p>Next, you&rsquo;ll get a text from your coach before you&rsquo;re assigned to a team. Then you can start your first club session.</p>
 """, """<p>Playing football and spending time with a supportive team can help you lose weight, make friends, get fitter and improve your health.</p>
-""", 'First month half price then £35 a month.', 'Register now for first month half price', 'https://manvfat.com/better-health/', None, None, 'https://manvfat.com/better-health/', 'man-v-fat-logo.svg', None, 2, 4, 2.0),
+""", 'First month half price then £35 a month.', 'Register now for first month half price', 'https://manvfat.com/better-health/', None, None, 'https://manvfat.com/better-health/', 'man-v-fat-logo.png', None, 2, 4, 2.0),
     (14, 'Couch to Fitness', """Online workout plans to suit your fitness level.
 """, """<p>Couch to Fitness provides a free online workout plan that you can do at home, in your own time.</p>
 """, """<p>Expert instructors guide you through 30-minute sessions 3 times a week. The sessions are suitable for different fitness levels and you don&#39;t need any equipment.</p>
@@ -257,7 +255,7 @@ V2_SERVICE = [
 
 <p>Some centres provide creche facilities for under 5s so you can do an activity while your children are being looked after.</p>
 """, """<p>However you choose to be active, doing exercise regularly can help you get fit and stay healthy.</p>
-""", 'From £10 a month.', 'Find out more', 'https://www.better.org.uk/healthy-communities/better-health-for-me?utm_source=phe&utm_medium=affiliate&utm_campaign=betterhealth', None, None, 'https://www.better.org.uk/', 'better-logo.svg', None, 2, 6, 2.0),
+""", 'From £10 a month.', 'Find out more', 'https://www.better.org.uk/healthy-communities/better-health-for-me?utm_source=phe&utm_medium=affiliate&utm_campaign=betterhealth', None, None, 'https://www.better.org.uk/', 'better-logo.png', None, 2, 6, 2.0),
     (16, 'Instructor Live', """A fitness platform with classes designed for beginners.
 """, """<p>The Instructor Live beginners package includes classes like:</p>
 
@@ -294,7 +292,7 @@ V2_SERVICE = [
 	<li>an app, which gives you access to services like exercise classes and personal training</li>
 </ul>
 """, """<p>Finding a way to get active could help you improve your overall physical and mental health and wellbeing.</p>
-""", 'Free 1-day pass. Memberships from £9.99 a month.', 'Find out more', 'https://www.everyoneactive.com/better-health-everyone-active/', None, None, 'https://www.everyoneactive.com/', 'everyone-active-logo.svg', None, 2, 6, 2.0),
+""", 'Free 1-day pass. Memberships from £9.99 a month.', 'Find out more', 'https://www.everyoneactive.com/better-health-everyone-active/', None, None, 'https://www.everyoneactive.com/', 'everyone-active-logo.png', None, 2, 6, 2.0),
 ]
 
 V2_SERVICE_CATEGORY = [
@@ -626,6 +624,7 @@ V2_SERVICE_TAXONOMY = [
     (18, 19),
 ]
 
+
 def _emit_values(rows):
     def lit(v):
         if v is None:
@@ -633,27 +632,54 @@ def _emit_values(rows):
         if isinstance(v, (int, float)):
             return str(v)
         return "'" + str(v).replace("'", "''") + "'"
-    return ",\n    ".join("(" + ", ".join(lit(x) for x in row) + ")" for row in rows)
+
+    return ",\n    ".join(
+        "(" + ", ".join(lit(x) for x in row) + ")" for row in rows
+    )
+
 
 class Command(BaseCommand):
-    help = "Insert built-in V2 data as INSERT statements (no-op if V2_SERVICE not empty). Also writes seed_v2.sql."
+    help = "Wipe and repopulate built-in V2 data as INSERT statements. Also writes seed_v2.sql."
 
     def handle(self, *args, **options):
-        with connection.cursor() as cur:
-            cur.execute('SELECT COUNT(1) FROM "V2_SERVICE";')
-            (count,) = cur.fetchone()
-            if count and count > 0:
-                self.stdout.write(self.style.HTTP_INFO("V2_SERVICE already has data—skipping V2_seed_data."))
-                return
+        # Order matters
+        tables_in_delete_order = [
+            "V2_SERVICE_TAXONOMY",
+            "V2_SERVICE_COSTS",
+            "V2_SERVICE_ACCESS",
+            "V2_SERVICE_TIME_REQUIRED",
+            "V2_SERVICE_MITIGATIONS",
+            "V2_SERVICE_WHO_NOT_FOR",
+            "V2_SERVICE_WHO_FOR",
+            "V2_SERVICE_HELPS_WITH",
+            "V2_SERVICE_CATEGORY",
+            "V2_SERVICE",
+            "V2_CATEGORY",
+            "V2_TAXONOMY",
+            "V2_COSTS",
+            "V2_ACCESS",
+            "V2_TIME_REQUIRED",
+            "V2_MITIGATIONS",
+            "V2_WHO_NOT_FOR",
+            "V2_WHO_FOR",
+            "V2_HELPS_WITH",
+            "V2_SERVICE_TYPE",
+            "V2_ACTION_TYPE",
+        ]
 
         stmts = []
+
         def ins(table, cols, rows):
             if not rows:
                 return
             cols_sql = ", ".join(['"' + c + '"' for c in cols])
             values_sql = _emit_values(rows)
             pk = cols[0]
-            stmt = 'INSERT INTO "' + table + '" (' + cols_sql + ') VALUES\n    ' + values_sql + '\nON CONFLICT ("' + pk + '") DO NOTHING;'
+            stmt = (
+                'INSERT INTO "' + table + '" (' + cols_sql + ') VALUES\n    ' +
+                values_sql +
+                '\nON CONFLICT ("' + pk + '") DO NOTHING;'
+            )
             stmts.append(stmt)
 
         def ins_through(table, left, right, rows):
@@ -661,28 +687,50 @@ class Command(BaseCommand):
                 return
             cols_sql = '"' + left + '", "' + right + '"'
             values_sql = _emit_values(rows)
-            stmt = 'INSERT INTO "' + table + '" (' + cols_sql + ') VALUES\n    ' + values_sql + '\nON CONFLICT DO NOTHING;'
+            stmt = (
+                'INSERT INTO "' + table + '" (' + cols_sql + ') VALUES\n    ' +
+                values_sql +
+                '\nON CONFLICT DO NOTHING;'
+            )
             stmts.append(stmt)
 
         # Lookups + category
-        ins("V2_ACTION_TYPE", ["id","type"], V2_ACTION_TYPE)
-        ins("V2_SERVICE_TYPE", ["id","type"], V2_SERVICE_TYPE)
-        ins("V2_HELPS_WITH", ["id","benefit"], V2_HELPS_WITH)
-        ins("V2_WHO_FOR", ["id","target"], V2_WHO_FOR)
-        ins("V2_WHO_NOT_FOR", ["id","target"], V2_WHO_NOT_FOR)
-        ins("V2_MITIGATIONS", ["id","type"], V2_MITIGATIONS)
-        ins("V2_TIME_REQUIRED", ["id","required"], V2_TIME_REQUIRED)
-        ins("V2_ACCESS", ["id","type"], V2_ACCESS)
-        ins("V2_COSTS", ["id","name"], V2_COSTS)
-        ins("V2_TAXONOMY", ["id","term"], V2_TAXONOMY)
-        ins("V2_CATEGORY", ["id","goal"], V2_CATEGORY)
+        ins("V2_ACTION_TYPE", ["id", "type"], V2_ACTION_TYPE)
+        ins("V2_SERVICE_TYPE", ["id", "type"], V2_SERVICE_TYPE)
+        ins("V2_HELPS_WITH", ["id", "benefit"], V2_HELPS_WITH)
+        ins("V2_WHO_FOR", ["id", "target"], V2_WHO_FOR)
+        ins("V2_WHO_NOT_FOR", ["id", "target"], V2_WHO_NOT_FOR)
+        ins("V2_MITIGATIONS", ["id", "type"], V2_MITIGATIONS)
+        ins("V2_TIME_REQUIRED", ["id", "required"], V2_TIME_REQUIRED)
+        ins("V2_ACCESS", ["id", "type"], V2_ACCESS)
+        ins("V2_COSTS", ["id", "name"], V2_COSTS)
+        ins("V2_TAXONOMY", ["id", "term"], V2_TAXONOMY)
+        ins("V2_CATEGORY", ["id", "goal"], V2_CATEGORY)
 
         # Service
-        ins("V2_SERVICE", [
-            "id","name","description","what_it_is","how_it_works","what_it_could_do",
-            "cost_text","action_text","action_url","action_url_playstore","action_url_appstore","action_url_moreinfo",
-            "logo_image","promo","action_id","service_type_id","sort_order"
-        ], V2_SERVICE)
+        ins(
+            "V2_SERVICE",
+            [
+                "id",
+                "name",
+                "description",
+                "what_it_is",
+                "how_it_works",
+                "what_it_could_do",
+                "cost_text",
+                "action_text",
+                "action_url",
+                "action_url_playstore",
+                "action_url_appstore",
+                "action_url_moreinfo",
+                "logo_image",
+                "promo",
+                "action_id",
+                "service_type_id",
+                "sort_order",
+            ],
+            V2_SERVICE,
+        )
 
         # Throughs
         ins_through("V2_SERVICE_CATEGORY", "service_id", "category_id", V2_SERVICE_CATEGORY)
@@ -695,7 +743,7 @@ class Command(BaseCommand):
         ins_through("V2_SERVICE_COSTS", "service_id", "cost_id", V2_SERVICE_COSTS)
         ins_through("V2_SERVICE_TAXONOMY", "service_id", "taxonomy_id", V2_SERVICE_TAXONOMY)
 
-        # build sql_blob earlier as you already do...
+        # Build SQL blob as before (only INSERTs)
         sql_blob = ";\n\n".join(stmts) + (";" if stmts else "")
 
         # Try to write to a safe place, but never fail if we can't.
@@ -707,14 +755,21 @@ class Command(BaseCommand):
                     f.write(blob)
                 self.stdout.write(self.style.HTTP_INFO(f"Wrote seed SQL to {out}"))
             except Exception as e:
-                self.stdout.write(self.style.WARNING(f"Could not write seed SQL file ({out}): {e}"))
+                self.stdout.write(
+                    self.style.WARNING(f"Could not write seed SQL file ({out}): {e}")
+                )
                 # continue — we will still execute the statements
 
         _try_write_sql(sql_blob, "seed_v2.sql")
-        
-        # Execute the statements regardless of file-write success
+
+        # Wipe tables then execute seed INSERTs in a single transaction
         with transaction.atomic():
             with connection.cursor() as cur:
+                for table in tables_in_delete_order:
+                    cur.execute(f'DELETE FROM "{table}";')
+                self.stdout.write(self.style.WARNING("Cleared all V2_* tables before reseeding."))
+
                 for stmt in stmts:
                     cur.execute(stmt)
+
         self.stdout.write(self.style.SUCCESS(f"Inserted V2 seed data ({len(stmts)} statements)."))

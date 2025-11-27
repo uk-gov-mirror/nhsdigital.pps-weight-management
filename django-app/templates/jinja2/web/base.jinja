@@ -11,7 +11,8 @@
 {# Override assetPath to use Django static() #}
 {% set assetPath = static('assets') %}
 
-{# Add CSS for all pages #}
+{% block pageTitle %}NHS - {{ serviceName }}{% endblock %}
+
 {% block head %}
     {{ super() }}
     <link rel="stylesheet" href="{{ static('nhsuk-frontend.min.css') }}">

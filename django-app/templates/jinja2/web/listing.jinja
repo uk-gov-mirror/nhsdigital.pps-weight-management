@@ -29,8 +29,9 @@
 
     <!-- start FILTERS area -->
     <div id="js-listing-filters" tabindex="-1" role="dialog" aria-modal="true">
-      <form method="get" class="app-listing-filters-form">
-
+      <form method="post" class="app-listing-filters-form">
+        {{ csrf_input }}
+		
         {{ button({
           "text": "Close",
           "classes": "nhsuk-button--secondary js-toggle-button",
@@ -249,7 +250,23 @@
 
   <div class="nhsuk-grid-column-three-quarters">
 
-    <h2 class="nhsuk-heading-m nhsuk-u-font-weight-normal">We have {{ results.length | default('some') }} options for you</h2>
+	{% set count = results | length %}
+
+	{% if count == 0 %}
+	  <h2 class="nhsuk-heading-m nhsuk-u-font-weight-normal">
+		We found no matches
+	  </h2>
+
+	{% elif count <= 50 %}
+	  <h2 class="nhsuk-heading-m nhsuk-u-font-weight-normal">
+		We found {{ count }} match{{ 'es' if count != 1 }}
+	  </h2>
+
+	{% else %}
+	  <h2 class="nhsuk-heading-m nhsuk-u-font-weight-normal">
+		We found more than 50 matches
+	  </h2>
+	{% endif %}
 
     {% for result in results %}
     <div class="nhsuk-card nhsuk-card--clickable">

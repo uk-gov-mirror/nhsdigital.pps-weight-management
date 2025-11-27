@@ -9,6 +9,16 @@ POSTCODE_REGEX = re.compile(r"^[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2}$", re.I)
 
 logger = logging.getLogger(__name__)
 
+FILTER_FIELDS = [
+    "goals",
+    "cost",
+    "timetable",
+    "location",
+    "taught",
+    "who_with",
+    "channel",
+]
+
 def start(request):
     request.session.flush()
     return render(request, 'web/index.jinja', {"data": request.session})
@@ -120,9 +130,7 @@ def details_contact_details(request):
 
         return redirect('goals')
 
-    return render(request, 'web/details-contact-details.jinja', {
-        "data": request.session,
-    })
+    return render(request, 'web/details-contact-details.jinja', { "data": request.session })
 
 def goals(request):
     if request.method == "POST":
@@ -185,22 +193,38 @@ def preference_channel(request):
     return render(request, 'web/preference-channel.jinja', {"data": request.session})
 
 def listing(request):
-    session_data = dict(request.session)
-    filter_fields = ["goals", "cost", "timetable", "location", "taught", "who_with", "channel"]
+    session_data = request.session
+    filters = {}
 
-    if request.GET:
-        for field in filter_fields:
-            values = request.GET.getlist(field)
+    if request.method == "POST":
+        for field in FILTER_FIELDS:
+            values = _clean_checkbox_list(field, request) 
+
             if values:
+                filters[field] = values
                 session_data[field] = values
-                request.session[field] = values
+            else:
+                filters.pop(field, None)
+                session_data.pop(field, None)
+    else:
+        for field in FILTER_FIELDS:
+            value = session_data.get(field)
+            if not value:
+                continue
 
-    payload = _transform_to_filter_format(session_data)
-    api_url = request.build_absolute_uri(reverse('v2:service-search'))
+            if isinstance(value, list):
+                filters[field] = value
+            else:
+                filters[field] = [value]
+                session_data[field] = filters[field]
+
+    payload = _transform_to_filter_format(filters)
+    
+    logger.exception(payload);
+    api_url = request.build_absolute_uri(reverse("v2:service-search"))
 
     results = []
     api_error = None
-
     try:
         resp = requests.post(
             api_url,
@@ -210,15 +234,18 @@ def listing(request):
         )
         resp.raise_for_status()
         results = resp.json()
+        
     except requests.HTTPError as e:
         api_error = f"HTTP {resp.status_code}"
         logger.error(
             "Service search API HTTPError: %s, status=%s, body=%s",
             e, getattr(resp, "status_code", None), getattr(resp, "text", None),
         )
+        
     except requests.RequestException as e:
         api_error = str(e)
         logger.exception("Service search API RequestException")
+
     return render(request, "web/listing.jinja", {
         "results": results,
         "data": session_data,
@@ -272,18 +299,19 @@ def _clean_checkbox_list(field_name: str, request):
     ]
     return values
 
-def _transform_to_filter_format(session_data: dict) -> dict:
+def _transform_to_filter_format(filters: dict) -> dict:
     filter_list = []
-    exclude_fields = ['details-postcode', 'barriers', 'contact', 'emailInput', 'mobileInput']
 
-    for key, value in session_data.items():
-        if key in exclude_fields:
-            continue
-        # Lists become { or: [...] }
-        if isinstance(value, list) and len(value) > 0:
-            filter_list.append({"or": value})
-        # Strings become { or: [value] } unless "dont_mind" or empty
-        elif isinstance(value, str) and value.strip() != "" and value != "dont_mind":
-            filter_list.append({"or": [value]})
+    for key, value in filters.items():
+        if isinstance(value, list):
+            cleaned = [v for v in value if v and v != "dont_mind"]
+            if cleaned:
+                filter_list.append({"or": cleaned})
+
+        elif isinstance(value, str):
+            v = value.strip()
+            if v and v != "dont_mind":
+                filter_list.append({"or": [v]})
 
     return {"filter": filter_list}
+    

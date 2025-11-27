@@ -164,7 +164,7 @@ jobs:
           if [ "$EVENT" = "workflow_dispatch" ] \
              || { [ "$EVENT" = "pull_request" ] && [ "$ACTION" = "closed" ] && [ "$MERGED" = "true" ]; } \
              || [ "$INFRA_CHANGED" = "true" ] \
-             || { [ "$EVENT" = "pull_request" ] && { [ "$ACTION" = "opened" ] || [ "$ACTION" = "reopened" ]; } && [ "$STATE_EXISTS" = "false" ]; }
+             || { [ "$EVENT" = "pull_request" ] && { [ "$ACTION" = "opened" ] || [ "$ACTION" = "reopened" ] || [ "$ACTION" = "synchronize" ]; } && [ "$STATE_EXISTS" = "false" ]; }
           then
             run_infra=true
           fi
