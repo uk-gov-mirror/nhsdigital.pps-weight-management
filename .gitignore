@@ -9,7 +9,10 @@ dist/
 crash.log
 override.tf
 # IDE
-.vscode/
+.vscode/*
+!.vscode/launch.json
+!.vscode/tasks.json
+!.vscode/extensions.json
 .DS_Store
 # Test output
 /playwright-report/

@@ -1,0 +1,44 @@
+services:
+  db:
+    image: postgres:16
+    env_file: .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-app}
+      POSTGRES_USER: ${POSTGRES_USER:-app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-app}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-app} -d ${POSTGRES_DB:-app}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  web:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: local
+    image: ppswm:local
+    env_file: .env
+    environment:
+      DJANGO_SETTINGS_MODULE: wm_django.settings.dev
+      DATABASE_URL: postgres://app:app@db:5432/app
+      DJANGO_SUPERUSER_USERNAME: admin
+      DJANGO_SUPERUSER_EMAIL: admin@example.com
+      DJANGO_SUPERUSER_PASSWORD: admin123
+    ports:
+      - "8000:8000"
+      - "5678:5678"
+    volumes:
+      - ../api:/app/api
+      - ../core:/app/core
+      - ../scheduler:/app/scheduler
+      - ../static:/app/static
+      - ../templates:/app/templates
+      - ../web:/app/web
+      - ../wm_django:/app/wm_django
+      - ../manage.py:/app/manage.py
+    depends_on:
+      db:
+        condition: service_healthy

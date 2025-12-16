@@ -1,0 +1,90 @@
+{% extends "web/layout/base.jinja" %}
+
+{% from "web/macros/layout.jinja" import two_thirds_column_start, two_thirds_column_end %}
+{% from "web/macros/forms.jinja" import form_error_summary, continue_button, back_link %}
+
+
+{% set pageName = "What makes it hard for you to stay healthy?" %}
+
+{% block beforeContent %}
+  {{ back_link("/goals") }}
+{% endblock %}
+
+{% block content %}
+  {{ two_thirds_column_start() }}
+
+    {% if error %}
+    {{ form_error_summary({
+      "titleText": "There is a problem",
+      "errorList": [
+        {
+          "text": "Please choose an option",
+          "href": "#goals"
+        }
+      ]
+    }) }}
+    {% endif %}
+
+    <form method="post">
+      {{ csrf_input }}
+
+      {{ checkboxes({
+        "idPrefix": "barriers",
+        "name": "barriers",
+        "errorMessage": {
+          "text": "Please choose an option"
+        } if error else undefined,
+        "fieldset": {
+          "legend": {
+            "text": "What makes it hard for you to stay healthy?",
+            "classes": "nhsuk-fieldset__legend--l",
+            "isPageHeading": "true"
+          }
+        },
+        "hint": {
+          "text": "Choose as many or as few as you like"
+        },
+        "items": [
+          {
+            "value": "too-busy",
+            "text": "Too busy",
+            "exclusiveGroup": "barriers-list"
+          },
+          {
+            "value": "too-stressed",
+            "text": "Too stressed",
+            "exclusiveGroup": "barriers-list"
+          },
+          {
+            "value": "no-support",
+            "text": "No support",
+            "exclusiveGroup": "barriers-list"
+          },
+          {
+            "value": "no-willpower",
+            "text": "No willpower",
+            "exclusiveGroup": "barriers-list"
+          },
+          {
+            "value": "tried-before-and-failed",
+            "text": "Tried before and failed",
+            "exclusiveGroup": "barriers-list"
+          },
+          {
+            "divider": "or"
+          },
+          {
+            "value": "none",
+            "text": "None of these",
+            "exclusive": "true",
+            "exclusiveGroup": "barriers-list"
+          }
+        ],
+        "values": data.barriers if data.barriers else undefined
+      }) }}
+
+      {{ continue_button() }}
+
+    </form>
+  {{ two_thirds_column_end() }}
+{% endblock %}

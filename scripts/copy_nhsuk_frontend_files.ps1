@@ -4,8 +4,8 @@ param(
 
     # Relative paths from base directory
     [string]$SrcRel  = "node_modules\nhsuk-frontend\dist\nhsuk",
-    [string]$DestRel = "django-app\static",
-    [string]$ScssRel = "django-app\static\assets\sass\nhsuk-frontend"
+    [string]$DestRel = "django_app\static",
+    [string]$ScssRel = "django_app\static\assets\sass\nhsuk-frontend"
 )
 
 $SrcRoot  = Join-Path $Base $SrcRel

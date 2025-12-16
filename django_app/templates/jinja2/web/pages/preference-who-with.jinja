@@ -1,0 +1,68 @@
+{% extends "web/layout/base.jinja" %}
+
+{% from "web/macros/layout.jinja" import two_thirds_column_start, two_thirds_column_end %}
+{% from "web/macros/forms.jinja" import form_error_summary, continue_button, back_link %}
+
+
+{% set pageName = "Do you prefer to do things on your own or in a group?" %}
+
+{% block beforeContent %}
+  {{ back_link("/barriers") }}
+{% endblock %}
+
+{% block content %}
+  {{ two_thirds_column_start() }}
+
+    {% if error %}
+    {{ form_error_summary({
+      "titleText": "There is a problem",
+      "errorList": [
+        {
+          "text": "Please choose an option",
+          "href": "#who_with"
+        }
+      ]
+    }) }}
+    {% endif %}
+
+    <form method="post">
+      {{ csrf_input }}
+
+      {{ radios({
+        "idPrefix": "who_with",
+        "name": "who_with",
+        "errorMessage": {
+          "text": "Please choose an option"
+        } if error else undefined,
+        "fieldset": {
+          "legend": {
+            "text": "Do you prefer to do things on your own or in a group?",
+            "classes": "nhsuk-fieldset__legend--l",
+            "isPageHeading": true
+          }
+        },
+        "items": [
+          {
+            "value": "who_with.alone",
+            "text": "Alone"
+          },
+          {
+            "value": "who_with.in_a_group",
+            "text": "In a group"
+          },
+          {
+            "divider": "or"
+          },
+          {
+            "value": "dont_mind",
+            "text": "Don’t mind"
+          }
+        ],
+        "value": data.who_with if data.who_with else undefined
+      }) }}
+
+      {{ continue_button() }}
+
+    </form>
+  {{ two_thirds_column_end() }}
+{% endblock %}

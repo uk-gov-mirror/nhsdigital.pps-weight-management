@@ -1,0 +1,381 @@
+[
+  {
+    "model": "api.v3_actiontype",
+    "pk": 1,
+    "fields": { "type": "self-service" }
+  },
+  {
+    "model": "api.v3_servicetype",
+    "pk": 1,
+    "fields": { "type": "digital" }
+  },
+  {
+    "model": "api.v3_helpswith",
+    "pk": 1,
+    "fields": { "benefit": "managing weight" }
+  },
+  {
+    "model": "api.v3_whofor",
+    "pk": 1,
+    "fields": { "target": "Adults" }
+  },
+  {
+    "model": "api.v3_whonotfor",
+    "pk": 1,
+    "fields": { "target": "Children" }
+  },
+  {
+    "model": "api.v3_mitigations",
+    "pk": 1,
+    "fields": { "type": "none" }
+  },
+  {
+    "model": "api.v3_timerequired",
+    "pk": 1,
+    "fields": { "required": "Once a week" }
+  },
+  {
+    "model": "api.v3_access",
+    "pk": 1,
+    "fields": { "type": "Online" }
+  },
+  {
+    "model": "api.v3_costs",
+    "pk": 1,
+    "fields": { "name": "Free" }
+  },
+  {
+    "model": "api.v3_taxonomy",
+    "pk": 1,
+    "fields": { "term": "service_area.digital" }
+  },
+  {
+    "model": "api.v3_category",
+    "pk": 1,
+    "fields": { "goal": "be_more_active" }
+  },
+  {
+    "model": "api.v3_contact",
+    "pk": 1,
+    "fields": {
+      "name": "Service 3 Contact",
+      "phone": "01234 567890",
+      "email": "service3@example.test"
+    }
+  },
+  {
+    "model": "api.v3_location",
+    "pk": 1,
+    "fields": {
+      "address_1": "Location One",
+      "address_2": "",
+      "town": "London",
+      "postcode": "SW1A 1AA",
+      "lat": 51.501,
+      "lon": -0.141,
+      "opening_hours": "24/7",
+      "contact": null
+    }
+  },
+  {
+    "model": "api.v3_location",
+    "pk": 2,
+    "fields": {
+      "address_1": "Gym A",
+      "address_2": "",
+      "town": "London",
+      "postcode": "SW1A 2AA",
+      "lat": 51.502,
+      "lon": -0.142,
+      "opening_hours": "9–5",
+      "contact": null
+    }
+  },
+  {
+    "model": "api.v3_location",
+    "pk": 3,
+    "fields": {
+      "address_1": "Gym B",
+      "address_2": "",
+      "town": "London",
+      "postcode": "SW1A 3AA",
+      "lat": 51.503,
+      "lon": -0.143,
+      "opening_hours": "9–5",
+      "contact": null
+    }
+  },
+  {
+    "model": "api.v3_location",
+    "pk": 4,
+    "fields": {
+      "address_1": "Gym C",
+      "address_2": "",
+      "town": "London",
+      "postcode": "SW1A 4AA",
+      "lat": 51.504,
+      "lon": -0.144,
+      "opening_hours": "9–5",
+      "contact": null
+    }
+  },
+  {
+    "model": "api.v3_service",
+    "pk": 1,
+    "fields": {
+      "name": "Service 1",
+      "description": "Service 1 description",
+      "what_it_is": "What service 1 is",
+      "how_it_works": "How service 1 works",
+      "what_it_could_do": "What service 1 could do for you",
+      "cost_text": "Free",
+      "action_text": "Sign up",
+      "action_url": "https://example.test/service1",
+      "action_url_playstore": "",
+      "action_url_appstore": "",
+      "action_url_moreinfo": "",
+      "logo_image": "",
+      "promo": "",
+      "opening_hours": "",
+      "action": 1,
+      "service_type": 1,
+      "sort_order": 1.0
+    }
+  },
+  {
+    "model": "api.v3_service",
+    "pk": 2,
+    "fields": {
+      "name": "Service 2 (no locations)",
+      "description": "Used by tests as a service with zero locations",
+      "what_it_is": "",
+      "how_it_works": "",
+      "what_it_could_do": "",
+      "cost_text": "",
+      "action_text": "",
+      "action_url": "",
+      "action_url_playstore": "",
+      "action_url_appstore": "",
+      "action_url_moreinfo": "",
+      "logo_image": "",
+      "promo": "",
+      "opening_hours": "",
+      "action": null,
+      "service_type": null,
+      "sort_order": 2.0
+    }
+  },
+  {
+    "model": "api.v3_service",
+    "pk": 3,
+    "fields": {
+      "name": "Service 3 (has contact)",
+      "description": "Used by tests as a service with contact details",
+      "what_it_is": "",
+      "how_it_works": "",
+      "what_it_could_do": "",
+      "cost_text": "",
+      "action_text": "",
+      "action_url": "",
+      "action_url_playstore": "",
+      "action_url_appstore": "",
+      "action_url_moreinfo": "",
+      "logo_image": "",
+      "promo": "",
+      "opening_hours": "",
+      "action": null,
+      "service_type": null,
+      "sort_order": 3.0
+    }
+  },
+  {
+    "model": "api.v3_service",
+    "pk": 4,
+    "fields": {
+      "name": "Service 4 (no contact)",
+      "description": "Used by tests to check empty contact",
+      "what_it_is": "",
+      "how_it_works": "",
+      "what_it_could_do": "",
+      "cost_text": "",
+      "action_text": "",
+      "action_url": "",
+      "action_url_playstore": "",
+      "action_url_appstore": "",
+      "action_url_moreinfo": "",
+      "logo_image": "",
+      "promo": "",
+      "opening_hours": "",
+      "action": null,
+      "service_type": null,
+      "sort_order": 4.0
+    }
+  },
+  {
+    "model": "api.v3_service",
+    "pk": 5,
+    "fields": {
+      "name": "Service 5",
+      "description": "Pagination filler",
+      "what_it_is": "",
+      "how_it_works": "",
+      "what_it_could_do": "",
+      "cost_text": "",
+      "action_text": "",
+      "action_url": "",
+      "action_url_playstore": "",
+      "action_url_appstore": "",
+      "action_url_moreinfo": "",
+      "logo_image": "",
+      "promo": "",
+      "opening_hours": "",
+      "action": null,
+      "service_type": null,
+      "sort_order": 5.0
+    }
+  },
+  {
+    "model": "api.v3_service",
+    "pk": 6,
+    "fields": {
+      "name": "Service 6",
+      "description": "Pagination filler",
+      "what_it_is": "",
+      "how_it_works": "",
+      "what_it_could_do": "",
+      "cost_text": "",
+      "action_text": "",
+      "action_url": "",
+      "action_url_playstore": "",
+      "action_url_appstore": "",
+      "action_url_moreinfo": "",
+      "logo_image": "",
+      "promo": "",
+      "opening_hours": "",
+      "action": null,
+      "service_type": null,
+      "sort_order": 6.0
+    }
+  },
+  {
+    "model": "api.v3_service",
+    "pk": 7,
+    "fields": {
+      "name": "Service 7",
+      "description": "Pagination filler",
+      "what_it_is": "",
+      "how_it_works": "",
+      "what_it_could_do": "",
+      "cost_text": "",
+      "action_text": "",
+      "action_url": "",
+      "action_url_playstore": "",
+      "action_url_appstore": "",
+      "action_url_moreinfo": "",
+      "logo_image": "",
+      "promo": "",
+      "opening_hours": "",
+      "action": null,
+      "service_type": null,
+      "sort_order": 7.0
+    }
+  },
+  {
+    "model": "api.v3_service",
+    "pk": 8,
+    "fields": {
+      "name": "Service 8 (3 locations)",
+      "description": "Used by tests as a service with 3 locations",
+      "what_it_is": "",
+      "how_it_works": "",
+      "what_it_could_do": "",
+      "cost_text": "",
+      "action_text": "",
+      "action_url": "",
+      "action_url_playstore": "",
+      "action_url_appstore": "",
+      "action_url_moreinfo": "",
+      "logo_image": "",
+      "promo": "",
+      "opening_hours": "",
+      "action": 1,
+      "service_type": 1,
+      "sort_order": 8.0
+    }
+  },
+  {
+    "model": "api.v3_service_location",
+    "pk": 1,
+    "fields": { "service": 1, "location": 1 }
+  },
+  {
+    "model": "api.v3_service_location",
+    "pk": 2,
+    "fields": { "service": 8, "location": 2 }
+  },
+  {
+    "model": "api.v3_service_location",
+    "pk": 3,
+    "fields": { "service": 8, "location": 3 }
+  },
+  {
+    "model": "api.v3_service_location",
+    "pk": 4,
+    "fields": { "service": 8, "location": 4 }
+  },
+  {
+    "model": "api.v3_service_contact",
+    "pk": 1,
+    "fields": { "service": 3, "contact": 1 }
+  },
+  {
+    "model": "api.v3_service_category",
+    "pk": 1,
+    "fields": { "service": 1, "category": 1 }
+  },
+  {
+    "model": "api.v3_service_category",
+    "pk": 2,
+    "fields": { "service": 8, "category": 1 }
+  },
+  {
+    "model": "api.v3_service_helpswith",
+    "pk": 1,
+    "fields": { "service": 1, "helpswith": 1 }
+  },
+  {
+    "model": "api.v3_service_whofor",
+    "pk": 1,
+    "fields": { "service": 1, "who_for": 1 }
+  },
+  {
+    "model": "api.v3_service_whonotfor",
+    "pk": 1,
+    "fields": { "service": 1, "who_not_for": 1 }
+  },
+  {
+    "model": "api.v3_service_mitigation",
+    "pk": 1,
+    "fields": { "service": 1, "mitigation": 1 }
+  },
+  {
+    "model": "api.v3_service_timerequired",
+    "pk": 1,
+    "fields": { "service": 1, "time": 1 }
+  },
+  {
+    "model": "api.v3_service_access",
+    "pk": 1,
+    "fields": { "service": 1, "access": 1 }
+  },
+  {
+    "model": "api.v3_service_cost",
+    "pk": 1,
+    "fields": { "service": 1, "cost": 1 }
+  },
+  {
+    "model": "api.v3_service_taxonomy",
+    "pk": 1,
+    "fields": { "service": 1, "taxonomy": 1 }
+  }
+]

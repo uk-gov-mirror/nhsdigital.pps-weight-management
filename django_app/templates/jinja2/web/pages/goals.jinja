@@ -1,0 +1,64 @@
+{% extends "web/layout/base.jinja" %}
+
+{% from "web/macros/layout.jinja" import two_thirds_column_start, two_thirds_column_end %}
+{% from "web/macros/forms.jinja" import form_error_summary, continue_button, back_link %}
+
+
+{% set pageName = "What changes do you want to make to stay healthy?" %}
+
+{% block beforeContent %}
+  {{ back_link("/details-postcode") }}
+{% endblock %}
+
+{% block content %}
+  {{ two_thirds_column_start() }}
+
+      {% if error %}
+      {{ form_error_summary({
+        "titleText": "There is a problem",
+        "errorList": [
+          {
+            "text": "Please choose an option",
+            "href": "#goals"
+          }
+        ]
+      }) }}
+      {% endif %}
+
+      <form method="post">
+        {{ csrf_input }}
+
+        {{ checkboxes({
+          "idPrefix": "goals",
+          "name": "goals",
+          "errorMessage": {
+            "text": "Please choose an option"
+          } if error else undefined,
+          "fieldset": {
+            "legend": {
+              "text": "What changes do you want to make to stay healthy?",
+              "classes": "nhsuk-fieldset__legend--l",
+              "isPageHeading": "true"
+            }
+          },
+          "hint": {
+            "text": "Choose as many or as few as you like"
+          },
+          "items": [
+            {
+              "value": "goals.healthy_eating",
+              "text": "Healthy eating"
+            },
+            {
+              "value": "goals.exercise",
+              "text": "Exercise"
+            }
+          ],
+          "values": data.goals if data.goals else undefined
+        }) }}
+
+        {{ continue_button() }}
+
+      </form>
+  {{ two_thirds_column_end() }}
+{% endblock %}

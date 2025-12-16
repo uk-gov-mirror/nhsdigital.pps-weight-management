@@ -1,0 +1,34 @@
+/* Hide the select box and blue eye */
+.inline-group .field-location select, /* location drop down */
+.inline-group tr.has_original.dynamic-v3_service_location_set
+    .field-location .related-widget-wrapper-link.add-related { /* green cross if it is an existing location */
+    display: none;
+}
+.inline-group .field-location .view-related {  /* blue eye */
+    display: none;
+}
+
+/* Hide the "Location" column header text */
+.inline-group th.column-location {
+    text-indent: -9999px;   /* visually hide the header text */
+    white-space: nowrap;
+}
+
+/* Hide the "V3_Service_Location #6" label in the first (original) column */
+.inline-group .dynamic-v3_service_location_set .original p {
+    display: none;
+}
+
+.inline-group .tabular tr.has_original td {
+    padding-top: 8px;
+}
+
+/* Hide the concatenated location header in the location popup */
+body.popup.model-v3_location #content > h2 {
+  display: none;
+}
+
+/* Hide the Contact Name that is floating over the contact name input box */
+tr.dynamic-v3_service_contact_set td.original > p {
+    display: none;
+}

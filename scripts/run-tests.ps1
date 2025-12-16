@@ -10,9 +10,6 @@ param(
   [string]$TfStateBucket = "nhse-pps-wm-terraform-state-bucket",
   [string]$TfLockTable   = "nhse-pps-wm-terraform-lock",
   [string]$DjangoBaseUrl,
-  [string]$CognitoClientId,
-  [string]$CognitoUsername = "test-user",
-  [string]$CognitoPassword = "MySecurePassword123!",
 
   [switch]$Api,
   [switch]$Ui,
@@ -53,18 +50,8 @@ elseif (-not $DjangoBaseUrl) {
 Write-Info "Configuring environment variables..."
 $env:AWS_REGION        = $AwsRegion
 $env:DJANGO_BASE_URL   = $DjangoBaseUrl.TrimEnd('/')
-$env:API_PREFIX_PUBLIC = "/public/api"
-$env:API_PREFIX_SECURE = "/secure/api"
-
-if ($CognitoClientId) { $env:COGNITO_CLIENT_ID = $CognitoClientId }
-$env:COGNITO_USERNAME  = $CognitoUsername
-$env:COGNITO_PASSWORD  = $CognitoPassword
 
 Write-Host "DJANGO_BASE_URL      = $env:DJANGO_BASE_URL"
-Write-Host "API_PREFIX_PUBLIC    = $env:API_PREFIX_PUBLIC"
-Write-Host "API_PREFIX_SECURE    = $env:API_PREFIX_SECURE"
-if ($env:COGNITO_CLIENT_ID) { Write-Host "COGNITO_CLIENT_ID     = $env:COGNITO_CLIENT_ID" }
-Write-Host "COGNITO_USERNAME     = $env:COGNITO_USERNAME"
 
 # 3) Install deps (once per machine)
 Write-Info "Installing npm dependencies..."
@@ -80,7 +67,7 @@ if ($InstallBrowsers -or $Ui) {
 Write-Info "Warming up endpoints (non-blocking)..."
 try {
   curl.exe -fsS -m 8 "$($env:DJANGO_BASE_URL)" | Out-Null
-  curl.exe -fsS -m 8 "$($env:DJANGO_BASE_URL)$($env:API_PREFIX_PUBLIC)/ping" | Out-Null
+  curl.exe -fsS -m 8 "$($env:DJANGO_BASE_URL)/health" | Out-Null
 } catch { }
 
 # 6) Run tests

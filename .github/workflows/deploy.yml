@@ -100,7 +100,7 @@ jobs:
             infra:
               - 'infra/**'
             django:
-              - 'django-app/**'
+              - 'django_app/**'
             tests:
               - 'tests/**'
 
@@ -348,9 +348,10 @@ jobs:
 
       - name: Build image
         if: ${{ env.RUN_DJANGO == 'true' }}
-        working-directory: django-app
+        working-directory: django_app
         run: |
           docker build \
+            --target dev \
             -t "${{ steps.meta.outputs.tag_sha }}" \
             -t "${{ steps.meta.outputs.tag_latest }}" \
             .
@@ -619,18 +620,83 @@ jobs:
         if: ${{ env.RUN_TESTS != 'true' }}
         run: echo "Not running tests - skip resolving environment values"
     
+  v3-testdata-setup:
+    name: v3 test data setup
+    needs: [prepare, expose_env_vars, decide, django]
+    # Only run when Django runs and tests are enabled
+    if: ${{ needs.decide.outputs.run_django == 'true' && needs.decide.outputs.run_tests == 'true' }}
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION:     ${{ vars.AWS_REGION }}
+      AWS_ACCOUNT_ID: ${{ needs.expose_env_vars.outputs.env_account_id }}
+      DEPLOY_ENV:     ${{ needs.prepare.outputs.deploy_env }}
+      GH_ENV:         ${{ needs.prepare.outputs.gh_env }}
+      ECS_CLUSTER:    ${{ format('{0}-ecs', vars.PROJECT) }}
+      ECS_SERVICE:    ${{ format('{0}-{1}-web', vars.PROJECT, needs.prepare.outputs.deploy_env) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (v3 testdata setup)
+        # if the job is running, run creds
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/${{ env.PROJECT }}-${{ env.GH_ENV }}-gh-oidc
+          role-session-name: gha-v3-testdata-${{ env.DEPLOY_ENV }}
+
+      - name: Fetch ECS service networking (v3 testdata setup)
+        id: v3test_net
+        env:
+          CLUSTER: ${{ env.ECS_CLUSTER }}
+          SERVICE: ${{ env.ECS_SERVICE }}
+        run: |
+          set -euo pipefail
+          SUBNETS=$(aws ecs describe-services \
+            --cluster "$CLUSTER" --services "$SERVICE" \
+            --query 'join(`,`, services[0].networkConfiguration.awsvpcConfiguration.subnets)' \
+            --output text)
+          SGS=$(aws ecs describe-services \
+            --cluster "$CLUSTER" --services "$SERVICE" \
+            --query 'join(`,`, services[0].networkConfiguration.awsvpcConfiguration.securityGroups)' \
+            --output text)
+
+          [ -z "$SUBNETS" ] && { echo "::error::Service has no subnets"; exit 1; }
+          [ -z "$SGS" ] && { echo "::error::Service has no security groups"; exit 1; }
+
+          echo "subnets=$SUBNETS" >> "$GITHUB_OUTPUT"
+          echo "sgs=$SGS" >> "$GITHUB_OUTPUT"
+
+      - name: Run v3_load_testdata (ECS one-off task)
+        env:
+          CLUSTER: ${{ env.ECS_CLUSTER }}
+          SERVICE: ${{ env.ECS_SERVICE }}
+        run: |
+          set -euo pipefail
+
+          TD_ARN=$(aws ecs describe-services \
+            --cluster "$CLUSTER" --services "$SERVICE" \
+            --query 'services[0].taskDefinition' \
+            --output text)
+
+          TASK_ARN=$(aws ecs run-task \
+            --cluster "$CLUSTER" \
+            --launch-type FARGATE \
+            --task-definition "$TD_ARN" \
+            --network-configuration "awsvpcConfiguration={subnets=[${{ steps.v3test_net.outputs.subnets }}],securityGroups=[${{ steps.v3test_net.outputs.sgs }}],assignPublicIp=DISABLED}" \
+            --overrides '{"containerOverrides":[{"name":"web","command":["bash","-lc","python3 manage.py v3_load_testdata"]}]}' \
+            --query 'tasks[0].taskArn' \
+            --output text)
+
+          echo "Started v3_load_testdata task: $TASK_ARN"
+          aws ecs wait tasks-stopped --cluster "$CLUSTER" --tasks "$TASK_ARN"
+
   api-tests:
     name: api-tests
-    needs: [resolve-env, decide]
+    needs: [resolve-env, decide, v3-testdata-setup]
     runs-on: ubuntu-latest
     env:
       AWS_REGION:        ${{ vars.AWS_REGION }}
       DJANGO_BASE_URL:   ${{ needs.resolve-env.outputs.django }}
-      API_PREFIX_PUBLIC: /public/api
-      API_PREFIX_SECURE: /secure/api
-      COGNITO_CLIENT_ID: ${{ needs.resolve-env.outputs.cognito_client_ci }}
-      COGNITO_USERNAME:  test-user
-      COGNITO_PASSWORD:  MySecurePassword123!
       RUN_TESTS:         ${{ needs.decide.outputs.run_tests }}
     steps:
       - uses: actions/checkout@v4
@@ -651,7 +717,7 @@ jobs:
         continue-on-error: true
         run: |
           join () { base="${1%/}"; path="${2}"; echo "${base}${path}"; }
-          curl -fsS -m 8 "$(join "$DJANGO_BASE_URL" "$API_PREFIX_PUBLIC")/ping" >/dev/null || true
+          curl -fsS -m 8 "$(join "$DJANGO_BASE_URL" "/health" >/dev/null || true
 
       - name: Run Jest (API)
         if: ${{ env.RUN_TESTS == 'true' }}
@@ -722,6 +788,76 @@ jobs:
           # Create empty JUnit so downstream parsers don't complain
           mkdir -p reports/junit
           printf '<testsuite name="ui" tests="0" failures="0" errors="0" skipped="0"/>\n' > reports/junit/playwright.xml
+
+  v3-restore-realdata:
+    name: v3 restore real data
+    needs: [prepare, expose_env_vars, decide, django, ui-tests]
+    # Only relevant if Django and tests ran; `always()` not needed here because
+    # it depends on ui-tests (which may skip via its own conditions)
+    if: ${{ needs.decide.outputs.run_django == 'true' && needs.decide.outputs.run_tests == 'true' }}
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION:     ${{ vars.AWS_REGION }}
+      AWS_ACCOUNT_ID: ${{ needs.expose_env_vars.outputs.env_account_id }}
+      DEPLOY_ENV:     ${{ needs.prepare.outputs.deploy_env }}
+      GH_ENV:         ${{ needs.prepare.outputs.gh_env }}
+      ECS_CLUSTER:    ${{ format('{0}-ecs', vars.PROJECT) }}
+      ECS_SERVICE:    ${{ format('{0}-{1}-web', vars.PROJECT, needs.prepare.outputs.deploy_env) }}
+    steps:
+      - uses: actions/checkout@v4
+  
+      - name: Configure AWS credentials (v3 restore)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/${{ env.PROJECT }}-${{ env.GH_ENV }}-gh-oidc
+          role-session-name: gha-v3-restore-${{ env.DEPLOY_ENV }}
+ 
+      - name: Fetch ECS service networking (v3 restore)
+        id: v3restore_net
+        env:
+          CLUSTER: ${{ env.ECS_CLUSTER }}
+          SERVICE: ${{ env.ECS_SERVICE }}
+        run: |
+          set -euo pipefail
+          SUBNETS=$(aws ecs describe-services \
+            --cluster "$CLUSTER" --services "$SERVICE" \
+            --query 'join(`,`, services[0].networkConfiguration.awsvpcConfiguration.subnets)' \
+            --output text)
+          SGS=$(aws ecs describe-services \
+            --cluster "$CLUSTER" --services "$SERVICE" \
+            --query 'join(`,`, services[0].networkConfiguration.awsvpcConfiguration.securityGroups)' \
+            --output text)
+  
+          [ -z "$SUBNETS" ] && { echo "::error::Service has no subnets"; exit 1; }
+          [ -z "$SGS" ] && { echo "::error::Service has no security groups"; exit 1; }
+  
+          echo "subnets=$SUBNETS" >> "$GITHUB_OUTPUT"
+          echo "sgs=$SGS" >> "$GITHUB_OUTPUT"
+ 
+      - name: Run v3_seed_data (ECS one-off task)
+        env:
+          CLUSTER: ${{ env.ECS_CLUSTER }}
+          SERVICE: ${{ env.ECS_SERVICE }}
+        run: |
+          set -euo pipefail
+ 
+          TD_ARN=$(aws ecs describe-services \
+            --cluster "$CLUSTER" --services "$SERVICE" \
+            --query 'services[0].taskDefinition' \
+            --output text)
+  
+          TASK_ARN=$(aws ecs run-task \
+            --cluster "$CLUSTER" \
+            --launch-type FARGATE \
+            --task-definition "$TD_ARN" \
+            --network-configuration "awsvpcConfiguration={subnets=[${{ steps.v3restore_net.outputs.subnets }}],securityGroups=[${{ steps.v3restore_net.outputs.sgs }}],assignPublicIp=DISABLED}" \
+            --overrides '{"containerOverrides":[{"name":"web","command":["bash","-lc","python3 manage.py v3_seed_data"]}]}' \
+            --query 'tasks[0].taskArn' \
+            --output text)
+  
+          echo "Started v3_seed_data task: $TASK_ARN"
+          aws ecs wait tasks-stopped --cluster "$CLUSTER" --tasks "$TASK_ARN"
 
   pr-comment:
     name: PR Comment (Test Summary)

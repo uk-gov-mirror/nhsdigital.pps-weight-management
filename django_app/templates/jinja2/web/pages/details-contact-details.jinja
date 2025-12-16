@@ -1,0 +1,95 @@
+{% extends "web/layout/base.jinja" %}
+
+{% from "web/macros/layout.jinja" import two_thirds_column_start, two_thirds_column_end %}
+{% from "web/macros/forms.jinja" import form_error_summary, continue_button, back_link %}
+
+
+{% set pageName = "How would you like to be contacted?" %}
+
+{% block beforeContent %}
+  {{ back_link("/details-postcode") }}
+{% endblock %}
+
+{% block content %}
+  {{ two_thirds_column_start() }}
+
+      {% if errors.list %}
+        {{ form_error_summary({
+          "titleText": "There is a problem",
+          "errorList": errors.list
+        }) }}
+      {% endif %}
+
+      <form method="post">
+        {{ csrf_input }}
+
+        {% set emailHtml %}
+          {{ input({
+            "id": "emailInput",
+            "name": "emailInput",
+            "classes": "nhsuk-u-width-two-thirds",
+            "value": data.emailInput if data.emailInput else undefined,
+            "label": {
+              "text": "Email address"
+            },
+            "errorMessage": {
+              "text": "Please enter a valid email address"
+            } if errors.email else undefined
+          }) }}
+        {% endset -%}
+
+        {% set mobileHtml %}
+          {{ input({
+            "id": "mobileInput",
+            "name": "mobileInput",
+            "classes": "nhsuk-u-width-two-thirds",
+            "value": data.mobileInput if data.mobileInput else undefined,
+            "label": {
+              "text": "Mobile phone number"
+            },
+            "errorMessage": {
+              "text": "Please enter a valid mobile phone number"
+            } if errors.mobile else undefined
+          }) }}
+        {% endset -%}
+
+        {{ checkboxes({
+          "idPrefix": "contact",
+          "name": "contact",
+          "fieldset": {
+            "legend": {
+              "text": "How would you like to be contacted?",
+              "classes": "nhsuk-fieldset__legend--l",
+              "isPageHeading": "true"
+            }
+          },
+          "hint": {
+            "text": "You can pick more than one"
+          },
+          "errorMessage": {
+            "text": "Please choose an option"
+          } if errors.contact else undefined,
+          "items": [
+            {
+              "value": "email",
+              "text": "Email",
+              "conditional": {
+                "html": emailHtml
+              }
+            },
+            {
+              "value": "text",
+              "text": "Text message (SMS)",
+              "conditional": {
+                "html": mobileHtml
+              }
+            }
+          ],
+          "values": data.contact if data.contact else undefined
+        }) }}
+
+        {{ continue_button() }}
+
+      </form>
+  {{ two_thirds_column_end() }}
+{% endblock %}

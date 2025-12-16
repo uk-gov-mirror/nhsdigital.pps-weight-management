@@ -1,0 +1,51 @@
+{% extends "web/layout/base.jinja" %}
+
+{% from "web/macros/layout.jinja" import two_thirds_column_start, two_thirds_column_end %}
+{% from "web/macros/forms.jinja" import form_error_summary, continue_button, back_link %}
+
+
+{% set pageName = "What is your name?" %}
+
+{% block beforeContent %}
+  {{ back_link("/consent-to-ur") }}
+{% endblock %}
+
+{% block content %}
+  {{ two_thirds_column_start() }}
+
+    {% if error %}
+    {{ form_error_summary({
+      "titleText": "There is a problem",
+      "errorList": [
+        {
+          "text": "Enter your name",
+          "href": "#details-name"
+        }
+      ]
+    }) }}
+    {% endif %}
+
+    <form method="post">
+
+      {{ input({
+        "label": {
+          "text": "What is your name?",
+          "classes": "nhsuk-label--l",
+          "isPageHeading": "true"
+        },
+        "hint": {
+          "text": "So we can say hi on our emails"
+        },
+        "id": "details-name",
+        "name": "details-name",
+        "value": data["details-name"] if data["details-name"] else undefined,
+        "errorMessage": {
+          "text": "Enter your name"
+        } if error else undefined
+      }) }}
+
+      {{ continue_button() }}
+
+    </form>
+  {{ two_thirds_column_end() }}
+{% endblock %}

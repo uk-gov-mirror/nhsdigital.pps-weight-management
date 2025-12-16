@@ -5,7 +5,7 @@
 .
 ├── .github/
 │   └── workflows/                    # GitHub Actions
-├── django-app/                       # Django app
+├── django_app/                       # Django app
 ├── docs/                             # Documentation
 ├── infra/
 │   └── terraform/

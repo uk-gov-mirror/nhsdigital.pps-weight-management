@@ -1,0 +1,346 @@
+{% extends "web/layout/base.jinja" %}
+
+{% from "web/macros/layout.jinja" import two_thirds_column_start, two_thirds_column_end %}
+{% from "web/macros/forms.jinja" import form_error_summary, continue_button, back_link %}
+
+
+{% set pageName = "Activities for you" %}
+
+{% block content %}
+<div class="nhsuk-grid-row">
+  <div class="nhsuk-grid-column-full">
+    <h1>Activities for you</h1>
+  </div>
+</div>
+
+<div class="nhsuk-grid-row">
+  <div class="nhsuk-grid-column-full">
+    {{ button({
+      "html": '
+        <svg class="app-icon app-icon--filter" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" width="2rem" height="2rem" viewBox="0 0 24 24">
+          <path d="M3.507 7.258c-.081.047-.094.14-.094.688 0 .595.008.64.119.718.106.074.997.083 8.468.083s8.362-.009 8.468-.083c.111-.078.119-.124.119-.69 0-.48-.018-.624-.084-.69-.076-.076-.918-.084-8.493-.082-5.613.001-8.441.019-8.503.056m2.628 4.098c-.03.057-.055.347-.055.644 0 .297.025.587.055.644.054.101.176.103 5.865.103s5.811-.002 5.865-.103c.03-.057.055-.347.055-.644 0-.297-.025-.587-.055-.644-.054-.101-.176-.103-5.865-.103s-5.811.002-5.865.103m2.641 4.016c-.061.087-.083.253-.083.628s.022.541.083.628l.083.119h3.169c3.078 0 3.17-.003 3.223-.103.031-.057.056-.356.056-.663 0-.438-.019-.578-.084-.644-.074-.074-.441-.084-3.224-.084h-3.14l-.083.119" />
+        </svg>
+        Show filters
+      ',
+      "classes": "nhsuk-button--secondary app-filter-toggle-button js-toggle-button",
+      "type": "button"
+    }) }}
+  </div>
+</div>
+
+<div class="nhsuk-grid-row">
+  <div class="nhsuk-grid-column-one-quarter">
+
+    <!-- start FILTERS area -->
+    <div id="js-listing-filters" tabindex="-1" role="dialog" aria-modal="true">
+      <form method="post" class="app-listing-filters-form">
+        {{ csrf_input }}
+		
+        {{ button({
+          "text": "Close",
+          "classes": "nhsuk-button--secondary js-toggle-button",
+          "type": "button"
+        }) }}
+
+        <h2 class="nhsuk-heading-m nhsuk-u-font-weight-normal">Filters</h2>
+
+        <!-- Goals -->
+        {{ checkboxes({
+          "idPrefix": "goals",
+          "name": "goals",
+          "classes": "nhsuk-checkboxes--small",
+          "fieldset": {
+            "legend": {
+              "text": "Goals",
+              "classes": "nhsuk-fieldset__legend--s"
+            }
+          },
+          "items": [
+            {
+              "value": "goals.exercise",
+              "text": "Exercise"
+            },
+            {
+              "value": "goals.healthy_eating",
+              "text": "Healthy eating"
+            }
+          ],
+          "values": data.goals if data.goals else undefined
+        }) }}
+
+        <hr class="nhsuk-section-break--m">
+
+        <!-- Cost -->
+        {{ checkboxes({
+          "idPrefix": "cost",
+          "name": "cost",
+          "classes": "nhsuk-checkboxes--small",
+          "fieldset": {
+            "legend": {
+              "text": "Cost",
+              "classes": "nhsuk-fieldset__legend--s"
+            }
+          },
+          "items": [
+            {
+              "value": "cost.free",
+              "text": "Free"
+            },
+            {
+              "value": "cost.initial_discount",
+              "text": "Initial discount or offer"
+            },
+            {
+              "value": "cost.permanent_discount",
+              "text": "Permanent discount"
+            },
+            {
+              "value": "cost.paid_for",
+              "text": "Paid for"
+            }
+          ],
+          "values": data.cost if data.cost else undefined
+        }) }}
+
+        <hr class="nhsuk-section-break--m">
+
+        <!-- Timetabling -->
+        {{ checkboxes({
+          "idPrefix": "timetable",
+          "name": "timetable",
+          "classes": "nhsuk-checkboxes--small",
+          "fieldset": {
+            "legend": {
+              "text": "Timetable",
+              "classes": "nhsuk-fieldset__legend--s"
+            }
+          },
+          "items": [
+            {
+              "value": "timetable.scheduled",
+              "text": "Scheduled"
+            },
+            {
+              "value": "timetable.self_paced",
+              "text": "Self-paced"
+            }
+          ],
+          "values": data.timetable if data.timetable else undefined
+        }) }}
+
+        <hr class="nhsuk-section-break--m">
+
+        <!-- Location -->
+        {{ checkboxes({
+          "idPrefix": "location",
+          "name": "location",
+          "classes": "nhsuk-checkboxes--small",
+          "fieldset": {
+            "legend": {
+              "text": "Location",
+              "classes": "nhsuk-fieldset__legend--s"
+            }
+          },
+          "items": [
+            {
+              "value": "location.venue_or_a_place",
+              "text": "At a venue or place"
+            },
+            {
+              "value": "location.wherever_works_for_you",
+              "text": "Wherever works for you"
+            }
+          ],
+          "values": data.location if data.location else undefined
+        }) }}
+
+        <hr class="nhsuk-section-break--m">
+
+        <!-- How taught -->
+        {{ checkboxes({
+          "idPrefix": "taught",
+          "name": "taught",
+          "classes": "nhsuk-checkboxes--small",
+          "fieldset": {
+            "legend": {
+              "text": "How you like to be taught",
+              "classes": "nhsuk-fieldset__legend--s"
+            }
+          },
+          "items": [
+            {
+              "value": "taught.taught_by_a_person",
+              "text": "Taught by a person"
+            },
+            {
+              "value": "taught.self_led",
+              "text": "Self-led"
+            }
+          ],
+          "values": data.taught if data.taught else undefined
+        }) }}
+
+        <hr class="nhsuk-section-break--m">
+
+        <!-- Who with -->
+        {{ checkboxes({
+          "idPrefix": "who_with",
+          "name": "who_with",
+          "classes": "nhsuk-checkboxes--small",
+          "fieldset": {
+            "legend": {
+              "text": "Who with",
+              "classes": "nhsuk-fieldset__legend--s"
+            }
+          },
+          "items": [
+            {
+              "value": "who_with.alone",
+              "text": "Alone"
+            },
+            {
+              "value": "who_with.in_a_group",
+              "text": "In a group"
+            }
+          ],
+          "values": data.who_with if data.who_with else undefined
+        }) }}
+
+        <hr class="nhsuk-section-break--m">
+
+        <!-- How channel -->
+        {{ checkboxes({
+          "idPrefix": "channel",
+          "name": "channel",
+          "classes": "nhsuk-checkboxes--small",
+          "fieldset": {
+            "legend": {
+              "text": "Access",
+              "classes": "nhsuk-fieldset__legend--s"
+            }
+          },
+          "items": [
+            {
+              "value": "channel.in_real_life",
+              "text": "In real life"
+            },
+            {
+              "value": "channel.digital",
+              "text": "Digital"
+            }
+          ],
+          "values": data.channel if data.channel else undefined
+        }) }}
+
+        <hr class="nhsuk-section-break--m">
+
+        <!-- style="width: 100%" -->
+        {{ button({
+          "text": "Update",
+          "classes": "nhsuk-button--full-width"
+        }) }}
+
+        {{ button({
+          "text": "Close",
+          "classes": "nhsuk-button--secondary js-toggle-button",
+          "type": "button"
+        }) }}
+      </form>
+
+    </div>
+  </div>
+
+  <!-- start results column -->
+
+  <div class="nhsuk-grid-column-three-quarters">
+
+	{% set count = results | length %}
+
+	{% if count == 0 %}
+	  <h2 class="nhsuk-heading-m nhsuk-u-font-weight-normal">
+		We found no matches
+	  </h2>
+
+	{% elif count <= 50 %}
+	  <h2 class="nhsuk-heading-m nhsuk-u-font-weight-normal">
+		We found {{ count }} match{{ 'es' if count != 1 }}
+	  </h2>
+
+	{% else %}
+	  <h2 class="nhsuk-heading-m nhsuk-u-font-weight-normal">
+		We found more than 50 matches
+	  </h2>
+	{% endif %}
+
+    {% for result in results %}
+    <div class="nhsuk-card nhsuk-card--clickable">
+      <div class="nhsuk-card__content">
+
+        <div class="app-handy-flex-container app-collapser">
+          <div>
+            <div class="app-roundel app-listing">
+              <img src=" {{ static('assets/images/services/') }}{{ result.logoImage }}" alt="{{ result.serviceName | default('Service name') }} logo" />
+            </div>
+          </div>
+          <div>
+            <h2 class="nhsuk-card__heading nhsuk-heading-s">
+              <a class="nhsuk-card__link" href="detail/{{ result.id }}">{{ result.serviceName | default('Service name') }}</a>
+            </h2>
+            <div class="nhsuk-card__description">
+              <p>{{ result.description | default('description') | striptags | safe }}</p>
+              <div class="nhsuk-grid-row">
+                <dl class="nhsuk-grid-column-one-third app-u-definition-list">
+                  <dt class="nhsuk-body-s">What</dt>
+                  <dd class="nhsuk-body-m">{{ result.serviceType | default('service type') }}</dd>
+                </dl>
+                <dl class="nhsuk-grid-column-one-third app-u-definition-list">
+                  <dt class="nhsuk-body-s">Cost</dt>
+                  <dd class="nhsuk-body-m">{{ result.costText | default('cost') }}</dd>
+                </dl>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    {% endfor %}
+
+  </div>
+
+</div>
+{% endblock %}
+
+{% block pageScripts %}
+  <script>
+    const buttons = document.querySelectorAll('.js-toggle-button');
+    const content = document.getElementById('js-listing-filters');
+    const bodyElement = document.getElementsByTagName('body')[0];
+    const mediaQuery = window.matchMedia('(max-width: 768px)');
+
+    function toggleContent() {
+      content.classList.toggle('js-show');
+      bodyElement.classList.toggle('js-obfuscate');
+    }
+
+    function updateToggleBehavior(e) {
+      if (e.matches) {
+        // Add listeners on small screens
+        buttons.forEach(button => {
+          button.addEventListener('click', toggleContent);
+        });
+      } else {
+        // Remove listeners and ensure content is visible
+        buttons.forEach(button => {
+          button.removeEventListener('click', toggleContent);
+        });
+        bodyElement.classList.remove('js-obfuscate');
+        content.classList.remove('show');
+      }
+    }
+
+    // Initial setup
+    updateToggleBehavior(mediaQuery);
+    mediaQuery.addEventListener('change', updateToggleBehavior);
+  </script>
+{% endblock %}

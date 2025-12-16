@@ -1,0 +1,74 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+
+{% block content %}
+<div class="dashboard">
+
+  <h1>{% trans "Admin landing page" %}</h1>
+
+  <div class="module">
+    <h2>{% trans "API versions" %}</h2>
+    <div class="inline-group">
+
+      <div class="inline-related" style="margin-bottom: 1em;">
+        <p>
+          <a href="{% url 'v1_admin:index' %}">
+            {% trans "V1 tables admin" %}
+          </a>
+        </p>
+        <p class="help">
+          {% trans "Manage all database tables for API version 1 (V1_* tables)." %}
+        </p>
+      </div>
+
+      <div class="inline-related" style="margin-bottom: 1em;">
+        <p>
+          <a href="{% url 'v2_admin:index' %}">
+            {% trans "V2 tables admin" %}
+          </a>
+        </p>
+        <p class="help">
+          {% trans "Manage all database tables for API version 2 (V2_* tables)." %}
+        </p>
+      </div>
+
+      <div class="inline-related" style="margin-bottom: 1em;">
+        <p>
+          <a href="{% url 'v3_admin:index' %}">
+            {% trans "V3 tables admin" %}
+          </a>
+        </p>
+        <p class="help">
+          {% trans "Manage all database tables for API version 3 (V3_* tables)." %}
+        </p>
+      </div>
+
+    </div>
+  </div>
+
+  {% if app_list %}
+    <div class="module">
+      <h2>{% trans "Other admin apps" %}</h2>
+      <div class="app-list">
+        {% for app in app_list %}
+          <div class="inline-related" style="margin-bottom: 1em;">
+            <h3>{{ app.name }}</h3>
+            <ul>
+              {% for model in app.models %}
+                <li>
+                  {% if model.admin_url %}
+                    <a href="{{ model.admin_url }}">{{ model.name }}</a>
+                  {% else %}
+                    {{ model.name }}
+                  {% endif %}
+                </li>
+              {% endfor %}
+            </ul>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+
+</div>
+{% endblock %}
