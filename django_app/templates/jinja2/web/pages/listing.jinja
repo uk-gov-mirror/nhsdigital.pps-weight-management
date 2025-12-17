@@ -254,7 +254,7 @@
 
   <div class="nhsuk-grid-column-three-quarters">
 
-	{% set count = results | length %}
+	{% set count = results.total %}
 
 	{% if count == 0 %}
 	  <h2 class="nhsuk-heading-m nhsuk-u-font-weight-normal">
@@ -272,7 +272,7 @@
 	  </h2>
 	{% endif %}
 
-    {% for result in results %}
+    {% for result in results.results %}
     <div class="nhsuk-card nhsuk-card--clickable">
       <div class="nhsuk-card__content">
 

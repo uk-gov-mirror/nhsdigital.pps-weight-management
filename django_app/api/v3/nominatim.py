@@ -24,8 +24,8 @@ def nominatim_geocode(postcode: str):
     }
 
     headers = {
-        # Nominatim requires a valid identifying User-Agent
-        "User-Agent": "BetterHealthApp/1.0 (contact@example.com)"
+        "User-Agent": "BetterHealthApp/1.0 (jamie.be11@nhs.net)",
+        "Accept": "application/json"
     }
 
     try:

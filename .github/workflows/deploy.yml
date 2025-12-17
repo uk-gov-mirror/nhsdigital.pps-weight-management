@@ -746,7 +746,7 @@ jobs:
 
   ui-tests:
     name: ui-tests
-    needs: [resolve-env, decide]
+    needs: [resolve-env, decide, v3-testdata-setup]
     runs-on: ubuntu-latest
     container: mcr.microsoft.com/playwright:v1.56.1-jammy   
     env:
@@ -791,9 +791,7 @@ jobs:
 
   v3-restore-realdata:
     name: v3 restore real data
-    needs: [prepare, expose_env_vars, decide, django, ui-tests]
-    # Only relevant if Django and tests ran; `always()` not needed here because
-    # it depends on ui-tests (which may skip via its own conditions)
+    needs: [prepare, expose_env_vars, decide, django, ui-tests, api-tests]
     if: ${{ needs.decide.outputs.run_django == 'true' && needs.decide.outputs.run_tests == 'true' }}
     runs-on: ubuntu-latest
     env:
