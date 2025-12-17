@@ -41,10 +41,10 @@ This repository includes a Docker Compose setup for running the Django app and P
 4. Connect VS Code for debugging
 
 5. Visit the app:
-   - Django site → http://localhost:8000  
-   - Health check → http://localhost:8000/health/
-   - REST API → http://localhost:8000/apidocs
-   - Admin → http://localhost:8000/admin
+   - Django site → http://127.0.0.1:8000  
+   - Health check → http://127.0.0.1:8000/health/
+   - REST API → http://127.0.0.1:8000/apidocs
+   - Admin → http://127.0.0.1:8000/admin
 
 6. Stop containers:
    ```bash
