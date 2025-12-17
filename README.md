@@ -5,6 +5,7 @@
 .
 ├── .github/
 │   └── workflows/                    # GitHub Actions
+├── .vscode/                          # VS Code launch debugging
 ├── django_app/                       # Django app
 ├── docs/                             # Documentation
 ├── infra/
@@ -83,8 +84,11 @@
 +----------------------+--------------------------------------+
 |      Web Frontend    |      REST API                        |
 |----------------------|--------------------------------------|
-| - /                  | - /public/api/                       |
-|                      | - /secure/api/  (Requires JWT auth)  |
-|                      | - /health/                           |
+| - /                  | - /v1/                               |
+|                      | - /v2/                               |
+|                      | - /v3/                               |
+|                      | - /admin/      # Administration Site |
+|                      | - /apidocs/    # Swagger UI          |
+|                      | - /health/     # Service health      |
 |----------------------|--------------------------------------|
 ```
