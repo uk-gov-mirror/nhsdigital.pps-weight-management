@@ -1,0 +1,45 @@
+name: Deploy Network Layer - Dev
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        type: choice
+        options:
+          - plan
+          - apply
+        default: plan
+
+env:
+  PROJECT:           nhse-pps-htsh
+  AWS_REGION:        ${{ vars.AWS_REGION }}
+  GH_ENV:            dev
+
+jobs:
+  plan-network-dev:
+    uses: ./.github/workflows/terraform-plan.yml
+    with:
+      environment: dev
+      layer: network
+      working_directory: infra/terraform/environments/dev/network
+      aws_region: ${{ vars.AWS_REGION }}
+      project: nhse-pps-htsh
+      gh_env: dev
+      aws_account_id: 515424599516
+
+
+  apply-network-dev:
+    if: inputs.action == 'apply'
+    needs: plan-network-dev
+    uses: ./.github/workflows/terraform-apply.yml
+    with:
+      environment: dev
+      layer: network
+      working_directory: infra/terraform/environments/dev/network
+      aws_region: ${{ vars.AWS_REGION }}
+      project: nhse-pps-htsh
+      gh_env: dev
+      aws_account_id: 515424599516
+

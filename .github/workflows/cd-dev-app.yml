@@ -1,0 +1,60 @@
+name: Deploy App Layer - Dev
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Docker image tag to deploy'
+        required: true
+        type: string
+        default: latest
+      action:
+        description: 'Action to perform'
+        required: true
+        type: choice
+        options:
+          - plan
+          - apply
+        default: plan
+      environment_suffix:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - poc
+          - dev
+          - sandbox
+        default: poc
+
+env:
+  PROJECT:           ${{ vars.PROJECT }}
+  AWS_REGION:        ${{ vars.AWS_REGION }}
+  GH_ENV:            dev
+
+jobs:
+  plan-app-dev:
+    uses: ./.github/workflows/terraform-plan.yml
+    with:
+      environment: dev
+      environment_suffix: ${{ inputs.environment_suffix }}
+      layer: app
+      working_directory: infra/terraform/environments/dev/app
+      image_tag: ${{ inputs.image_tag }}
+      aws_region: ${{ vars.AWS_REGION }}
+      aws_account_id: 515424599516
+      project: nhse-pps-htsh
+      gh_env: dev
+
+  apply-app-dev:
+    if: inputs.action == 'apply'
+    needs: plan-app-dev
+    uses: ./.github/workflows/terraform-apply.yml
+    with:
+      environment: dev
+      environment_suffix: ${{ inputs.environment_suffix }}
+      layer: app
+      working_directory: infra/terraform/environments/dev/app
+      aws_region: ${{ vars.AWS_REGION }}
+      aws_account_id: 515424599516
+      project: nhse-pps-htsh
+      gh_env: dev

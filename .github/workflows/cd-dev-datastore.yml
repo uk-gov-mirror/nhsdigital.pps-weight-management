@@ -1,0 +1,43 @@
+name: Deploy Datastore Layer - Dev
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        type: choice
+        options:
+          - plan
+          - apply
+        default: plan
+
+env:
+  PROJECT:           ${{ vars.PROJECT }}
+  AWS_REGION:        ${{ vars.AWS_REGION }}
+  GH_ENV:            dev
+
+jobs:
+  plan-datastore-dev:
+    uses: ./.github/workflows/terraform-plan.yml
+    with:
+      environment: dev
+      layer: datastore
+      working_directory: infra/terraform/environments/dev/datastore
+      aws_region: ${{ vars.AWS_REGION }}
+      aws_account_id: 515424599516
+      project: nhse-pps-htsh
+      gh_env: dev
+
+  apply-datastore-dev:
+    if: inputs.action == 'apply'
+    needs: plan-datastore-dev
+    uses: ./.github/workflows/terraform-apply.yml
+    with:
+      environment: dev
+      layer: datastore
+      working_directory: infra/terraform/environments/dev/datastore
+      aws_region: ${{ vars.AWS_REGION }}
+      aws_account_id: 515424599516
+      project: nhse-pps-htsh
+      gh_env: dev
