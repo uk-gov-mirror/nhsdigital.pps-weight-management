@@ -1,0 +1,37 @@
+{% extends "web/layout/base.jinja" %}
+
+{% block pageTitle %}Pilot access{% endblock %}
+
+{% block content %}
+  <div class="nhsuk-width-container">
+    <main class="nhsuk-main-wrapper" id="maincontent" role="main">
+      <h1 class="nhsuk-heading-xl">Pilot site</h1>
+
+      <p class="nhsuk-body">
+        This site is currently in a pilot/beta phase. Access is limited to invited users.
+      </p>
+
+      <h2 class="nhsuk-heading-m">Already accepted?</h2>
+      <p class="nhsuk-body">
+        If you have already been accepted, you can request a magic link to sign in.
+      </p>
+      <p class="nhsuk-body">
+        <a class="nhsuk-link" href="{{ url('pilot_access:magic_link_request') }}">
+          Request a magic link
+        </a>
+      </p>
+
+      <hr class="nhsuk-section-break nhsuk-section-break--m nhsuk-section-break--visible" />
+
+      <h2 class="nhsuk-heading-m">Need an invite?</h2>
+      <p class="nhsuk-body">
+        If you haven’t been invited yet, you can request an invite.
+      </p>
+      <p class="nhsuk-body">
+        <a class="nhsuk-link" href="{{ url('pilot_access:request_invite') }}">
+          Request an invite
+        </a>
+      </p>
+    </main>
+  </div>
+{% endblock %}

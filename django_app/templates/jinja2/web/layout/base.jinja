@@ -23,8 +23,40 @@
     "service": {
       "text": serviceName,
       "href": url('home')
-    }
+    },
+    "account": (
+      {
+        "items": [
+          {
+            "text": "Log out",
+            "href": "#logout"
+          }
+        ]
+      }
+      if user.is_authenticated
+      else None
+    )
   }) }}
+
+  {% if user.is_authenticated %}
+    <form
+      id="logout-form"
+      method="post"
+      action="{{ url('pilot_access:logout') }}"
+      style="display: none;"
+    >
+      {{ csrf_input }}
+    </form>
+
+    <script>
+      document.addEventListener("click", function (event) {
+        if (event.target.closest('a[href="#logout"]')) {
+          event.preventDefault();
+          document.getElementById("logout-form").submit();
+        }
+      });
+    </script>
+  {% endif %}
 {% endblock %}
 
 {% block footer %}

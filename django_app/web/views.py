@@ -73,7 +73,8 @@ FILTER_FIELDS: List[str] = [
 
 def start(request: HttpRequest) -> HttpResponse:
     """Start the journey by clearing any existing session data."""
-    request.session.flush()
+    """Don't call session.flush() !! It clears the logged in users sessionid"""
+    # request.session.flush()
     return render(request, "web/pages/index.jinja", {"data": request.session})
 
 

@@ -22,7 +22,8 @@ services:
     image: ppswm:local
     env_file: .env
     environment:
-      DJANGO_SETTINGS_MODULE: wm_django.settings.dev
+      DJANGO_SETTINGS_MODULE: wm_django.settings.local
+      DJANGO_SECRET_KEY: xxx-local-dev-secret-key-xxx
       DATABASE_URL: postgres://app:app@db:5432/app
       DJANGO_SUPERUSER_USERNAME: admin
       DJANGO_SUPERUSER_EMAIL: admin@example.com
@@ -33,6 +34,7 @@ services:
     volumes:
       - ../api:/app/api
       - ../core:/app/core
+      - ../pilot_access:/app/pilot_access
       - ../scheduler:/app/scheduler
       - ../static:/app/static
       - ../templates:/app/templates

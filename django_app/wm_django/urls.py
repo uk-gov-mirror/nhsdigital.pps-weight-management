@@ -28,6 +28,9 @@ urlpatterns = [
     # Health check
     path("health", include("api.health.urls")),
 
+    # Pilot Access
+    path("pilot/", include(("pilot_access.urls", "pilot_access"), namespace="pilot_access")),
+
     # Website
     path("", include("web.urls")),
 ]

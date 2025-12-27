@@ -1,0 +1,46 @@
+{% extends "web/layout/base.jinja" %}
+
+{% block content %}
+  <h1 class="nhsuk-heading-l">Sign in</h1>
+
+  <p class="nhsuk-body">
+    If you are already registered, enter your email address and we will send you a sign-in link.
+  </p>
+
+  {% if form.errors %}
+    {{ errorSummary({
+      "titleText": "There is a problem",
+      "errorList": [
+        {
+          "text": form.email.errors[0],
+          "href": "#email"
+        }
+      ]
+    }) }}
+  {% endif %}
+
+  <form method="post" novalidate>
+    {{ csrf_input }}
+
+    {{ input({
+      "label": {
+        "text": "Email address"
+      },
+      "id": "email",
+      "name": "email",
+      "type": "email",
+      "value": form.email.value() or "",
+      "errorMessage": (
+        {
+          "text": form.email.errors[0]
+        }
+        if form.email.errors
+        else None
+      )
+    }) }}
+
+    {{ button({
+      "text": "Send sign-in link"
+    }) }}
+  </form>
+{% endblock %}

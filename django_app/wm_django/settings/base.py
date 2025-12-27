@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     "web",
     "api",
     "scheduler",
+    "pilot_access"
 ]
 
 
@@ -73,7 +74,8 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-]
+    "pilot_access.middleware.PilotAccessMiddleware",
+ ]
 
 
 # -------------------------------------------------------------------
@@ -106,6 +108,11 @@ TEMPLATES = [
         "DIRS": [BASE_DIR / "templates" / "jinja2"],
         "OPTIONS": {
             "environment": "wm_django.jinja2_env.environment",
+            "context_processors": [
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
+            ],
         },
     },
 ]
@@ -210,3 +217,27 @@ SPECTACULAR_SETTINGS = {
     "DESCRIPTION": "API documentation for Weight Management services.",
     "SERVE_INCLUDE_SCHEMA": False,
 }
+
+# -------------------------------------------------------------------
+# Pilot Access - URL prefixes that are publicly accessible
+# -------------------------------------------------------------------
+
+PILOT_ACCESS_PUBLIC_PATH_PREFIXES = [
+    "/pilot/",          # invite request + accept invite
+    "/health",          # health checks
+    "/static/",         # static files
+    "/admin/",          # admin (login still guarded by Django)
+    "/apidocs/",        # Swagger UI
+    "/redoc/",          # API Documentation
+    "/schema.yaml",     # REST API Schema
+    "/v1/",             # REST api v1
+    "/v2/",             # REST api v2
+    "/v3/",             # REST api v3
+]
+
+# -------------------------------------------------------------------
+# Pilot Access - Email and SMS senders (empty = use mocks that log)
+# -------------------------------------------------------------------
+
+PILOT_ACCESS_EMAIL_SENDER = ""
+PILOT_ACCESS_SMS_SENDER = ""
