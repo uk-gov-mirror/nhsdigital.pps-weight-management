@@ -5,6 +5,14 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from drf_spectacular.views import SpectacularRedocView
 from api.admin import v1_admin_site, v2_admin_site, v3_admin_site
 from api.admin_views import v3_location_detail_json
+from pilot_access.pilot_admin import pilot_admin_site
+
+# Handle invalid page requests
+handler404 = "web.errors.handler404"
+
+# The default /admin/ landing page is just a hub (API versions + Pilot Access).
+# Hide the nav sidebar there so it doesn't show an app/model tree.
+admin.site.enable_nav_sidebar = False
 
 urlpatterns = [
     path("admin/v3/location/<int:pk>/json/", v3_location_detail_json, name="v3_location_detail_json"),
@@ -13,6 +21,7 @@ urlpatterns = [
     path("admin/v1/", v1_admin_site.urls),
     path("admin/v2/", v2_admin_site.urls),
     path("admin/v3/", v3_admin_site.urls),
+    path("admin/pilot/", pilot_admin_site.urls),
     path("admin/", admin.site.urls),
 
     # REST API

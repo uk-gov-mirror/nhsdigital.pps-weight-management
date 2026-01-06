@@ -4,7 +4,7 @@
   <h1 class="nhsuk-heading-l">Sign in</h1>
 
   <p class="nhsuk-body">
-    If you are already registered, enter your email address and we will send you a sign-in link.
+    If you are already registered, enter your email address or mobile number and we will send you a verification code.
   </p>
 
   {% if form.errors %}
@@ -12,8 +12,8 @@
       "titleText": "There is a problem",
       "errorList": [
         {
-          "text": form.email.errors[0],
-          "href": "#email"
+          "text": form.contact.errors[0],
+          "href": "#contact"
         }
       ]
     }) }}
@@ -24,23 +24,23 @@
 
     {{ input({
       "label": {
-        "text": "Email address"
+        "text": "Email address or mobile number"
       },
-      "id": "email",
-      "name": "email",
-      "type": "email",
-      "value": form.email.value() or "",
+      "id": "contact",
+      "name": "contact",
+      "type": "text",
+      "value": form.contact.value() or "",
       "errorMessage": (
         {
-          "text": form.email.errors[0]
+          "text": form.contact.errors[0]
         }
-        if form.email.errors
+        if form.contact.errors
         else None
       )
     }) }}
 
     {{ button({
-      "text": "Send sign-in link"
+      "text": "Send verification code"
     }) }}
   </form>
 {% endblock %}

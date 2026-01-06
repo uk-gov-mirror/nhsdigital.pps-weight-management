@@ -57,7 +57,7 @@ INSTALLED_APPS = [
     "web",
     "api",
     "scheduler",
-    "pilot_access"
+    "pilot_access.apps.PilotAccessConfig",
 ]
 
 

@@ -1,0 +1,136 @@
+// Pagination styles for listing page
+
+// Override NHS pagination defaults for our custom pagination bar
+.app-pagination-bar {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: wrap !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  gap: 16px !important;
+  margin-top: 32px !important;
+  margin-bottom: 32px !important;
+
+  // Override NHS pagination list styles
+  .nhsuk-pagination__list {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: 4px !important;
+    list-style: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .nhsuk-pagination__list li {
+    display: flex !important;
+    align-items: center !important;
+    width: auto !important;
+    position: static !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    float: none !important;
+  }
+
+  // Base styles for both a and span pagination links
+  .nhsuk-pagination__link {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-width: 40px !important;
+    width: auto !important;
+    height: 40px !important;
+    padding: 8px 12px !important;
+    text-decoration: none !important;
+    border: 1px solid #d8dde0 !important;
+    border-radius: 4px !important;
+    background-color: #fff !important;
+    color: #005eb8 !important;
+    box-sizing: border-box !important;
+    font-size: 1rem !important;
+    line-height: 1 !important;
+    position: static !important;
+    vertical-align: middle !important;
+
+    // Remove the NHS default ::before pseudo-element that causes alignment issues
+    &::before {
+      display: none !important;
+      content: none !important;
+    }
+
+    &:hover {
+      background-color: #f0f4f5 !important;
+      border-color: #aeb7bd !important;
+    }
+  }
+
+  // Ensure anchor tags don't have position:relative and remove ::before
+  a.nhsuk-pagination__link {
+    position: static !important;
+    
+    &::before {
+      display: none !important;
+      content: none !important;
+    }
+  }
+
+  .nhsuk-pagination__link--current {
+    background-color: #005eb8 !important;
+    border-color: #005eb8 !important;
+    color: #fff !important;
+    font-weight: 600 !important;
+  }
+
+  .nhsuk-pagination__link--ellipsis {
+    border: none !important;
+    background: none !important;
+    min-width: 24px !important;
+    padding: 8px 4px !important;
+    color: #4c6272 !important;
+  }
+
+  .nhsuk-pagination-item--number,
+  .nhsuk-pagination-item--current,
+  .nhsuk-pagination-item--ellipsis {
+    display: flex !important;
+    align-items: center !important;
+    width: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    float: none !important;
+  }
+}
+
+// Distance selector - inline with label
+.app-distance-selector {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 8px !important;
+  flex-wrap: wrap !important;
+
+  .nhsuk-label {
+    margin-bottom: 0 !important;
+  }
+}
+
+// Page size selector - inline with label  
+.app-page-size-selector {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 8px !important;
+  margin-bottom: 0 !important;
+
+  .nhsuk-label {
+    margin-bottom: 0 !important;
+    white-space: nowrap !important;
+  }
+}
+
+// Auto-width select - override NHS min-width
+.nhsuk-select.nhsuk-select--auto {
+  width: auto !important;
+  min-width: auto !important;
+}

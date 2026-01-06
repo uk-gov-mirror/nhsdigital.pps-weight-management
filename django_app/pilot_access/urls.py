@@ -6,10 +6,11 @@ app_name = "pilot_access"
 
 urlpatterns = [
     path("landing/", views.landing, name="landing"),
-    path("request-invite", views.request_invite, name="request_invite"),
-    path("request-invite/done", views.request_invite_done, name="request_invite_done"),
-    path("accept/", views.accept_invitation, name="accept_invitation"),
+    path("contact-info/", views.campaign_contact_info, name="campaign_contact_info"),
+    path("otp/", views.otp_verify, name="otp_verify"),
+    path("disclaimer/", views.disclaimer, name="disclaimer"),
     path("logout/", views.logout_post, name="logout"),
     path("login/", views.magic_link_request, name="magic_link_request"),
-    path("login/consume/", views.magic_link_consume, name="magic_link_consume"),
+    path("account/", views.account, name="account"),
+    path("account/delete/", views.delete_account, name="delete_account"),
 ]

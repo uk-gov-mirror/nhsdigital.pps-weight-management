@@ -16,12 +16,18 @@ class EmailSender:
     def send_magic_link(self, email: str, link: str) -> None:
         raise NotImplementedError
 
+    def send_otp(self, *, email: str, otp: str) -> None:
+        raise NotImplementedError
+
 
 class SmsSender:
     """
     Interface for sending pilot SMS messages.
     """
     def send_invite(self, *, phone: str, link_or_code: str) -> None:
+        raise NotImplementedError
+
+    def send_otp(self, *, phone: str, otp: str) -> None:
         raise NotImplementedError
 
 
@@ -36,6 +42,9 @@ class MockEmailSender(EmailSender):
     def send_magic_link(self, email: str, link: str) -> None:
         logger.info("[MOCK EMAIL] To=%s MagicLink=%s", email, link)
 
+    def send_otp(self, *, email: str, otp: str) -> None:
+        logger.info("[MOCK EMAIL] To=%s OTP=%s", email, otp)
+
 
 @dataclass(frozen=True)
 class MockSmsSender(SmsSender):
@@ -44,6 +53,9 @@ class MockSmsSender(SmsSender):
     """
     def send_invite(self, *, phone: str, link_or_code: str) -> None:
         logger.info("[MOCK SMS] To=%s Invite=%s", phone, link_or_code)
+
+    def send_otp(self, *, phone: str, otp: str) -> None:
+        logger.info("[MOCK SMS] To=%s OTP=%s", phone, otp)
 
 
 def get_email_sender() -> EmailSender:
@@ -55,7 +67,6 @@ def get_email_sender() -> EmailSender:
     if not path:
         return MockEmailSender()
 
-    # Optional: allow swapping by dotted path later
     module_path, class_name = path.rsplit(".", 1)
     mod = __import__(module_path, fromlist=[class_name])
     cls = getattr(mod, class_name)
