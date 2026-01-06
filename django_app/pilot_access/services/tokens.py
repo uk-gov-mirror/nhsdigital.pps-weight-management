@@ -4,23 +4,15 @@ from __future__ import annotations
 import hashlib
 import secrets
 import hmac
-import random
 import string
 from django.conf import settings
 
 
-def generate_token() -> str:
-    """
-    Returns the *raw* token you send to the user (email/SMS).
-    """
-    return secrets.token_urlsafe(32)
-
-
 def generate_otp() -> str:
     """
-    Generate a 6-digit OTP code.
+    Generate a cryptographically secure 6-digit OTP code.
     """
-    return ''.join(random.choices(string.digits, k=6))
+    return ''.join(secrets.choice(string.digits) for _ in range(6))
 
 
 def hash_token(raw_token: str) -> str:

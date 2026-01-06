@@ -753,6 +753,7 @@ jobs:
       HOME:         /root  
       DJANGO_BASE_URL: ${{ needs.resolve-env.outputs.django }}
       RUN_TESTS:       ${{ needs.decide.outputs.run_tests }}
+      TEST_CAMPAIGN_CODE: "999999"
     steps:
       - uses: actions/checkout@v4
 

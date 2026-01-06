@@ -1,5 +1,17 @@
 [
   {
+    "model": "pilot_access.campaign",
+    "pk": 999,
+    "fields": {
+      "campaign_code": "999999",
+      "valid_from": "2024-01-01",
+      "valid_to": "2099-12-31",
+      "comment": "E2E Test Campaign - DO NOT DELETE",
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
     "model": "api.v3_actiontype",
     "pk": 1,
     "fields": { "type": "self-service" }

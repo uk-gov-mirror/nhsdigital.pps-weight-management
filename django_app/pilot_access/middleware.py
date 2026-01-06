@@ -28,7 +28,8 @@ class PilotAccessMiddleware(MiddlewareMixin):
 
         # Require disclaimer acceptance
         if not pilot_profile.disclaimer_accepted_at:
-            return redirect(reverse("pilot_access:accept_invitation"))
+            # User has a profile but hasn't completed signup - send to landing
+            return redirect(reverse("pilot_access:landing"))
 
         # Make it easy for templates to show account/logout links.
         request.pilot_access_profile = pilot_profile

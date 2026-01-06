@@ -10,12 +10,6 @@ class EmailSender:
     """
     Interface for sending pilot emails.
     """
-    def send_invite(self, *, email: str, link_or_code: str) -> None:
-        raise NotImplementedError
-
-    def send_magic_link(self, email: str, link: str) -> None:
-        raise NotImplementedError
-
     def send_otp(self, *, email: str, otp: str) -> None:
         raise NotImplementedError
 
@@ -24,9 +18,6 @@ class SmsSender:
     """
     Interface for sending pilot SMS messages.
     """
-    def send_invite(self, *, phone: str, link_or_code: str) -> None:
-        raise NotImplementedError
-
     def send_otp(self, *, phone: str, otp: str) -> None:
         raise NotImplementedError
 
@@ -36,12 +27,6 @@ class MockEmailSender(EmailSender):
     """
     Mock implementation: logs instead of sending.
     """
-    def send_invite(self, *, email: str, link_or_code: str) -> None:
-        logger.info("[MOCK EMAIL] To=%s Invite=%s", email, link_or_code)
-
-    def send_magic_link(self, email: str, link: str) -> None:
-        logger.info("[MOCK EMAIL] To=%s MagicLink=%s", email, link)
-
     def send_otp(self, *, email: str, otp: str) -> None:
         logger.info("[MOCK EMAIL] To=%s OTP=%s", email, otp)
 
@@ -51,9 +36,6 @@ class MockSmsSender(SmsSender):
     """
     Mock implementation: logs instead of sending.
     """
-    def send_invite(self, *, phone: str, link_or_code: str) -> None:
-        logger.info("[MOCK SMS] To=%s Invite=%s", phone, link_or_code)
-
     def send_otp(self, *, phone: str, otp: str) -> None:
         logger.info("[MOCK SMS] To=%s OTP=%s", phone, otp)
 

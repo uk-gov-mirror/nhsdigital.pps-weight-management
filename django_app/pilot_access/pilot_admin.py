@@ -5,7 +5,7 @@ A dedicated admin site for pilot operations.
 Requested behaviour:
 - Available at /admin/pilot/
 - Shows the standard Django "Authentication and Authorization" apps (Users, Groups)
-- Shows a "Pilot access" section (Campaign, Pilot Profiles, Magic Links, User Filters)
+- Shows a "Pilot access" section (Pilot Profiles, Magic Links, User Filters, Campaigns)
 
 We keep the default /admin/ site in place (used by the API admin wiring) and
 add this separate AdminSite instance for pilot users.
@@ -60,9 +60,8 @@ pilot_admin_site.register(get_user_model())
 
 
 # --- Pilot Access ---
-# Register with their ModelAdmin classes so actions (e.g. "approve/accept invite
-# requests") appear in the pilot admin UI.
-pilot_admin_site.register(Campaign, CampaignAdmin)
+# Register with their ModelAdmin classes so actions appear in the pilot admin UI.
 pilot_admin_site.register(PilotProfile, PilotProfileAdmin)
-pilot_admin_site.register(UserFilter, UserFilterAdmin)
 pilot_admin_site.register(MagicLink, MagicLinkAdmin)
+pilot_admin_site.register(UserFilter, UserFilterAdmin)
+pilot_admin_site.register(Campaign, CampaignAdmin)
