@@ -3,6 +3,7 @@ from __future__ import annotations
 import time
 import re
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model, login, logout
 from django.core.cache import cache
@@ -434,7 +435,12 @@ def campaign_contact_info(request: HttpRequest) -> HttpResponse:
             
             # Check rate limit for OTP generation
             if _check_otp_generation_rate_limit(contact_for_limit):
-                errors['__all__'] = 'Too many requests. Please try again later.'
+                if settings.DEBUG:
+                    key = _rate_limit_key_otp_generation(contact_for_limit)
+                    count = cache.get(key, 0)
+                    errors['__all__'] = f'Too many requests. Please try again later. (DEBUG: count={count}, limit={OTP_GENERATION_LIMIT})'
+                else:
+                    errors['__all__'] = 'Too many requests. Please try again later.'
                 _ensure_min_response_time(start_time)
                 return render(request, "pilot_access/campaign_contact_info.jinja", {
                     'campaign_code': campaign_code,

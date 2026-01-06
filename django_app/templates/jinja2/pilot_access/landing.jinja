@@ -117,18 +117,18 @@
         </div>
 
       {% elif show_magic_link %}
-        {# No campaign code - show magic link request #}
+        {# No campaign code - show login option #}
         <p class="nhsuk-body">
           This site is currently in a pilot/beta phase. Access is limited to invited users.
         </p>
 
         <h2 class="nhsuk-heading-m">Already accepted?</h2>
         <p class="nhsuk-body">
-          If you have already been accepted, you can request a magic link to sign in.
+          If you have already been accepted, you can sign in using a one-time password sent to your email or phone.
         </p>
         <p class="nhsuk-body">
           <a class="nhsuk-link" href="{{ url('pilot_access:magic_link_request') }}">
-            Request a magic link
+            Sign in
           </a>
         </p>
       {% endif %}

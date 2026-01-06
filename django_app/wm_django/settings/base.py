@@ -223,7 +223,13 @@ SPECTACULAR_SETTINGS = {
 # -------------------------------------------------------------------
 
 PILOT_ACCESS_PUBLIC_PATH_PREFIXES = [
-    "/pilot/",          # invite request + accept invite
+    # Specific pilot pages that don't require authentication
+    "/pilot/landing/",      # login/signup landing page
+    "/pilot/contact-info/", # campaign signup contact info
+    "/pilot/otp/",          # OTP verification
+    "/pilot/disclaimer/",   # disclaimer iframe
+    "/pilot/login/",        # request OTP for login
+    # Other public paths
     "/health",          # health checks
     "/static/",         # static files
     "/admin/",          # admin (login still guarded by Django)

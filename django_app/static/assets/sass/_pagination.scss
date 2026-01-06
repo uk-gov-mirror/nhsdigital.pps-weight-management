@@ -53,10 +53,13 @@
     position: static !important;
     vertical-align: middle !important;
 
-    // Remove the NHS default ::before pseudo-element that causes alignment issues
-    &::before {
+    // Remove the NHS default pseudo-elements that cause alignment issues
+    &::before,
+    &::after {
       display: none !important;
       content: none !important;
+      position: static !important;
+      border: none !important;
     }
 
     &:hover {
@@ -65,11 +68,22 @@
     }
   }
 
-  // Ensure anchor tags don't have position:relative and remove ::before
+  // Ensure anchor tags don't have position:relative and remove pseudo-elements
   a.nhsuk-pagination__link {
     position: static !important;
     
-    &::before {
+    &::before,
+    &::after {
+      display: none !important;
+      content: none !important;
+      position: static !important;
+    }
+  }
+  
+  // Ensure span tags also have no pseudo-elements
+  span.nhsuk-pagination__link {
+    &::before,
+    &::after {
       display: none !important;
       content: none !important;
     }
@@ -99,6 +113,24 @@
     margin: 0 !important;
     padding: 0 !important;
     float: none !important;
+    
+    &:last-child {
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+  }
+  
+  // Ensure all li items including first and last are consistent
+  li.nhsuk-pagination-item--number,
+  li.nhsuk-pagination-item--current,
+  li.nhsuk-pagination-item--ellipsis {
+    &:first-child,
+    &:last-child {
+      display: flex !important;
+      align-items: center !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
   }
 }
 

@@ -12,6 +12,9 @@
       <h2 class="nhsuk-error-summary__title" id="error-summary-title">There is a problem</h2>
       <div class="nhsuk-error-summary__body">
         <ul class="nhsuk-list nhsuk-error-summary__list">
+          {% if errors.__all__ %}
+            <li>{{ errors.__all__ }}</li>
+          {% endif %}
           {% if errors.email %}
             <li><a href="#emailInput">{{ errors.email }}</a></li>
           {% endif %}

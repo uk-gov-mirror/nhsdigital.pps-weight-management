@@ -70,5 +70,16 @@
       interceptLogoutLink();
     }
   </script>
+  {% if request.user.is_authenticated and not request.user.is_staff %}
+  <script>
+    // Prevent showing cached authenticated pages when navigating back after logout/account deletion
+    window.addEventListener('pageshow', function(event) {
+      if (event.persisted) {
+        // Page was restored from bfcache - reload to check auth status
+        window.location.reload();
+      }
+    });
+  </script>
+  {% endif %}
 <script src="{{ static('assets/javascript/main.js') }}"></script>
 {% endblock %}
