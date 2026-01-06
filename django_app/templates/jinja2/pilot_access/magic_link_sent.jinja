@@ -1,0 +1,11 @@
+{% extends "web/layout/base.jinja" %}
+
+{% block content %}
+  <h1 class="nhsuk-heading-l">Check your {% if is_email %}email{% else %}phone{% endif %}</h1>
+  <p class="nhsuk-body">
+    If that {% if is_email %}email address{% else %}mobile number{% endif %} is registered, you'll receive a verification code shortly.
+  </p>
+  <p class="nhsuk-body">
+    <a class="nhsuk-link" href="{{ url('pilot_access:magic_link_request') }}">Try again</a>
+  </p>
+{% endblock %}

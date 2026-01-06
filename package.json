@@ -2,8 +2,11 @@
   "scripts": {
     "test:ui": "playwright test",
     "test:api": "jest",
-    "test": "npm run test:api && npm run test:ui",
     "test:ci:ui": "playwright test",
+    "test:ui:headed": "playwright test --headed",
+    "test:ui:debug": "playwright test --debug",
+    "test:ui:report": "playwright show-report",
+    "test:ui:pilot": "playwright test tests/ui/pilot_access.spec.ts",
     "test:ci:api": "jest --ci"
   },
   "devDependencies": {

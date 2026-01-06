@@ -1,0 +1,25 @@
+{% extends "web/layout/base.jinja" %}
+
+{% from "web/macros/layout.jinja" import two_thirds_column_start, two_thirds_column_end %}
+
+{% set pageName = "Disclaimer" %}
+
+{% block content %}
+  {{ two_thirds_column_start() }}
+
+    <h1>Disclaimer</h1>
+
+    <p>As part of this pilot project we need to know a few details about you so we can:</p>
+    <ul>
+      <li>make suggestions that might work for you</li>
+      <li>check in with you to help you keep going</li>
+    </ul>
+    <p>To recommend services local to you we will ask for your postcode.</p>
+    <p>So we remain in contact with you during this pilot project we will ask for your preferred contact details.</p>
+    <p>You will be able to see, change, and delete any information you provide us at any time.</p>
+    <p>This information will not be disclosed to any 3rd parties.</p>
+    <p>One of our researchers will contact you periodicaly to ask you about your experience using this service.</p>
+    <p>By accepting this invitation to participate you agree to these terms.</p>
+    <p>You can widthdraw consent at any time by deleting your account.</p>
+  {{ two_thirds_column_end() }}
+{% endblock %}

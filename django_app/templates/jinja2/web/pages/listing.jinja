@@ -35,6 +35,9 @@
     <div id="js-listing-filters" tabindex="-1" role="dialog" aria-modal="true">
       <form method="post" class="app-listing-filters-form">
         {{ csrf_input }}
+        <input type="hidden" name="page_size" id="hidden-page-size" value="{{ pagination.page_size }}">
+        <input type="hidden" name="page" value="1">
+        <input type="hidden" name="distance" id="hidden-distance" value="{{ distance }}">
 		
         {{ button({
           "text": "Close",
@@ -254,23 +257,40 @@
 
   <div class="nhsuk-grid-column-three-quarters">
 
-	{% set count = results.total %}
+    {% set count = results.total %}
 
-	{% if count == 0 %}
-	  <h2 class="nhsuk-heading-m nhsuk-u-font-weight-normal">
-		We found no matches
-	  </h2>
+    {% if count == 0 %}
+      <h2 class="nhsuk-heading-m nhsuk-u-font-weight-normal">
+        We found no matches
+      </h2>
 
-	{% elif count <= 50 %}
-	  <h2 class="nhsuk-heading-m nhsuk-u-font-weight-normal">
-		We found {{ count }} match{{ 'es' if count != 1 }}
-	  </h2>
+    {% else %}
+      <div class="nhsuk-u-margin-bottom-4">
+        <h2 class="nhsuk-heading-m nhsuk-u-font-weight-normal nhsuk-u-margin-bottom-2">
+          We found {{ count }} match{{ 'es' if count != 1 }}
+        </h2>
+        
+        {% if pagination.total_results > 0 %}
+        <p class="nhsuk-body-s nhsuk-u-secondary-text-color">
+          Showing {{ pagination.showing_from }} to {{ pagination.showing_to }} of {{ pagination.total_results }}
+        </p>
+        {% endif %}
+      </div>
 
-	{% else %}
-	  <h2 class="nhsuk-heading-m nhsuk-u-font-weight-normal">
-		We found more than 50 matches
-	  </h2>
-	{% endif %}
+      <!-- Search distance selector -->
+      {% if postcode %}
+      <div class="nhsuk-form-group nhsuk-u-margin-bottom-4 app-distance-selector">
+        <label class="nhsuk-label nhsuk-u-font-size-16" for="distance-select">
+          Local services search distance from your postcode {{ postcode }}:
+        </label>
+        <select class="nhsuk-select nhsuk-select--auto" id="distance-select" name="distance" onchange="updateDistance(this.value)" >
+          {% for d in distance_options %}
+          <option value="{{ d }}" {{ 'selected' if d == distance }}>{{ d }} miles</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+    {% endif %}
 
     {% for result in results.results %}
     <div class="nhsuk-card nhsuk-card--clickable">
@@ -306,41 +326,179 @@
     </div>
     {% endfor %}
 
+    <!-- Hidden form for pagination navigation - must be before pagination controls -->
+    <form id="pagination-form" method="post" style="display: none;">
+      {{ csrf_input }}
+      <input type="hidden" name="page" id="pagination-page" value="{{ pagination.current_page }}">
+      <input type="hidden" name="page_size" id="pagination-page-size" value="{{ pagination.page_size }}">
+      <input type="hidden" name="distance" id="pagination-distance" value="{{ distance }}">
+      {% for field in ['goals', 'cost', 'timetable', 'location', 'taught', 'who_with', 'channel'] %}
+        {% if data[field] %}
+          {% for val in data[field] %}
+            <input type="hidden" name="{{ field }}" value="{{ val }}">
+          {% endfor %}
+        {% endif %}
+      {% endfor %}
+    </form>
+
+    <!-- Pagination and page size -->
+    {% if pagination.total_pages > 1 or pagination.total_results > 0 %}
+    <div class="nhsuk-pagination app-pagination-bar">
+      {% if pagination.total_pages > 1 %}
+      <nav role="navigation" aria-label="Pagination">
+        <ul class="nhsuk-pagination__list">
+          {% for page_num in pagination.page_range %}
+            {% if page_num == -1 %}
+              <li class="nhsuk-pagination-item--ellipsis">
+                <span class="nhsuk-pagination__link nhsuk-pagination__link--ellipsis">…</span>
+              </li>
+            {% elif page_num == pagination.current_page %}
+              <li class="nhsuk-pagination-item--current">
+                <span class="nhsuk-pagination__link nhsuk-pagination__link--current" aria-current="page">{{ page_num }}</span>
+              </li>
+            {% else %}
+              <li class="nhsuk-pagination-item--number">
+                <a href="javascript:void(0);" onclick="goToPage({{ page_num }})" class="nhsuk-pagination__link" aria-label="Page {{ page_num }}">{{ page_num }}</a>
+              </li>
+            {% endif %}
+          {% endfor %}
+        </ul>
+      </nav>
+      {% else %}
+      <div></div>
+      {% endif %}
+      
+      <!-- Page size selector -->
+      <div class="nhsuk-form-group app-page-size-selector">
+        <label class="nhsuk-label nhsuk-u-font-size-16" for="page-size-select">
+          Results per page:
+        </label>
+        <select class="nhsuk-select nhsuk-select--auto" id="page-size-select" name="page_size" onchange="updatePageSize(this.value)">
+          {% for size in pagination.page_size_options %}
+          <option value="{{ size }}" {{ 'selected' if size == pagination.page_size }}>{{ size }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    {% endif %}
+
   </div>
 
 </div>
-{% endblock %}
 
-{% block pageScripts %}
-  <script>
-    const buttons = document.querySelectorAll('.js-toggle-button');
-    const content = document.getElementById('js-listing-filters');
-    const bodyElement = document.getElementsByTagName('body')[0];
-    const mediaQuery = window.matchMedia('(max-width: 768px)');
+<script>
+  // Navigate to a specific page
+  function goToPage(pageNum) {
+    var paginationForm = document.getElementById('pagination-form');
+    if (!paginationForm) {
+      console.error('Pagination form not found');
+      return;
+    }
+    
+    // Sync current page size and distance from visible dropdowns to hidden form
+    var pageSizeSelect = document.getElementById('page-size-select');
+    var distanceSelect = document.getElementById('distance-select');
+    
+    if (pageSizeSelect) {
+      document.getElementById('pagination-page-size').value = pageSizeSelect.value;
+    }
+    if (distanceSelect) {
+      document.getElementById('pagination-distance').value = distanceSelect.value;
+    }
+    
+    document.getElementById('pagination-page').value = pageNum;
+    paginationForm.submit();
+  }
+
+  // Page size dropdown handler
+  function updatePageSize(newSize) {
+    var paginationForm = document.getElementById('pagination-form');
+    if (!paginationForm) {
+      console.error('Pagination form not found');
+      return;
+    }
+    
+    // Sync distance from visible dropdown
+    var distanceSelect = document.getElementById('distance-select');
+    if (distanceSelect) {
+      document.getElementById('pagination-distance').value = distanceSelect.value;
+    }
+    
+    document.getElementById('pagination-page-size').value = newSize;
+    document.getElementById('pagination-page').value = '1'; // Reset to page 1
+    paginationForm.submit();
+  }
+
+  // Distance dropdown handler
+  function updateDistance(newDistance) {
+    var paginationForm = document.getElementById('pagination-form');
+    if (!paginationForm) {
+      console.error('Pagination form not found');
+      return;
+    }
+    
+    // Sync page size from visible dropdown
+    var pageSizeSelect = document.getElementById('page-size-select');
+    if (pageSizeSelect) {
+      document.getElementById('pagination-page-size').value = pageSizeSelect.value;
+    }
+    
+    document.getElementById('pagination-distance').value = newDistance;
+    document.getElementById('pagination-page').value = '1'; // Reset to page 1
+    paginationForm.submit();
+  }
+
+  // Filter form setup
+  (function() {
+    var filterForm = document.querySelector('.app-listing-filters-form');
+    if (filterForm) {
+      filterForm.addEventListener('submit', function(e) {
+        // Sync dropdown values to hidden fields before filter form submits
+        var pageSizeSelect = document.getElementById('page-size-select');
+        var distanceSelect = document.getElementById('distance-select');
+        var hiddenPageSize = document.getElementById('hidden-page-size');
+        var hiddenDistance = document.getElementById('hidden-distance');
+        
+        if (pageSizeSelect && hiddenPageSize) {
+          hiddenPageSize.value = pageSizeSelect.value;
+        }
+        if (distanceSelect && hiddenDistance) {
+          hiddenDistance.value = distanceSelect.value;
+        }
+      });
+    }
+
+    // Mobile filter toggle setup
+    var buttons = document.querySelectorAll('.js-toggle-button');
+    var content = document.getElementById('js-listing-filters');
+    var bodyElement = document.getElementsByTagName('body')[0];
+    var mediaQuery = window.matchMedia('(max-width: 768px)');
 
     function toggleContent() {
-      content.classList.toggle('js-show');
-      bodyElement.classList.toggle('js-obfuscate');
+      if (content) {
+        content.classList.toggle('js-show');
+        bodyElement.classList.toggle('js-obfuscate');
+      }
     }
 
     function updateToggleBehavior(e) {
       if (e.matches) {
-        // Add listeners on small screens
-        buttons.forEach(button => {
+        buttons.forEach(function(button) {
           button.addEventListener('click', toggleContent);
         });
       } else {
-        // Remove listeners and ensure content is visible
-        buttons.forEach(button => {
+        buttons.forEach(function(button) {
           button.removeEventListener('click', toggleContent);
         });
         bodyElement.classList.remove('js-obfuscate');
-        content.classList.remove('show');
+        if (content) {
+          content.classList.remove('js-show');
+        }
       }
     }
 
-    // Initial setup
     updateToggleBehavior(mediaQuery);
     mediaQuery.addEventListener('change', updateToggleBehavior);
-  </script>
+  })();
+</script>
 {% endblock %}

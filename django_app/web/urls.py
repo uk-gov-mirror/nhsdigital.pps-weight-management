@@ -3,11 +3,8 @@ from . import views
 
 urlpatterns = [
     path('', views.start, name='home'),
-    path('consent-to-pilot', views.consent_to_pilot, name='consent_to_pilot'),
-    path('consent-to-ur', views.consent_to_ur, name='consent_to_ur'),
-    path('details-name', views.details_name, name='details_name'),
-    path('details-postcode', views.details_postcode, name='details_postcode'),
     path('details-contact-details', views.details_contact_details, name='details_contact_details'),
+    path('details-postcode', views.details_postcode, name='details_postcode'),
     path('goals', views.goals, name='goals'),
     path('barriers', views.barriers, name='barriers'),
     path('preference-who-with', views.preference_who_with, name='preference_who_with'),

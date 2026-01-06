@@ -1,6 +1,7 @@
 # Run tests
 # .\scripts\run-tests.ps1 -EnvName dev-jb -Api -Ui -InstallBrowsers
 # .\scripts\run-tests.ps1 -EnvName pr-38 -DjangoBaseUrl http://127.0.0.1:8000 -Api -Ui -InstallBrowsers
+# .\scripts\run-tests.ps1 -EnvName dev-jb -Ui -TestCampaignCode 999999
 
 param(
   [Parameter(Mandatory = $true)]
@@ -10,6 +11,7 @@ param(
   [string]$TfStateBucket = "nhse-pps-wm-terraform-state-bucket",
   [string]$TfLockTable   = "nhse-pps-wm-terraform-lock",
   [string]$DjangoBaseUrl,
+  [string]$TestCampaignCode = "999999",       # Campaign code from v3_testdata.json fixture
 
   [switch]$Api,
   [switch]$Ui,
@@ -50,8 +52,10 @@ elseif (-not $DjangoBaseUrl) {
 Write-Info "Configuring environment variables..."
 $env:AWS_REGION        = $AwsRegion
 $env:DJANGO_BASE_URL   = $DjangoBaseUrl.TrimEnd('/')
+$env:TEST_CAMPAIGN_CODE = $TestCampaignCode
 
 Write-Host "DJANGO_BASE_URL      = $env:DJANGO_BASE_URL"
+Write-Host "TEST_CAMPAIGN_CODE   = $env:TEST_CAMPAIGN_CODE"
 
 # 3) Install deps (once per machine)
 Write-Info "Installing npm dependencies..."

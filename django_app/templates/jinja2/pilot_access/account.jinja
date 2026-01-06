@@ -1,0 +1,158 @@
+{% extends "web/layout/base.jinja" %}
+
+{% from "nhsuk/components/button/macro.jinja" import format_datetime %}
+
+{% block content %}
+  <h1 class="nhsuk-heading-l">Your account</h1>
+
+  <p class="nhsuk-body">Disclaimer accepted: {{ profile.disclaimer_accepted_at|nhs_date }}</p>
+  <p class="nhsuk-body"><a class="nhsuk-link" href="#" id="open-disclaimer">View disclaimer</a></p>
+
+  <dialog id="disclaimer-dialog" class="nhsuk-u-padding-0" style="width: min(900px, 95vw);">
+    <div class="nhsuk-u-padding-4">
+      <div class="nhsuk-u-display-flex nhsuk-u-justify-content-space-between nhsuk-u-align-items-center">
+        <h2 class="nhsuk-heading-m nhsuk-u-margin-bottom-2">Pilot disclaimer</h2>
+        <button type="button" class="nhsuk-button nhsuk-button--secondary nhsuk-u-margin-bottom-0" id="close-disclaimer">
+          Close
+        </button>
+      </div>
+
+      <div style="height: min(70vh, 700px);">
+        <iframe
+          src="{{ url('pilot_access:disclaimer') }}"
+          title="Pilot disclaimer"
+          style="border: 0; width: 100%; height: 100%;"
+        ></iframe>
+      </div>
+    </div>
+  </dialog>
+
+  <script>
+    (function () {
+      var openBtn = document.getElementById("open-disclaimer");
+      var dlg = document.getElementById("disclaimer-dialog");
+      var closeBtn = document.getElementById("close-disclaimer");
+
+      if (!openBtn || !dlg || !closeBtn) return;
+
+      openBtn.addEventListener("click", function (e) {
+        e.preventDefault();
+        if (typeof dlg.showModal === "function") dlg.showModal();
+      });
+
+      closeBtn.addEventListener("click", function () {
+        dlg.close();
+      });
+
+      dlg.addEventListener("click", function (e) {
+        // close when clicking the backdrop area
+        var rect = dlg.getBoundingClientRect();
+        var inDialog =
+          rect.top <= e.clientY && e.clientY <= rect.bottom &&
+          rect.left <= e.clientX && e.clientX <= rect.right;
+        if (!inDialog) dlg.close();
+      });
+    })();
+  </script>
+
+  <form method="post" class="nhsuk-u-margin-top-4">
+    {{ csrf_input }}
+
+    {% if next %}
+      <input type="hidden" name="next" value="{{ next }}">
+    {% endif %}
+
+    {% if form.non_field_errors() %}
+      <div class="nhsuk-error-summary" aria-labelledby="error-summary-title" role="alert" tabindex="-1">
+        <h2 class="nhsuk-error-summary__title" id="error-summary-title">There is a problem</h2>
+        <div class="nhsuk-error-summary__body">
+          <ul class="nhsuk-list nhsuk-error-summary__list">
+            {% for err in form.non_field_errors() %}
+              <li>{{ err }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+    {% endif %}
+
+    <div class="nhsuk-form-group">
+      <label class="nhsuk-label" for="id_email">Email address</label>
+      {% if form.email.errors %}
+        <span class="nhsuk-error-message">{{ form.email.errors[0] }}</span>
+      {% endif %}
+      <input class="nhsuk-input" id="id_email" name="email" type="email" value="{{ form.email.value() or '' }}">
+    </div>
+
+    <div class="nhsuk-form-group">
+      <label class="nhsuk-label" for="id_phone">Mobile number</label>
+      {% if form.phone.errors %}
+        <span class="nhsuk-error-message">{{ form.phone.errors[0] }}</span>
+      {% endif %}
+      <input class="nhsuk-input" id="id_phone" name="phone" type="tel" value="{{ form.phone.value() or '' }}">
+    </div>
+
+    <div class="nhsuk-form-group">
+      <fieldset class="nhsuk-fieldset" aria-describedby="preferred-contact-hint">
+        <legend class="nhsuk-fieldset__legend nhsuk-fieldset__legend--s">
+          <h2 class="nhsuk-fieldset__heading">Preferred contact method</h2>
+        </legend>
+
+        {% if form.preferred_contact_method.errors %}
+          <span class="nhsuk-error-message">{{ form.preferred_contact_method.errors[0] }}</span>
+        {% endif %}
+
+        <div class="nhsuk-radios">
+          {% for value, label in form.preferred_contact_method.field.choices %}
+            <div class="nhsuk-radios__item">
+              <input
+                class="nhsuk-radios__input"
+                id="id_preferred_contact_method_{{ value }}"
+                name="preferred_contact_method"
+                type="radio"
+                value="{{ value }}"
+                {% if form.preferred_contact_method.value() == value %}checked{% endif %}
+              >
+              <label class="nhsuk-label nhsuk-radios__label" for="id_preferred_contact_method_{{ value }}">
+                {{ label }}
+              </label>
+            </div>
+          {% endfor %}
+        </div>
+      </fieldset>
+    </div>
+
+    <div class="nhsuk-form-group">
+      <label class="nhsuk-label" for="id_postcode">Postcode</label>
+      {% if form.postcode.errors %}
+        <span class="nhsuk-error-message">{{ form.postcode.errors[0] }}</span>
+      {% endif %}
+      <div class="nhsuk-hint">For example, SW1A 1AA</div>
+      <input class="nhsuk-input" id="id_postcode" name="postcode" type="text" value="{{ form.postcode.value() or '' }}">
+    </div>
+
+    <div class="nhsuk-button-group">
+      {{ button({
+        "text": "Save changes",
+        "type": "submit"
+      }) }}
+
+      {% if next %}
+        <a class="nhsuk-button nhsuk-button--secondary"
+          href="{{ next }}">
+          Cancel
+        </a>
+      {% else %}
+        <a class="nhsuk-button nhsuk-button--secondary"
+          href="{{ url('home') }}">
+          Cancel
+        </a>
+      {% endif %}
+    </div>
+  </form>
+
+  <hr class="nhsuk-u-margin-top-6 nhsuk-u-margin-bottom-4">
+
+  <h2 class="nhsuk-heading-m">Delete your account</h2>
+  <p class="nhsuk-body">This will remove your pilot access and delete your account.</p>
+  <a class="nhsuk-link" href="{{ url('pilot_access:delete_account') }}">Delete my account</a>
+{% endblock %}

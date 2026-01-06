@@ -4,8 +4,6 @@
 {% block content %}
 <div class="dashboard">
 
-  <h1>{% trans "Admin landing page" %}</h1>
-
   <div class="module">
     <h2>{% trans "API versions" %}</h2>
     <div class="inline-group">
@@ -46,29 +44,21 @@
     </div>
   </div>
 
-  {% if app_list %}
-    <div class="module">
-      <h2>{% trans "Other admin apps" %}</h2>
-      <div class="app-list">
-        {% for app in app_list %}
-          <div class="inline-related" style="margin-bottom: 1em;">
-            <h3>{{ app.name }}</h3>
-            <ul>
-              {% for model in app.models %}
-                <li>
-                  {% if model.admin_url %}
-                    <a href="{{ model.admin_url }}">{{ model.name }}</a>
-                  {% else %}
-                    {{ model.name }}
-                  {% endif %}
-                </li>
-              {% endfor %}
-            </ul>
-          </div>
-        {% endfor %}
+  <div class="module">
+    <h2>{% trans "Pilot Access" %}</h2>
+    <div class="inline-group">
+      <div class="inline-related" style="margin-bottom: 1em;">
+        <p>
+          <a href="/admin/pilot/">
+            {% trans "Pilot admin" %}
+          </a>
+        </p>
+        <p class="help">
+          {% trans "Manage pilot users, invitations, magic links, and filters." %}
+        </p>
       </div>
     </div>
-  {% endif %}
+  </div>
 
 </div>
 {% endblock %}

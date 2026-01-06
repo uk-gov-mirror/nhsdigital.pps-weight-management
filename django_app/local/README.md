@@ -24,6 +24,7 @@ This repository includes a Docker Compose setup for running the Django app and P
    # Start Docker Desktop
    docker build --target local -t ppswm:local .
    docker compose -p local -f local/docker-compose.local.yml up -d web
+   docker compose -f local/docker-compose.local.yml exec web python manage.py makemigrations
    docker compose -f local/docker-compose.local.yml exec web python manage.py migrate
    docker compose -f local/docker-compose.local.yml exec web python manage.py createsuperuser --noinput
    ```

@@ -1,0 +1,46 @@
+{% extends "web/layout/base.jinja" %}
+
+{% block content %}
+  <h1 class="nhsuk-heading-l">Sign in</h1>
+
+  <p class="nhsuk-body">
+    If you are already registered, enter your email address or mobile number and we will send you a verification code.
+  </p>
+
+  {% if form.errors %}
+    {{ errorSummary({
+      "titleText": "There is a problem",
+      "errorList": [
+        {
+          "text": form.contact.errors[0],
+          "href": "#contact"
+        }
+      ]
+    }) }}
+  {% endif %}
+
+  <form method="post" novalidate>
+    {{ csrf_input }}
+
+    {{ input({
+      "label": {
+        "text": "Email address or mobile number"
+      },
+      "id": "contact",
+      "name": "contact",
+      "type": "text",
+      "value": form.contact.value() or "",
+      "errorMessage": (
+        {
+          "text": form.contact.errors[0]
+        }
+        if form.contact.errors
+        else None
+      )
+    }) }}
+
+    {{ button({
+      "text": "Send verification code"
+    }) }}
+  </form>
+{% endblock %}

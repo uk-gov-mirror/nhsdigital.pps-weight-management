@@ -19,16 +19,27 @@
 {% endblock %}
 
 {% block header %}
+  {% set showPilotAccount = request.user.is_authenticated and (not request.user.is_staff) and request.pilot_access_registered %}
   {{ header({
     "service": {
       "text": serviceName,
-      "href": url('home')
-    }
+      "href": url("home")
+    },
+    "account": ({
+      "items": [
+        { "text": "", "icon": true },
+        { "text": "Settings", "href": url("pilot_access:account") },
+        { "text": "Log out", "href": url("pilot_access:logout") },
+      ]
+    } if showPilotAccount else none)
   }) }}
 {% endblock %}
 
 {% block footer %}
   {{ super() }}
+  <form id="pilot-logout-form" method="post" action="{{ url('pilot_access:logout') }}" style="display:none">
+    {{ csrf_input }}
+  </form>
 {% endblock %}
 
 {% block bodyEnd %}
@@ -36,6 +47,39 @@
   <script type="module">
     import { initAll } from "{{ static('nhsuk-frontend.min.js') }}";
     initAll();
+
+    function interceptLogoutLink() {
+      const logoutLink = document.querySelector('.nhsuk-header__account-link[href="/pilot/logout/"]');
+      const logoutForm = document.getElementById('pilot-logout-form');
+
+      if (!logoutLink || !logoutForm) {
+        return;
+      }
+
+      logoutLink.addEventListener('click', function(event) {
+        event.preventDefault();
+        logoutForm.submit();
+      });
+    }
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", function () {
+        interceptLogoutLink();
+      });
+    } else {
+      interceptLogoutLink();
+    }
   </script>
-  <script src="{{ static('assets/javascript/main.js') }}"></script>
+  {% if request.user.is_authenticated and not request.user.is_staff %}
+  <script>
+    // Prevent showing cached authenticated pages when navigating back after logout/account deletion
+    window.addEventListener('pageshow', function(event) {
+      if (event.persisted) {
+        // Page was restored from bfcache - reload to check auth status
+        window.location.reload();
+      }
+    });
+  </script>
+  {% endif %}
+<script src="{{ static('assets/javascript/main.js') }}"></script>
 {% endblock %}
