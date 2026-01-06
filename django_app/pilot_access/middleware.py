@@ -5,13 +5,23 @@ from django.utils.deprecation import MiddlewareMixin
 
 
 class PilotAccessMiddleware(MiddlewareMixin):
+    def _is_public_path(self, path: str) -> bool:
+        """Check if path matches any public path prefix."""
+        # Normalize path to handle both /admin and /admin/
+        path_with_slash = path if path.endswith('/') else path + '/'
+        
+        for prefix in settings.PILOT_ACCESS_PUBLIC_PATH_PREFIXES:
+            # Check both the original path and path with trailing slash
+            if path.startswith(prefix) or path_with_slash.startswith(prefix):
+                return True
+        return False
+    
     def process_request(self, request):
         path = request.path
 
         # Allow public paths
-        for prefix in settings.PILOT_ACCESS_PUBLIC_PATH_PREFIXES:
-            if path.startswith(prefix):
-                return None
+        if self._is_public_path(path):
+            return None
 
         # Require authentication via invite flow
         if not request.user.is_authenticated:
@@ -40,10 +50,7 @@ class PilotAccessMiddleware(MiddlewareMixin):
     def process_response(self, request, response):
         """Add cache control headers to prevent back button showing pages after logout."""
         # Only add headers for authenticated pages (not public paths)
-        path = request.path
-        is_public = any(path.startswith(prefix) for prefix in settings.PILOT_ACCESS_PUBLIC_PATH_PREFIXES)
-        
-        if not is_public:
+        if not self._is_public_path(request.path):
             response['Cache-Control'] = 'no-cache, no-store, must-revalidate, private'
             response['Pragma'] = 'no-cache'
             response['Expires'] = '0'

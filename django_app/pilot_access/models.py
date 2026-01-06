@@ -112,7 +112,6 @@ class PilotProfile(models.Model):
         default=CONTACT_EMAIL,
     )
 
-    # Renamed from invited_at
     created_at = models.DateTimeField(default=timezone.now)
     disclaimer_accepted_at = models.DateTimeField(null=True, blank=True)
 
