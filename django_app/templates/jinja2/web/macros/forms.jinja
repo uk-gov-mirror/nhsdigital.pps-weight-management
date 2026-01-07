@@ -1,7 +1,3 @@
-{% from "nhsuk/components/error-summary/macro.jinja" import errorSummary %}
-{% from "nhsuk/components/button/macro.jinja" import button %}
-{% from "nhsuk/components/back-link/macro.jinja" import backLink %}
-
 {# Thin wrapper around NHS error summary so behaviour can be centralised later #}
 {% macro form_error_summary(config) %}
   {{ errorSummary(config) }}
