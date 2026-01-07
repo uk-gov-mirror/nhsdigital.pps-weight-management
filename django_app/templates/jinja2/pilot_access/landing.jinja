@@ -3,11 +3,10 @@
 {% block pageTitle %}Pilot access{% endblock %}
 
 {% block content %}
-  <div class="nhsuk-width-container">
-    <main class="nhsuk-main-wrapper" id="maincontent" role="main">
-      <h1 class="nhsuk-heading-xl">Pilot site</h1>
 
       {% if campaign %}
+        
+        <h1 class="nhsuk-heading-xl">Pilot site (campaign code present)</h1>
         {# Valid campaign - show the campaign comment and disclaimer form #}
         <div class="nhsuk-inset-text">
           <p class="nhsuk-body">{{ campaign.comment }}</p>
@@ -117,21 +116,19 @@
         </div>
 
       {% elif show_magic_link %}
-        {# No campaign code - show login option #}
-        <p class="nhsuk-body">
-          This site is currently in a pilot/beta phase. Access is limited to invited users.
-        </p>
-
-        <h2 class="nhsuk-heading-m">Already accepted?</h2>
-        <p class="nhsuk-body">
-          If you have already been accepted, you can sign in using a one-time password sent to your email or phone.
-        </p>
-        <p class="nhsuk-body">
-          <a class="nhsuk-link" href="{{ url('pilot_access:magic_link_request') }}">
-            Sign in
-          </a>
-        </p>
+        {# No campaign code - show login option -"blocking page" #}
+        {{ two_thirds_column_start() }}
+          <h1 class="nhsuk-heading-l">NHS Help to stay healthy (pilot)</h1>
+          <p>
+            “Pilot” means we are testing a new service with a small number of people in some areas.
+          </p>
+          
+          <hr>
+          
+          <h2 class="nhsuk-heading-m">Returning user?</h2>
+          <p>
+            If you have used this site before, you can <a href="{{ url('pilot_access:magic_link_request') }}">sign in here</a>
+          </p>
+        {{ two_thirds_column_end() }}
       {% endif %}
-    </main>
-  </div>
 {% endblock %}
