@@ -2,7 +2,7 @@
 
 {% from "web/macros/layout.jinja" import two_thirds_column_start, two_thirds_column_end %}
 
-{% set pageName = "Enter your verification code" %}
+{% set pageName = "Check your phone or email" %}
 
 {% block content %}
   {{ two_thirds_column_start() }}
@@ -37,26 +37,21 @@
   <form method="post">
     {{ csrf_input }}
 
-    <h1 class="nhsuk-heading-l">Enter your verification code</h1>
+    <h1 class="nhsuk-heading-l">Check your phone or email</h1>
 
     <p class="nhsuk-body">
-      We've sent a 6-digit code to {{ contact_display }}. 
-      Please enter it below to continue.
-    </p>
-
-    <p class="nhsuk-body nhsuk-u-secondary-text-color">
-      The code will expire in 15 minutes.
+      We’ve sent you a security code you can sign in with
     </p>
 
     <div class="nhsuk-form-group{% if form.otp.errors %} nhsuk-form-group--error{% endif %}">
-      <label class="nhsuk-label" for="otp">Verification code</label>
+      <label class="nhsuk-label" for="otp">Security code</label>
       {% if form.otp.errors %}
         <span class="nhsuk-error-message">
           <span class="nhsuk-u-visually-hidden">Error:</span> {{ form.otp.errors[0] }}
         </span>
       {% endif %}
       <input 
-        class="nhsuk-input nhsuk-input--width-10{% if form.otp.errors %} nhsuk-input--error{% endif %}" 
+        class="nhsuk-input nhsuk-input--width-6{% if form.otp.errors %} nhsuk-input--error{% endif %}" 
         id="otp" 
         name="otp" 
         type="text" 
@@ -73,7 +68,7 @@
 
   <p class="nhsuk-body">
     <a class="nhsuk-link" href="{{ url('pilot_access:magic_link_request') }}">
-      Didn't receive a code? Request a new one
+      Not received a code?
     </a>
   </p>
 
