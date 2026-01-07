@@ -233,7 +233,7 @@ test.describe('Registration Flow', () => {
     await signupWithCampaign(page, VALID_CAMPAIGN_CODE, email, phone, 'email');
     
     // Should be on OTP page
-    await expect(page.locator('h1')).toContainText(/verification code/i);
+    await expect(page.locator('h1')).toContainText(/Check your phone or email/i);
     await expect(page.locator('body')).toContainText(email);
     
     // In DEBUG mode, OTP should be visible
@@ -397,7 +397,7 @@ test.describe('User Enumeration Prevention', () => {
     
     // Should still show OTP page (to prevent enumeration)
     await expect(page).toHaveURL(/\/pilot\/otp\//);
-    await expect(page.locator('h1')).toContainText(/verification code/i);
+    await expect(page.locator('h1')).toContainText(/Check your phone or email/i);
   });
 
   test('invalid phone still shows OTP verify page', async ({ page }) => {
@@ -408,7 +408,7 @@ test.describe('User Enumeration Prevention', () => {
     
     // Should still show OTP page (to prevent enumeration)
     await expect(page).toHaveURL(/\/pilot\/otp\//);
-    await expect(page.locator('h1')).toContainText(/verification code/i);
+    await expect(page.locator('h1')).toContainText(/Check your phone or email/i);
   });
 
   test('OTP verification fails for non-existent user (same as wrong code)', async ({ page }) => {
