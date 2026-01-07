@@ -22,6 +22,27 @@
     </div>
   </div>
 
+  <div class="nhsuk-u-padding-top-6 nhsuk-u-padding-bottom-6">
+    <div class="nhsuk-width-container">
+      <div class="nhsuk-grid-row">
+        <div class="nhsuk-grid-column-two-thirds">
+
+          {% set insetTextHtml %}
+            <p>
+              We’re inviting people from your area to try a new service where you can find activities to help you exercise more and eat healthily.
+            </p>
+          {% endset %}
+
+          {{ insetText({
+            "html": insetTextHtml,
+            "classes": "nhsuk-u-margin-0"
+          }) }}
+          
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="nhsuk-u-padding-top-6 nhsuk-u-padding-bottom-3">
     <div class="nhsuk-width-container">
       <div class="nhsuk-grid-row">
@@ -29,9 +50,9 @@
           <h2>Find new ways to eat well and move more</h2>
           <p>Choose from:</p>
           <ul class="nhsuk-u-padding-bottom-3">
+            <li>local activities, like walking groups near you</li>
             <li>exercise programmes, like Couch to Fitness</li>
             <li>weight management programmes, like the NHS Weight Loss Plan</li>
-            <li>walking programmes, like NHS Active 10</li>
           </ul>
           <h2>We’ll show you the options that best meet your needs</h2>
           <p>Tell us a bit about yourself and we'll match you to the activities we think will work best for you.</p>
@@ -44,7 +65,7 @@
     <div class="nhsuk-width-container">
       <div class="nhsuk-grid-row">
         <div class="nhsuk-grid-column-two-thirds nhsuk-u-padding-bottom-6">
-          <div class="app-robo-mecc" style="background-image: url('/static/assets/images/bot/avatar-standard.svg')">
+          <div class="app-robo-mecc">
             <div>
               <h2>We’ll help you keep going</h2>
               <p>We’ll check in with you to ask how you’re doing and encourage you to carry on.</p>
