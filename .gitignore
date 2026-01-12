@@ -20,3 +20,5 @@ override.tf
 /reports/
 .env
 __pycache__
+# Certificates
+*.crt

@@ -3,7 +3,7 @@
   "configurations": [
     {
       "name": "Attach Django (Docker)",
-      "type": "python",
+      "type": "debugpy",
       "request": "attach",
 	  "justMyCode": false,
       "connect": {
