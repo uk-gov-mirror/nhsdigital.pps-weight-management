@@ -120,6 +120,7 @@ jobs:
   decide:
     needs: [prepare, changes, expose_env_vars]
     runs-on: ubuntu-latest
+    environment: ${{ needs.prepare.outputs.gh_env }}
     outputs:
       run_infra:  ${{ steps.set.outputs.run_infra }}
       run_django: ${{ steps.set.outputs.run_django }}
