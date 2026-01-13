@@ -566,6 +566,7 @@ jobs:
     name: Resolve Preview URL -> ${{ needs.prepare.outputs.deploy_env }}
     needs: [prepare, changes, expose_env_vars, decide, django]
     runs-on: ubuntu-latest
+    environment: ${{ needs.prepare.outputs.gh_env }}
     env:
       DEPLOY_ENV:     ${{ needs.prepare.outputs.deploy_env }}
       AWS_ACCOUNT_ID: ${{ needs.expose_env_vars.outputs.env_account_id }}
@@ -628,6 +629,7 @@ jobs:
     # Only run when Django runs and tests are enabled
     if: ${{ needs.decide.outputs.run_django == 'true' && needs.decide.outputs.run_tests == 'true' }}
     runs-on: ubuntu-latest
+    environment: ${{ needs.prepare.outputs.gh_env }}
     env:
       AWS_REGION:     ${{ vars.AWS_REGION }}
       AWS_ACCOUNT_ID: ${{ needs.expose_env_vars.outputs.env_account_id }}
@@ -797,6 +799,7 @@ jobs:
     needs: [prepare, expose_env_vars, decide, django, ui-tests, api-tests]
     if: ${{ needs.decide.outputs.run_django == 'true' && needs.decide.outputs.run_tests == 'true' }}
     runs-on: ubuntu-latest
+    environment: ${{ needs.prepare.outputs.gh_env }}
     env:
       AWS_REGION:     ${{ vars.AWS_REGION }}
       AWS_ACCOUNT_ID: ${{ needs.expose_env_vars.outputs.env_account_id }}
