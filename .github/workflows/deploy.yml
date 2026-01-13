@@ -194,6 +194,7 @@ jobs:
     name: Infra -> ${{ needs.prepare.outputs.deploy_env }}
     needs: [prepare, changes, expose_env_vars, decide]
     runs-on: ubuntu-latest
+    environment: ${{ needs.prepare.outputs.gh_env }}
     concurrency:
       group: infra-${{ needs.prepare.outputs.deploy_env }}
       cancel-in-progress: false
