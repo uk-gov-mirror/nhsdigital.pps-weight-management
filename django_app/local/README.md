@@ -22,6 +22,7 @@ This repository includes a Docker Compose setup for running the Django app and P
    ```bash
    cd django_app
    # Start Docker Desktop
+   # If running behind a corporate proxy then pass --build-arg INSTALL_CA_CERTS=true
    docker build --target local -t ppswm:local .
    docker compose -p local -f local/docker-compose.local.yml up -d web
    docker compose -f local/docker-compose.local.yml exec web python manage.py makemigrations
