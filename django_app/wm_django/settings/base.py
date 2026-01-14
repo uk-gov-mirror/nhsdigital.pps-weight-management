@@ -227,8 +227,9 @@ PILOT_ACCESS_PUBLIC_PATH_PREFIXES = [
     "/pilot/landing/",      # login/signup landing page
     "/pilot/contact-info/", # campaign signup contact info
     "/pilot/otp/",          # OTP verification
-    "/pilot/disclaimer/",   # disclaimer iframe
+    "/pilot/disclaimer/",   # disclaimer acceptance
     "/pilot/login/",        # request OTP for login
+    "pilot/returning/",     # check if first time or returning user
     # Other public paths
     "/health",          # health checks
     "/static/",         # static files

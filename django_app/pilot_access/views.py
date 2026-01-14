@@ -513,10 +513,15 @@ def campaign_contact_info(request: HttpRequest) -> HttpResponse:
         'data': data,
     })
 
-
-@xframe_options_sameorigin
 def disclaimer(request: HttpRequest) -> HttpResponse:
-    return render(request, "pilot_access/disclaimer.jinja")
+    if request.method == "POST":
+        disclaimer_accepted = request.POST.get("disclaimer_accepted")
+        if disclaimer_accepted:
+            # TODO: move saving of the disclaimer accepting record to here
+            return redirect("pilot_access:campaign_contact_info")
+        else:
+            return redirect("pilot_access:details_not_shared")
+    return render(request, "pilot_access:disclaimer.jinja")
 
 
 def account(request: HttpRequest) -> HttpResponse:
@@ -577,3 +582,17 @@ def delete_account(request: HttpRequest) -> HttpResponse:
             "email": profile.email or user.email,
         },
     )
+
+def returning(request: HttpRequest) -> HttpResponse:
+    """Check if user is returning pilot user."""
+    if request.method == "POST":
+        # Explicitly check for the string value sent by your form
+        is_returning_user = request.POST.get("returning", "").lower()
+        
+        if is_returning_user == "true" or is_returning_user == "yes":
+            return redirect("pilot_access:otp_verify")
+        
+        # Default fallback if 'false', empty, or missing
+        return redirect("pilot_access:disclaimer")
+
+    return render(request, "pilot_access/returning.jinja")

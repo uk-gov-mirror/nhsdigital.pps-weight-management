@@ -1,0 +1,34 @@
+{% extends "web/layout/base.jinja" %}
+{% from "web/macros/layout.jinja" import two_thirds_column_start, two_thirds_column_end %}
+{% from "web/macros/forms.jinja" import form_error_summary, continue_button, back_link %}
+{% set pageName = "Have you used this site before?" %}
+{% block content %}
+    {{ two_thirds_column_start() }}
+    <form method="post">
+        {{ csrf_input }}
+        {{ radios({
+                "idPrefix": "returning",
+                "name": "returning",
+                "fieldset": {
+                "legend": {
+                "text": "Is this your first time using 'NHS Help to stay healthy'?",
+                "classes": "nhsuk-fieldset__legend--l",
+                "isPageHeading": "true"
+                }
+                },
+                "items": [
+                {
+                "value": false,
+                "text": "First time"
+                },
+                {
+                "value": true,
+                "text": "I've used it before"
+                }
+                ],
+                "values": data.returning if data.returning else undefined
+                }) }}
+        {{ continue_button() }}
+    </form>
+    {{ two_thirds_column_end() }}
+{% endblock content %}
