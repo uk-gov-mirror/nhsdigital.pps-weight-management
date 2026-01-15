@@ -521,7 +521,7 @@ def disclaimer(request: HttpRequest) -> HttpResponse:
             return redirect("pilot_access:campaign_contact_info")
         else:
             return redirect("pilot_access:details_not_shared")
-    return render(request, "pilot_access:disclaimer.jinja")
+    return render(request, "pilot_access/disclaimer.jinja")
 
 
 def account(request: HttpRequest) -> HttpResponse:
@@ -586,13 +586,13 @@ def delete_account(request: HttpRequest) -> HttpResponse:
 def returning(request: HttpRequest) -> HttpResponse:
     """Check if user is returning pilot user."""
     if request.method == "POST":
-        # Explicitly check for the string value sent by your form
+        
         is_returning_user = request.POST.get("returning", "").lower()
         
         if is_returning_user == "true" or is_returning_user == "yes":
             return redirect("pilot_access:otp_verify")
-        
-        # Default fallback if 'false', empty, or missing
-        return redirect("pilot_access:disclaimer")
+        else:
+            # create django new user
+            return redirect("pilot_access:disclaimer")
 
     return render(request, "pilot_access/returning.jinja")

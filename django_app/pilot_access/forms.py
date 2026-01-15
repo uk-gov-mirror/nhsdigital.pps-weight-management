@@ -1,6 +1,5 @@
 from django import forms
 from django.core.exceptions import ValidationError
-from django.contrib.auth import get_user_model
 
 from .models import PilotProfile
 
@@ -228,3 +227,15 @@ class DeleteAccountForm(forms.Form):
         required=True,
         label="Yes, delete my account",
     )
+
+class CheckReturningUserForm(forms.Form):
+    returning = forms.ChoiceField(
+        label="Are you a returning user?",
+        choices=(
+            ("yes", "First Time"),
+            ("no", "I've used it before"),
+        ),
+        widget=forms.RadioSelect,
+        required=True,
+    )
+    

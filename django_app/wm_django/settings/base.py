@@ -229,7 +229,7 @@ PILOT_ACCESS_PUBLIC_PATH_PREFIXES = [
     "/pilot/otp/",          # OTP verification
     "/pilot/disclaimer/",   # disclaimer acceptance
     "/pilot/login/",        # request OTP for login
-    "pilot/returning/",     # check if first time or returning user
+    "/pilot/returning/",     # check if first time or returning user
     # Other public paths
     "/health",          # health checks
     "/static/",         # static files
