@@ -7,6 +7,17 @@
 {% endblock beforeContent %}
 {% block content %}
   {{ two_thirds_column_start() }}
+  {% if error %}
+    {{ form_error_summary({
+      "titleText": "There is a problem",
+      "errorList": [
+        {
+          "text": "Please choose an option",
+          "href": "#disclaimer_accepted"
+        }
+      ]
+    }) }}
+  {% endif %}
   <h1>Can we use your basic information?</h1>
   <p>We need to know a few details about you so we can:</p>
   <ul>
@@ -26,14 +37,16 @@
         "fieldset": {
         "legend": {
         "text": "We'll need your contact details and postcode. Is that OK?",
-        "classes": "nhsuk-fieldset__legend--l"}},
+        "classes": "nhsuk-fieldset__legend--l"
+        }
+        },
         "items": [
         {
-        "value": true,
+        "value": "accepted",
         "text": "Yes, that's OK"
         },
         {
-        "value": false,
+        "value": "not-accepted",
         "text": "No, I don't want to continue"
         }
         ],

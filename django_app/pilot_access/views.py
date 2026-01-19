@@ -560,7 +560,7 @@ def disclaimer(request: HttpRequest) -> HttpResponse:
                 return redirect("pilot_access:campaign_contact_info")
             else:
                 return redirect("pilot_access:details_not_shared")
-        return render(request, "pilot_access/disclaimer.jinja", {"form": form})
+        return render(request, "pilot_access/disclaimer.jinja", {"form": form, "error": True})
     else:
         form = DisclaimerForm()
 

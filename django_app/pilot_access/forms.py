@@ -7,12 +7,12 @@ from .models import PilotProfile
 class DisclaimerForm(forms.Form):
     """Form for accepting the disclaimer to use personal information."""
 
-    disclaimer_accepted = forms.BooleanField(
+    disclaimer_accepted = forms.CharField(
         required=True,
         widget=forms.RadioSelect(
             choices=[
-                (True, "Yes, that's OK"),
-                (False, "No, I don't want to continue"),
+                ("accepted", "Yes, that's OK"),
+                ("not-accepted", "No, I don't want to continue"),
             ]
         ),
         label="We'll need your contact details and postcode. Is that OK?",
