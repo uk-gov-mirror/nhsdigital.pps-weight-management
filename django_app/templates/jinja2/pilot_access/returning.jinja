@@ -4,6 +4,17 @@
 {% set pageName = "Have you used this site before?" %}
 {% block content %}
     {{ two_thirds_column_start() }}
+    {% if error %}
+        {{ form_error_summary({
+            "titleText": "There is a problem",
+            "errorList": [
+                {
+                    "text": "Please choose an option",
+                    "href": "#returning"
+                }
+            ]
+        }) }}
+    {% endif %}
     <form method="post">
         {{ csrf_input }}
         {{ radios({
@@ -18,11 +29,11 @@
                 },
                 "items": [
                 {
-                "value": false,
+                "value": "first-time",
                 "text": "First time"
                 },
                 {
-                "value": true,
+                "value": "returning",
                 "text": "I've used it before"
                 }
                 ],

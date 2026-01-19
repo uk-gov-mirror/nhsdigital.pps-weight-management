@@ -22,12 +22,12 @@ class DisclaimerForm(forms.Form):
 class ReturningForm(forms.Form):
     """Form for checking if user is a returning user."""
 
-    returning = forms.BooleanField(
+    returning = forms.CharField(
         required=True,
         widget=forms.RadioSelect(
             choices=[
-                (False, "First time"),
-                (True, "I've used it before"),
+                ("first-time", "First time"),
+                ("returning", "I've used it before"),
             ]
         ),
         label="Is this your first time using 'NHS Help to stay healthy'?",

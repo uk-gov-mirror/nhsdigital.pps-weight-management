@@ -640,12 +640,21 @@ def returning(request: HttpRequest) -> HttpResponse:
         form = ReturningForm(request.POST)
         if form.is_valid():
             is_returning_user = form.cleaned_data["returning"]
-
-            if is_returning_user:
-                return redirect("pilot_access:otp_verify")
-            else:
+            if is_returning_user == "returning":
+                return redirect("pilot_access:magic_link_request")
+            elif is_returning_user == "first-time":
                 return redirect("pilot_access:disclaimer")
-        return render(request, "pilot_access/returning.jinja", {"form": form})
+            else:
+                return render(
+                    request,
+                    "pilot_access/returning.jinja",
+                    {
+                        "error": True,
+                    },
+                )
+        return render(
+            request, "pilot_access/returning.jinja", {"form": form, "error": True}
+        )
     else:
         form = ReturningForm()
 
