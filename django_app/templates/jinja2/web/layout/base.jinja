@@ -8,6 +8,7 @@
 {% from "nhsuk/components/checkboxes/macro.jinja" import checkboxes %}
 {% from "nhsuk/components/radios/macro.jinja" import radios %}
 {% from "nhsuk/components/notification-banner/macro.jinja" import notificationBanner %}
+{% from "nhsuk/components/footer/macro.jinja" import footer %}
 
 {% set assetPath = '/static/assets' %}
 
@@ -28,16 +29,28 @@
     },
     "account": ({
       "items": [
-        { "text": "", "icon": true },
-        { "text": "Settings", "href": url("pilot_access:account") },
-        { "text": "Log out", "href": url("pilot_access:logout") },
+        { "text": "Edit my details", "icon": true, "href": url("pilot_access:account") },
+        { "text": "Sign out", "href": url("pilot_access:logout") },
       ]
     } if showPilotAccount else none)
   }) }}
 {% endblock %}
 
 {% block footer %}
-  {{ super() }}
+  {{ footer({
+    "meta": {
+      "items": [
+        {
+          "text": "Mitigation disclaimer",
+          "href": "/"
+        },
+        {
+          "text": "Privacy policy",
+          "href": "/"
+        }
+      ]
+    }
+  }) }}
   <form id="pilot-logout-form" method="post" action="{{ url('pilot_access:logout') }}" style="display:none">
     {{ csrf_input }}
   </form>
