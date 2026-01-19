@@ -711,3 +711,11 @@ def _is_valid_mobile(mobile: str) -> bool:
     if not mobile:
         return False
     return bool(MOBILE_REGEX.match(mobile.strip()))
+
+def success(request: HttpRequest) -> HttpResponse:
+    """Show a simple success page."""
+    return render(
+        request,
+        "web/pages/success.jinja",
+    )
+    

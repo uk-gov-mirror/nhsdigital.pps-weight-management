@@ -1,0 +1,18 @@
+{% extends "web/layout/base.jinja" %}
+{% from "web/macros/layout.jinja" import two_thirds_column_start, two_thirds_column_end %}
+{% from "nhsuk/components/button/macro.jinja" import button %}
+
+{% set pageName = "Success" %}
+{% set bannerHtml %}
+    <h3 class="nhsuk-notification-banner__heading">You've successfully signed in</h3>
+    <p>Welcome to NHS Help to stay healthy.</p>
+    {{ button({"text": "Continue", "href": "/details-postcode"}) }}
+{% endset %}
+{% block content %}
+    {{ two_thirds_column_start() }}
+    {{ notificationBanner({
+        "type": "success",
+        "html": bannerHtml
+    }) }}
+    {{ two_thirds_column_end() }}
+{% endblock content %}

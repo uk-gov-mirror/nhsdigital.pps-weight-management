@@ -361,7 +361,7 @@ def otp_verify(request: HttpRequest) -> HttpResponse:
             except UserFilter.DoesNotExist:
                 pass
 
-            return redirect("/")
+            return redirect("/success")
     else:
         form = OTPForm()
 

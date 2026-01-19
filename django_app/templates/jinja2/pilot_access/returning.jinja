@@ -20,6 +20,9 @@
         {{ radios({
                 "idPrefix": "returning",
                 "name": "returning",
+                "errorMessage": {
+                "text": "Please choose an option"
+                } if error else undefined,
                 "fieldset": {
                 "legend": {
                 "text": "Is this your first time using 'NHS Help to stay healthy'?",

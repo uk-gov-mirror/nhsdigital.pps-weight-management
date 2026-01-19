@@ -1,74 +1,81 @@
 {% extends "web/layout/base.jinja" %}
-
 {% from "web/macros/layout.jinja" import two_thirds_column_start, two_thirds_column_end %}
-
-{% set pageName = "How would you like to be contacted?" %}
-
+{% set pageName = "Contact details" %}
 {% block content %}
   {{ two_thirds_column_start() }}
-
   {% if errors %}
-    <div class="nhsuk-error-summary" aria-labelledby="error-summary-title" role="alert" tabindex="-1">
+    <div class="nhsuk-error-summary"
+         aria-labelledby="error-summary-title"
+         role="alert"
+         tabindex="-1">
       <h2 class="nhsuk-error-summary__title" id="error-summary-title">There is a problem</h2>
       <div class="nhsuk-error-summary__body">
         <ul class="nhsuk-list nhsuk-error-summary__list">
-          {% if errors.__all__ %}
-            <li>{{ errors.__all__ }}</li>
-          {% endif %}
+          {% if errors.__all__ %}<li>{{ errors.__all__ }}</li>{% endif %}
           {% if errors.email %}
-            <li><a href="#emailInput">{{ errors.email }}</a></li>
+            <li>
+              <a href="#emailInput">{{ errors.email }}</a>
+            </li>
           {% endif %}
           {% if errors.phone %}
-            <li><a href="#phoneInput">{{ errors.phone }}</a></li>
+            <li>
+              <a href="#phoneInput">{{ errors.phone }}</a>
+            </li>
           {% endif %}
           {% if errors.preferred_contact_method %}
-            <li><a href="#preferredContact">{{ errors.preferred_contact_method }}</a></li>
+            <li>
+              <a href="#preferredContact">{{ errors.preferred_contact_method }}</a>
+            </li>
           {% endif %}
         </ul>
       </div>
     </div>
   {% endif %}
-
   <form method="post">
     {{ csrf_input }}
-
-    <h1 class="nhsuk-heading-l">How would you like to be contacted?</h1>
-
+    <h1 class="nhsuk-heading-l">Contact details</h1>
     <p class="nhsuk-body">
-      We'll send you a verification code to confirm your identity.
+      Tell us your contact details so we can:
+      <ul>
+        <li>send you a security code to sign in with</li>
+        <li>check in with you to helop you keep going - we'll ask you if you're OK with this later on</li>
+      </ul>
     </p>
-
     <div class="nhsuk-form-group{% if errors.email %} nhsuk-form-group--error{% endif %}">
       <label class="nhsuk-label" for="emailInput">Email address</label>
-      {% if errors.email %}
-        <span class="nhsuk-error-message">{{ errors.email }}</span>
-      {% endif %}
-      <input class="nhsuk-input{% if errors.email %} nhsuk-input--error{% endif %}" id="emailInput" name="email" type="email" value="{{ data.email or '' }}">
+      {% if errors.email %}<span class="nhsuk-error-message">{{ errors.email }}</span>{% endif %}
+      <input class="nhsuk-input{% if errors.email %} nhsuk-input--error{% endif %}"
+             id="emailInput"
+             name="email"
+             type="email"
+             value="{{ data.email or '' }}">
     </div>
-
     <div class="nhsuk-form-group{% if errors.phone %} nhsuk-form-group--error{% endif %}">
       <label class="nhsuk-label" for="phoneInput">Mobile number</label>
-      {% if errors.phone %}
-        <span class="nhsuk-error-message">{{ errors.phone }}</span>
-      {% endif %}
-      <input class="nhsuk-input{% if errors.phone %} nhsuk-input--error{% endif %}" id="phoneInput" name="phone" type="tel" value="{{ data.phone or '' }}">
+      {% if errors.phone %}<span class="nhsuk-error-message">{{ errors.phone }}</span>{% endif %}
+      <input class="nhsuk-input{% if errors.phone %} nhsuk-input--error{% endif %}"
+             id="phoneInput"
+             name="phone"
+             type="tel"
+             value="{{ data.phone or '' }}">
     </div>
-
     <div class="nhsuk-form-group{% if errors.preferred_contact_method %} nhsuk-form-group--error{% endif %}">
       <label class="nhsuk-label" for="preferredContact">Preferred contact method</label>
       <div class="nhsuk-hint">We will send your verification code using this method</div>
       {% if errors.preferred_contact_method %}
         <span class="nhsuk-error-message">{{ errors.preferred_contact_method }}</span>
       {% endif %}
-      <select class="nhsuk-select{% if errors.preferred_contact_method %} nhsuk-select--error{% endif %}" id="preferredContact" name="preferred_contact_method">
+      <select class="nhsuk-select{% if errors.preferred_contact_method %} nhsuk-select--error{% endif %}"
+              id="preferredContact"
+              name="preferred_contact_method">
         <option value="">Select an option</option>
-        <option value="email" {% if data.preferred_contact_method == 'email' %}selected{% endif %}>Email</option>
-        <option value="sms" {% if data.preferred_contact_method == 'sms' %}selected{% endif %}>Text message (SMS)</option>
+        <option value="email"
+                {% if data.preferred_contact_method == 'email' %}selected{% endif %}>Email</option>
+        <option value="sms"
+                {% if data.preferred_contact_method == 'sms' %}selected{% endif %}>Text message (SMS)</option>
       </select>
     </div>
-
     <button class="nhsuk-button" type="submit">Continue</button>
   </form>
-
   {{ two_thirds_column_end() }}
-{% endblock %}
+{% endblock content %}

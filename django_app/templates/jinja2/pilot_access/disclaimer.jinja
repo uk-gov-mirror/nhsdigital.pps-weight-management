@@ -34,6 +34,9 @@
     {{ radios({
         "idPrefix": "disclaimer_accepted",
         "name": "disclaimer_accepted",
+        "errorMessage": {
+        "text": "Please choose an option"
+        } if error else undefined,
         "fieldset": {
         "legend": {
         "text": "We'll need your contact details and postcode. Is that OK?",
