@@ -1,0 +1,73 @@
+{% extends "web/layout/base.jinja" %}
+{% from "web/macros/layout.jinja" import two_thirds_column_start, two_thirds_column_end %}
+{% from "web/macros/forms.jinja" import form_error_summary, continue_button, back_link %}
+{% set pageName = "Allow check-ins?" %}
+{% block beforeContent %}
+    {{ back_link("/preference-channel") }}
+{% endblock beforeContent %}
+{% block content %}
+    <div class="nhsuk-width-container">
+        <main class="nhsuk-main-wrapper">
+            <div class="nhsuk-grid-row">
+                <div class="nhsuk-grid-column-one-quarter" style="text-align:right;">
+                    <img src="static/assets/images/bot/avatar-standard.svg"
+                         alt="Checkmark icon"
+                         class="robo-image"
+                         height="{{ 75 }}"
+                         width="{{ 75 }}">
+                </div>
+                <div class="nhsuk-grid-column-two-thirds">
+                    {% if error %}
+                        {{ form_error_summary({
+                            "titleText": "There is a problem",
+                            "errorList": [
+                                {
+                                    "text": "Please choose an option",
+                                    "href": "#allowCheckins"
+                                }
+                            ]
+                        }) }}
+                    {% endif %}
+                    <h1 class="nhsuk-heading-l">I can help you along the way!</h1>
+                    <p class="nhsuk-body-l">We're about to show you some options we think will help you to stay healthy</p>
+                    <p>After you've chosen the activity you think will work best for you, I'm here to:</p>
+                    <ul>
+                        <li>check in on you to see how you're doing</li>
+                        <li>encourage you to keep going</li>
+                        <li>help you to find something else if it isn't working for you</li>
+                    </ul>
+                    <hr class="nhsuk-section-break nhsuk-section-break--l nhsuk-section-break--visible">
+                    <p>If you want me to check in with you, I'll send you a message after you've had a chance to choose an activity.</p>
+                    <form method="post">
+                        {{ csrf_input }}
+                        {{ radios({
+                                                "idPrefix": "allow_check_in",
+                                                "name": "allow_check_in",
+                                                "errorMessage": {
+                                                "text": "Please choose an option"
+                                                } if error else undefined,
+                                                "fieldset": {
+                                                "legend": {
+                                                "text": "Can I help you keep going?",
+                                                "classes": "nhsuk-fieldset__legend--l"
+                                                }
+                                                },
+                                                "items": [
+                                                {
+                                                "value": "yes",
+                                                "text": "Yes"
+                                                },
+                                                {
+                                                "value": "no",
+                                                "text": "No"
+                                                }
+                                                ],
+                                                "values": data.allowCheckins if data.allowCheckins else undefined
+                                                }) }}
+                        {{ continue_button() }}
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+{% endblock content %}

@@ -11,8 +11,9 @@ The journey is a multi-step form stored in the session. Rough order:
 6. details_contact_details
 7. goals, barriers      - goals and barriers
 8. preference_*         - preferences (who with / timetable / channel)
-9. listing              - show matching services from the API
-10. detail              - show a single service from the API
+9. allow-check-in       - user permission to check in
+10. listing             - show matching services from the API
+11. detail              - show a single service from the API
 
 All state is stored in request.session; the API is called at the listing/detail
 steps. Templates live under ``templates/jinja2/web/pages`` and are referenced
@@ -391,7 +392,7 @@ def preference_channel(request: HttpRequest) -> HttpResponse:
             )
         request.session["channel"] = value
         _persist_to_user_filter(request.user, "channel", value)
-        return redirect("listing")
+        return redirect("allow-check-in")
 
     return render(
         request,
@@ -624,6 +625,36 @@ def detail(request: HttpRequest, service_id: int) -> HttpResponse:
         {"service": service, "data": request.session},
     )
 
+def allow_check_in(request: HttpRequest) -> HttpResponse:
+    """Collect user permission to check in."""
+    if request.method == "POST":
+        value = request.POST.get("allow_check_in")
+        if value == "no":
+            return redirect("no_check_in")
+        elif value == "yes":
+            request.session["allow_check_in"] = value
+            _persist_to_user_filter(request.user, "allow_check_in", value)
+            return redirect("listing")
+        else:
+            return render(
+                request,
+                "web/pages/allow-check-in.jinja",
+                {"error": True, "data": request.session},
+            )
+
+    return render(
+        request,
+        "web/pages/allow-check-in.jinja",
+        {"data": request.session},
+    )
+
+
+def no_check_in(request: HttpRequest) -> HttpResponse:
+    """Show a page when user declines check-in."""
+    return render(
+        request,
+        "web/pages/no-check-in.jinja",
+    )
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -718,4 +749,3 @@ def success(request: HttpRequest) -> HttpResponse:
         request,
         "web/pages/success.jinja",
     )
-    

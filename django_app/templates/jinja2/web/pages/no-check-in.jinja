@@ -1,0 +1,25 @@
+{% extends "web/layout/base.jinja" %}
+{% from "web/macros/layout.jinja" import two_thirds_column_start, two_thirds_column_end %}
+{% from "web/macros/forms.jinja" import continue_button, back_link %}
+{% set pageName = "Check-in" %}
+{% block beforeContent %}
+    {{ back_link("/allow-check-in") }}
+{% endblock beforeContent %}
+{% block content %}
+    <div class="nhsuk-width-container">
+        <main class="nhsuk-main-wrapper">
+            {{ two_thirds_column_start() }}
+            <div class="app-robo-mecc"
+                 style="background-image: url('/static/assets/images/bot/avatar-standard.svg')">
+                <div>
+                    <h2>I will not check in with you</h2>
+                    <p>You can still explore all the options we think will help you to stay healthy</p>
+                </div>
+            </div>
+            <div class="nhsuk-u-padding-top-6">
+                <p>{{ button({"text": "Continue", "href": "/listing"}) }}</p>
+            </div>
+            {{ two_thirds_column_end() }}
+        </main>
+    </div>
+{% endblock content %}

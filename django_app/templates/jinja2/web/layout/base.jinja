@@ -1,7 +1,6 @@
 {# Weight management base template #}
 {% extends "nhsuk/template.jinja" %}
-
-{% from "nhsuk/components/button/macro.jinja" import button %}
+  {% from "nhsuk/components/button/macro.jinja" import button %}
 {% from "nhsuk/components/back-link/macro.jinja" import backLink %}
 {% from "nhsuk/components/input/macro.jinja" import input %}
 {% from "nhsuk/components/error-summary/macro.jinja" import errorSummary %}
@@ -9,33 +8,28 @@
 {% from "nhsuk/components/radios/macro.jinja" import radios %}
 {% from "nhsuk/components/notification-banner/macro.jinja" import notificationBanner %}
 {% from "nhsuk/components/footer/macro.jinja" import footer %}
-
-{% set assetPath = '/static/assets' %}
-
+{% set assetPath = "/static/assets" %}
 {% block pageTitle %}NHS - {{ serviceName }}{% endblock %}
-
 {% block head %}
-    {{ super() }}
-    <link rel="stylesheet" href="{{ static('nhsuk-frontend.min.css') }}">
-	<link rel="stylesheet" href="{{ static('assets/css/main.css') }}">
+  {{ super() }}
+  <link rel="stylesheet" href="{{ static('nhsuk-frontend.min.css') }}">
+  <link rel="stylesheet" href="{{ static('assets/css/main.css') }}">
 {% endblock %}
-
 {% block header %}
   {% set showPilotAccount = request.user.is_authenticated and (not request.user.is_staff) and request.pilot_access_registered %}
   {{ header({
     "service": {
-      "text": serviceName,
-      "href": url("home")
-    },
-    "account": ({
-      "items": [
-        { "text": "Edit my details", "icon": true, "href": url("pilot_access:account") },
-        { "text": "Sign out", "href": url("pilot_access:logout") },
-      ]
-    } if showPilotAccount else none)
+    "text": serviceName,
+    "href": url("home") 
+  },
+  "account": ({
+  "items": [
+  { "text": "Edit my details", "icon": true, "href": url("pilot_access:account") },
+  { "text": "Sign out", "href": url("pilot_access:logout") },
+  ]
+  } if showPilotAccount else none)
   }) }}
 {% endblock %}
-
 {% block footer %}
   {{ footer({
     "meta": {
@@ -51,11 +45,13 @@
       ]
     }
   }) }}
-  <form id="pilot-logout-form" method="post" action="{{ url('pilot_access:logout') }}" style="display:none">
+  <form id="pilot-logout-form"
+        method="post"
+        action="{{ url('pilot_access:logout') }}"
+        style="display:none">
     {{ csrf_input }}
   </form>
 {% endblock %}
-
 {% block bodyEnd %}
   {{ super() }}
   <script type="module">
@@ -85,7 +81,7 @@
     }
   </script>
   {% if request.user.is_authenticated and not request.user.is_staff %}
-  <script>
+    <script>
     // Prevent showing cached authenticated pages when navigating back after logout/account deletion
     window.addEventListener('pageshow', function(event) {
       if (event.persisted) {
@@ -93,7 +89,7 @@
         window.location.reload();
       }
     });
-  </script>
+    </script>
   {% endif %}
-<script src="{{ static('assets/javascript/main.js') }}"></script>
+  <script src="{{ static('assets/javascript/main.js') }}"></script>
 {% endblock %}
