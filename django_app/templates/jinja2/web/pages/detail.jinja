@@ -37,17 +37,17 @@
 {% if service.promoImage %}
   <div class="nhsuk-grid-row">
     <div class="nhsuk-grid-column-one-half">
-      <h2>What it is</h2>
-      {{ service.whatItIs | safe }}
+      <h1 class="nhsuk-heading-l">What it is</h1>
+      <p class="nhsuk-body">{{ service.whatItIs | safe }}</p>
 
-      <h2>How it works</h2>
+      <h1 class="nhsuk-heading-l nhsuk-u-padding-top-3">How it works</h1>
       {{ service.howItWorks | safe }}
 
-      <h2>What it could do for you</h2>
+      <h1 class="nhsuk-heading-l nhsuk-u-padding-top-3">What it could do for you</h1>
       {{ service.whatItCouldDo | safe }}
 
       {% if service.helpsWith|default([])|length > 0 %}
-        <h3>{{ service.serviceName }} can help you with:</h3>
+        <h2 class="nhsuk-heading-m nhsuk-u-padding-top-3">{{ service.serviceName }} can help you with:</h2>
         <ul>
           {% for item in service.helpsWith %}
           <li>{{ item }}</li>
@@ -65,17 +65,17 @@
   <div class="nhsuk-grid-row">
     <div class="nhsuk-grid-column-two-thirds">
 
-      <h2>What it is</h2>
+      <h1 class="nhsuk-heading-l">What it is</h1>
       {{ service.whatItIs | default('What it is') | safe }}
 
-      <h2>How it works</h2>
+      <h1 class="nhsuk-heading-l">How it works</h1>
       {{ service.howItWorks | default('How it works') | safe }}
 
       <h2>What it could do for you</h2>
       {{ service.whatItCouldDo | default('What it could do') | safe }}
 
       {% if service.helpsWith|default([])|length > 0 %}
-        <h3>{{ service.serviceName | default('service name') }} can help you with:</h3>
+        <h2 class="nhsuk-heading-m">{{ service.serviceName | default('service name') }} can help you with:</h2>
         <ul>
           {% for item in service.helpsWith %}
             <li>{{ item }}</li>
@@ -92,7 +92,7 @@
   <div class="nhsuk-grid-column-two-thirds nhsuk-u-margin-top-6">
 
     {% if service.whoItsFor|default([])|length > 0 %}
-      <h2>Who it’s for</h2>
+      <h1 class="nhsuk-heading-l">Who it’s for</h1>
       <ul>
         {% for item in service.whoItsFor %}
         <li>{{ item }}</li>
@@ -101,7 +101,7 @@
     {% endif %}
 
     {% if service.whoItsNotFor|default([])|length > 0 %}
-      <h2>Who it’s not for</h2>
+      <h1 class="nhsuk-heading-l">Who it’s not for</h1>
       <ul>
         {% for item in service.whoItsNotFor %}
         <li>{{ item }}</li>
@@ -117,7 +117,7 @@
     {% endif %}
 
     {% if service.howMuchTime|default([])|length > 0 %}
-      <h2>How much time you’ll need</h2>
+      <h1 class="nhsuk-heading-l">How much time you’ll need</h1>
       <ul>
         {% for item in service.howMuchTime %}
         <li>{{ item }}</li>
@@ -126,7 +126,7 @@
     {% endif %}
 
     {% if service.howToAccess|default([])|length > 0 %}
-      <h2>How you can access it</h2>
+      <h1 class="nhsuk-heading-l">How you can access it</h1>
       <ul>
         {% for item in service.howToAccess %}
         <li>{{ item }}</li>
@@ -135,7 +135,7 @@
     {% endif %}
 
     {% if service.cost|default([])|length > 0 %}
-      <h2>Cost</h2>
+      <h1 class="nhsuk-heading-l">Cost</h1>
       <ul>
         {% for item in service.cost %}
         <li>{{ item }}</li>
@@ -143,7 +143,7 @@
       </ul>
     {% endif %}
 
-    <h2>Get started</h2>
+    <h1 class="nhsuk-heading-l">Get started</h1>
 
     {% if service.actionType == 'action link' %}
       {{ actionLink({
