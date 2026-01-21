@@ -1,74 +1,110 @@
 {% extends "web/layout/base.jinja" %}
-
 {% from "web/macros/layout.jinja" import two_thirds_column_start, two_thirds_column_end %}
-{% from "web/macros/forms.jinja" import form_error_summary, continue_button, back_link %}
-
-
+{% from "web/macros/forms.jinja" import form_error_summary, continue_button %}
 {% set pageName = "Get help to make healthy lifestyle changes that last" %}
-
 {% block main %}
-<main id="maincontent" class="app-magazine-style-start">
-
-  <div class="nhsuk-u-padding-top-6 nhsuk-u-padding-bottom-3">
-    <div class="nhsuk-width-container">
-      <div class="nhsuk-grid-row">
-        <div class="nhsuk-grid-column-two-thirds">
-          <h1 class="nhsuk-heading-xl">
-            Get help to make healthy lifestyle changes that last
-          </h1>
-          <p class="nhsuk-lede-text">From improving your mental health to upping your energy levels, exercising and eating well can make a big difference to your quality of life.</p>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="nhsuk-u-padding-top-6 nhsuk-u-padding-bottom-3">
-    <div class="nhsuk-width-container">
-      <div class="nhsuk-grid-row">
-        <div class="nhsuk-grid-column-two-thirds">
-          <h2>Find new ways to eat well and move more</h2>
-          <p>Choose from:</p>
-          <ul class="nhsuk-u-padding-bottom-3">
-            <li>exercise programmes, like Couch to Fitness</li>
-            <li>weight management programmes, like the NHS Weight Loss Plan</li>
-            <li>walking programmes, like NHS Active 10</li>
-          </ul>
-          <h2>We’ll show you the options that best meet your needs</h2>
-          <p>Tell us a bit about yourself and we'll match you to the activities we think will work best for you.</p>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="nhsuk-u-padding-top-6 nhsuk-u-padding-bottom-0">
-    <div class="nhsuk-width-container">
-      <div class="nhsuk-grid-row">
-        <div class="nhsuk-grid-column-two-thirds nhsuk-u-padding-bottom-6">
-          <div class="app-robo-mecc" style="background-image: url('/static/assets/images/bot/avatar-standard.svg')">
-            <div>
-              <h2>We’ll help you keep going</h2>
-              <p>We’ll check in with you to ask how you’re doing and encourage you to carry on.</p>
-            </div>
+  <main id="maincontent" class="app-magazine-style-start--return-user">
+    <div class="nhsuk-u-padding-top-6 nhsuk-u-padding-bottom-3">
+      <div class="nhsuk-width-container">
+        <div class="nhsuk-grid-row">
+          <div class="nhsuk-grid-column-two-thirds">
+            {% for message in messages %}
+              <div class="app-magazine-style-start--return-user-caption">
+                <h3 class="nhsuk-heading-s">{{ message }}</h3>
+              </div>
+            {% endfor %}
+            <h1 class="nhsuk-heading-xl">Get help to make healthy lifestyle changes that last</h1>
+            <p class="nhsuk-lede-text">
+              From improving your mental health to upping your energy levels, exercising and eating well can make a big difference to your quality of life.
+            </p>
           </div>
         </div>
       </div>
     </div>
-  </div>
-
-  <div class="nhsuk-u-padding-top-6 nhsuk-u-padding-bottom-3">
-    <div class="nhsuk-width-container">
-      <div class="nhsuk-grid-row">
-        <div class="nhsuk-grid-column-two-thirds">
-          <p>
-            {{ button({
-              "text": "Start now",
-              "href": start_href
-            }) }}
-          </p>
+    {% if onboarding_complete %}
+      <div class="nhsuk-width-container">
+        <div class="nhsuk-grid-row">
+          <div class="nhsuk-grid-column-two-thirds">
+            <h2 class="nhsuk-heading-l nhsuk-u-padding-top-6 nhsuk-u-padding-bottom-3">How you'd like to stay healthy</h2>
+            {% for message in messages %}
+              <div class="nhsuk-inset-text">
+                <p>{{ message }}</p>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="nhsuk-grid-row">
+          <div class="nhsuk-grid-column-one-third">
+            <div class="nhsuk-heading-xs">
+              <h4>Changes you want to make</h4>
+            </div>
+          </div>
+          <div class="nhsuk-grid-column-one-third">
+            <ul>
+              {% for goal in user_fields.goals %}<li>{{ goal.replace('goals.', '').replace('_', ' ').title() }}</li>{% endfor %}
+            </ul>
+          </div>
+          <div class="nhsuk-grid-column-one-third">
+            <a href="{{ url("goals") }}?mode=edit"
+               class="nhsuk-link nhsuk-link--no-visited-state">Change</a>
+          </div>
         </div>
       </div>
-    </div>
-  </div>
-
-</main>
-{% endblock %}
+    {% else %}
+      <div class="nhsuk-u-padding-top-6 nhsuk-u-padding-bottom-3">
+        <div class="nhsuk-width-container">
+          <div class="nhsuk-grid-row">
+            <div class="nhsuk-grid-column-two-thirds">
+              <h2>Find new ways to eat well and move more</h2>
+              <p>Choose from:</p>
+              <ul class="nhsuk-u-padding-bottom-3">
+                <li>exercise programmes, like Couch to Fitness</li>
+                <li>weight management programmes, like the NHS Weight Loss Plan</li>
+                <li>walking programmes, like NHS Active 10</li>
+              </ul>
+              <h2>We’ll show you the options that best meet your needs</h2>
+              <p>Tell us a bit about yourself and we'll match you to the activities we think will work best for you.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="nhsuk-u-padding-top-6 nhsuk-u-padding-bottom-0">
+        <div class="nhsuk-width-container">
+          <div class="nhsuk-grid-row">
+            <div class="nhsuk-grid-column-two-thirds nhsuk-u-padding-bottom-6">
+              <div class="app-robo-mecc"
+                   style="background-image: url('/static/assets/images/bot/avatar-standard.svg')">
+                <div>
+                  <h2>We’ll help you keep going</h2>
+                  <p>We’ll check in with you to ask how you’re doing and encourage you to carry on.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="nhsuk-u-padding-top-6 nhsuk-u-padding-bottom-3">
+        <div class="nhsuk-width-container">
+          <div class="nhsuk-grid-row">
+            <div class="nhsuk-grid-column-two-thirds">
+              <p>
+                {{ button({
+                                "text": "Start now",
+                                "href": start_href
+                                }) }}
+              </p>
+              <div class="nhsuk-u-padding-bottom-3">
+                <a href="{{ url('pilot_access:account') }}"
+                   class="nhsuk-link nhsuk-link--no-visited-state">Edit my details</a>
+              </div>
+              <div>
+                <a href="{{ url('pilot_access:delete_account') }}"
+                   class="nhsuk-link nhsuk-link--no-visited-state">Delete all my information</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+  </main>
+{% endblock main %}

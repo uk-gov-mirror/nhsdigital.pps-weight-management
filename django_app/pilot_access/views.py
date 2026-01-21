@@ -358,7 +358,14 @@ def otp_verify(request: HttpRequest) -> HttpResponse:
                     for key, value in uf.data.items():
                         request.session[key] = value
                     request.session.modified = True
-                return redirect("/listing")
+                if len(uf.data) == 7:
+                    # User has completed onboarding - redirect to listing
+                    request.session["onboarding_complete"] = True
+                    return redirect("/")
+                else:
+                    # User dropped out during onboarding - redirect to start
+                    messages.success(request, "Welcome back!")
+                    return redirect("/")
             except UserFilter.DoesNotExist:
                 return redirect("/success")
     else:
@@ -379,7 +386,7 @@ def otp_verify(request: HttpRequest) -> HttpResponse:
 @require_POST
 def logout_post(request: HttpRequest) -> HttpResponse:
     logout(request)
-    messages.success(request, "You have been logged out.")
+    # messages.success(request, "You have been logged out.")
     return redirect("pilot_access:landing")
 
 
