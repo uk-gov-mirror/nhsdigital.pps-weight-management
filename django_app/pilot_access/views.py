@@ -358,10 +358,9 @@ def otp_verify(request: HttpRequest) -> HttpResponse:
                     for key, value in uf.data.items():
                         request.session[key] = value
                     request.session.modified = True
+                return redirect("/listing")
             except UserFilter.DoesNotExist:
-                pass
-
-            return redirect("/success")
+                return redirect("/success")
     else:
         form = OTPForm()
 
