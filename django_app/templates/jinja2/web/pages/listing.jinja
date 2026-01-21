@@ -267,7 +267,7 @@
     {% else %}
       <div class="nhsuk-u-margin-bottom-4">
         <h2 class="nhsuk-heading-m nhsuk-u-font-weight-normal nhsuk-u-margin-bottom-2">
-          We found {{ count }} match{{ 'es' if count != 1 }}
+          We have some options for you
         </h2>
         
         {% if pagination.total_results > 0 %}
@@ -276,20 +276,6 @@
         </p>
         {% endif %}
       </div>
-
-      <!-- Search distance selector -->
-      {% if postcode %}
-      <div class="nhsuk-form-group nhsuk-u-margin-bottom-4 app-distance-selector">
-        <label class="nhsuk-label nhsuk-u-font-size-16" for="distance-select">
-          Local services search distance from your postcode {{ postcode }}:
-        </label>
-        <select class="nhsuk-select nhsuk-select--auto" id="distance-select" name="distance" onchange="updateDistance(this.value)" >
-          {% for d in distance_options %}
-          <option value="{{ d }}" {{ 'selected' if d == distance }}>{{ d }} miles</option>
-          {% endfor %}
-        </select>
-      </div>
-      {% endif %}
     {% endif %}
 
     {% for result in results.results %}
