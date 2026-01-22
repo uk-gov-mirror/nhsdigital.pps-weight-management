@@ -375,6 +375,8 @@ def goals(request: HttpRequest) -> HttpResponse:
 
 def barriers(request: HttpRequest) -> HttpResponse:
     """Collect barriers as a checkbox list."""
+    mode = request.GET.get("mode")
+    back_href = "/" if mode == "edit" else "/goals"
     if request.method == "POST":
         values = _clean_checkbox_list("barriers", request)
         if not values:
@@ -385,12 +387,16 @@ def barriers(request: HttpRequest) -> HttpResponse:
             )
         request.session["barriers"] = values
         _persist_to_user_filter(request.user, "barriers", values)
-        return redirect("preference_who_with")
+        if mode == "edit":
+            messages.success(request, "Your data has been updated.")
+            return redirect("/")
+        else:
+            return redirect("preference_who_with")
 
     return render(
         request,
         "web/pages/barriers.jinja",
-        {"data": request.session},
+        {"data": request.session, "back_href": back_href},
     )
 
 
@@ -401,6 +407,8 @@ def barriers(request: HttpRequest) -> HttpResponse:
 
 def preference_who_with(request: HttpRequest) -> HttpResponse:
     """Collect preference for who the participant wants to attend with."""
+    mode = request.GET.get("mode")
+    back_href = "/" if mode == "edit" else "/barriers"
     if request.method == "POST":
         value = request.POST.get("who_with")
         if value in (None, "", CHECKBOX_UNCHECKED_VALUE):
@@ -411,17 +419,23 @@ def preference_who_with(request: HttpRequest) -> HttpResponse:
             )
         request.session["who_with"] = value
         _persist_to_user_filter(request.user, "who_with", value)
-        return redirect("preference_timetable")
+        if mode == "edit":
+            messages.success(request, "Your data has been updated.")
+            return redirect("/")
+        else:
+            return redirect("preference_timetable")
 
     return render(
         request,
         "web/pages/preference-who-with.jinja",
-        {"data": request.session},
+        {"data": request.session, "back_href": back_href},
     )
 
 
 def preference_timetable(request: HttpRequest) -> HttpResponse:
     """Collect timetable preferences as a checkbox list."""
+    mode = request.GET.get("mode")
+    back_href = "/" if mode == "edit" else "/preference-who-with"
     if request.method == "POST":
         value = request.POST.get("timetable")
         if value in (None, "", CHECKBOX_UNCHECKED_VALUE):
@@ -432,17 +446,23 @@ def preference_timetable(request: HttpRequest) -> HttpResponse:
             )
         request.session["timetable"] = value
         _persist_to_user_filter(request.user, "timetable", value)
-        return redirect("preference_channel")
+        if mode == "edit":
+            messages.success(request, "Your data has been updated.")
+            return redirect("/")
+        else:
+            return redirect("preference_channel")
 
     return render(
         request,
         "web/pages/preference-timetable.jinja",
-        {"data": request.session},
+        {"data": request.session, "back_href": back_href},
     )
 
 
 def preference_channel(request: HttpRequest) -> HttpResponse:
     """Collect preferred contact channel."""
+    mode = request.GET.get("mode")
+    back_href = "/" if mode == "edit" else "/preference-timetable"
     if request.method == "POST":
         value = request.POST.get("channel")
         if value in (None, "", CHECKBOX_UNCHECKED_VALUE):
@@ -453,12 +473,16 @@ def preference_channel(request: HttpRequest) -> HttpResponse:
             )
         request.session["channel"] = value
         _persist_to_user_filter(request.user, "channel", value)
-        return redirect("allow-check-in")
+        if mode == "edit":
+            messages.success(request, "Your data has been updated.")
+            return redirect("/")
+        else:
+            return redirect("allow-check-in")
 
     return render(
         request,
         "web/pages/preference-channel.jinja",
-        {"data": request.session},
+        {"data": request.session, "back_href": back_href},
     )
 
 

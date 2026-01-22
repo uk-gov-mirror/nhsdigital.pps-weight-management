@@ -3,12 +3,11 @@
 {% from "web/macros/layout.jinja" import two_thirds_column_start, two_thirds_column_end %}
 {% from "web/macros/forms.jinja" import form_error_summary, continue_button, back_link %}
 
-
 {% set pageName = "What makes it hard for you to stay healthy?" %}
 
 {% block beforeContent %}
-  {{ back_link("/goals") }}
-{% endblock %}
+  {{ back_link(back_href) }}
+{% endblock beforeContent %}
 
 {% block content %}
   {{ two_thirds_column_start() }}
@@ -19,7 +18,7 @@
       "errorList": [
         {
           "text": "Please choose an option",
-          "href": "#goals"
+          "href": "#barriers"
         }
       ]
     }) }}
@@ -87,4 +86,4 @@
 
     </form>
   {{ two_thirds_column_end() }}
-{% endblock %}
+{% endblock content %}

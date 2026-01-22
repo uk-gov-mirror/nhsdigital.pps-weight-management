@@ -1,5 +1,5 @@
 {% extends "web/layout/base.jinja" %}
-{% from "web/macros/layout.jinja" import two_thirds_column_start, two_thirds_column_end %}
+{% from "web/macros/layout.jinja" import two_thirds_column_start, two_thirds_column_end, summary_row %}
 {% from "web/macros/forms.jinja" import form_error_summary, continue_button %}
 {% set pageName = "Get help to make healthy lifestyle changes that last" %}
 {% block main %}
@@ -9,9 +9,11 @@
         <div class="nhsuk-grid-row">
           <div class="nhsuk-grid-column-two-thirds">
             {% for message in messages %}
-              <div class="app-magazine-style-start--return-user-caption">
-                <h3 class="nhsuk-heading-s">{{ message }}</h3>
-              </div>
+              {% if "info" in message.tags %}
+                <div class="app-magazine-style-start--return-user-caption">
+                  <h3 class="nhsuk-heading-s">{{ message }}</h3>
+                </div>
+              {% endif %}
             {% endfor %}
             <h1 class="nhsuk-heading-xl">Get help to make healthy lifestyle changes that last</h1>
             <p class="nhsuk-lede-text">
@@ -33,22 +35,30 @@
             {% endfor %}
           </div>
         </div>
-        <div class="nhsuk-grid-row">
-          <div class="nhsuk-grid-column-one-third">
-            <div class="nhsuk-heading-xs">
-              <h4>Changes you want to make</h4>
-            </div>
-          </div>
-          <div class="nhsuk-grid-column-one-third">
-            <ul>
-              {% for goal in user_fields.goals %}<li>{{ goal.replace('goals.', '').replace('_', ' ').title() }}</li>{% endfor %}
-            </ul>
-          </div>
-          <div class="nhsuk-grid-column-one-third">
-            <a href="{{ url("goals") }}?mode=edit"
-               class="nhsuk-link nhsuk-link--no-visited-state">Change</a>
-          </div>
-        </div>
+        {{ summary_row("Changes you want to make",
+                user_fields.goals | map("replace", "goals.", "") 
+        | map("replace", "_", " ")
+        | map("capitalize"),
+        url("goals") ~ "?mode=edit"
+        ) }}
+        <hr class="nhsuk-section-break--m">
+        {{ summary_row("What makes it hard to stay healthy",
+                user_fields.barriers | map("replace", "-", " ") 
+        | map("capitalize"),
+        url("barriers") ~ "?mode=edit") }}
+        <hr class="nhsuk-section-break--m">
+        {{ summary_row("Doing things on your own or in a group",
+                user_fields.who_with.replace("_", " ").replace("dont", "don't ").replace("who with.", "").capitalize(),
+        url("preference_who_with") ~ "?mode=edit") }}
+        <hr class="nhsuk-section-break--m">
+        {{ summary_row("Following a schedule or at your own pace",
+                user_fields.timetable.replace("_", " ").replace("dont", "don't ").replace("timetable.", "").capitalize(),
+        url("preference_timetable") ~ "?mode=edit") }}
+        <hr class="nhsuk-section-break--m">
+        {{ summary_row("Digital or in-person activities",
+                user_fields.channel.replace("_", " ").replace("dont", "don't ").replace("channel.", "").capitalize(),
+        url("preference_channel") ~ "?mode=edit") }}
+        <hr class="nhsuk-section-break--m">
       </div>
     {% else %}
       <div class="nhsuk-u-padding-top-6 nhsuk-u-padding-bottom-3">

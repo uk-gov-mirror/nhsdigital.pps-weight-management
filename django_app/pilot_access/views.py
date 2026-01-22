@@ -364,7 +364,7 @@ def otp_verify(request: HttpRequest) -> HttpResponse:
                     return redirect("/")
                 else:
                     # User dropped out during onboarding - redirect to start
-                    messages.success(request, "Welcome back!")
+                    messages.info(request, "Welcome back!")
                     return redirect("/")
             except UserFilter.DoesNotExist:
                 return redirect("/success")
