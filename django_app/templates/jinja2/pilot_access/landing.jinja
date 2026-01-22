@@ -2,6 +2,7 @@
 {% from "web/macros/layout.jinja" import two_thirds_column_start, two_thirds_column_end %}
 {% from "web/macros/forms.jinja" import form_error_summary, continue_button, back_link %}
 {% set pageName = "Get help to make healthy lifestyle changes that last" %}
+{% block pageTitle %}Pilot access{% endblock %}
 {% block main %}
   {% if campaign %}
     <main id="maincontent" class="app-magazine-style-start">
