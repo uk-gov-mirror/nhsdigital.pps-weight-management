@@ -498,7 +498,7 @@ def allow_check_in(request: HttpRequest) -> HttpResponse:
         value = request.POST.get("allow_check_in")
         request.session["allow_check_in"] = value
         _persist_to_user_filter(request.user, "allow_check_in", value)
-        if mode == "edit":
+        if mode == "edit" and value in ("yes", "no"):
             messages.success(request, "Your data has been updated.")
             return redirect("/")
         elif value == "no":
