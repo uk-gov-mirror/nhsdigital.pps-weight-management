@@ -356,7 +356,7 @@ def goals(request: HttpRequest) -> HttpResponse:
             return render(
                 request,
                 "web/pages/goals.jinja",
-                {"error": True, "data": request.session},
+                {"error": True, "data": request.session, "back_href": back_href},
             )
         request.session["goals"] = values
         _persist_to_user_filter(request.user, "goals", values)
@@ -383,7 +383,7 @@ def barriers(request: HttpRequest) -> HttpResponse:
             return render(
                 request,
                 "web/pages/barriers.jinja",
-                {"error": True, "data": request.session},
+                {"error": True, "data": request.session, "back_href": back_href},
             )
         request.session["barriers"] = values
         _persist_to_user_filter(request.user, "barriers", values)
@@ -415,7 +415,7 @@ def preference_who_with(request: HttpRequest) -> HttpResponse:
             return render(
                 request,
                 "web/pages/preference-who-with.jinja",
-                {"error": True, "data": request.session},
+                {"error": True, "data": request.session, "back_href": back_href},
             )
         request.session["who_with"] = value
         _persist_to_user_filter(request.user, "who_with", value)
@@ -442,7 +442,7 @@ def preference_timetable(request: HttpRequest) -> HttpResponse:
             return render(
                 request,
                 "web/pages/preference-timetable.jinja",
-                {"error": True, "data": request.session},
+                {"error": True, "data": request.session, "back_href": back_href},
             )
         request.session["timetable"] = value
         _persist_to_user_filter(request.user, "timetable", value)
@@ -469,7 +469,7 @@ def preference_channel(request: HttpRequest) -> HttpResponse:
             return render(
                 request,
                 "web/pages/preference-channel.jinja",
-                {"error": True, "data": request.session},
+                {"error": True, "data": request.session, "back_href": back_href},
             )
         request.session["channel"] = value
         _persist_to_user_filter(request.user, "channel", value)
@@ -485,6 +485,46 @@ def preference_channel(request: HttpRequest) -> HttpResponse:
         {"data": request.session, "back_href": back_href},
     )
 
+# ---------------------------------------------------------------------------
+# Journey: option to allow check-in
+# ---------------------------------------------------------------------------
+
+def allow_check_in(request: HttpRequest) -> HttpResponse:
+    """Collect user permission to check in."""
+    mode = request.GET.get("mode")
+    back_href = "/" if mode == "edit" else "/preference-channel"
+    if request.method == "POST":
+        
+        value = request.POST.get("allow_check_in")
+        request.session["allow_check_in"] = value
+        _persist_to_user_filter(request.user, "allow_check_in", value)
+        if mode == "edit":
+            messages.success(request, "Your data has been updated.")
+            return redirect("/")
+        elif value == "no":
+            return redirect("no_check_in")
+        elif value == "yes":
+            return redirect("listing")
+        else:
+            return render(
+                request,
+                "web/pages/allow-check-in.jinja",
+                {"error": True, "data": request.session, "back_href": back_href},
+            )
+
+    return render(
+        request,
+        "web/pages/allow-check-in.jinja",
+        {"data": request.session, "back_href": back_href},
+    )
+
+
+def no_check_in(request: HttpRequest) -> HttpResponse:
+    """Show a page when user declines check-in."""
+    return render(
+        request,
+        "web/pages/no-check-in.jinja",
+    )
 
 # ---------------------------------------------------------------------------
 # Journey: listing and detail (API-backed)
@@ -729,43 +769,9 @@ def detail(request: HttpRequest, service_id: int) -> HttpResponse:
         {"service": service, "data": request.session},
     )
 
-
-def allow_check_in(request: HttpRequest) -> HttpResponse:
-    """Collect user permission to check in."""
-    if request.method == "POST":
-        value = request.POST.get("allow_check_in")
-        if value == "no":
-            return redirect("no_check_in")
-        elif value == "yes":
-            request.session["allow_check_in"] = value
-            _persist_to_user_filter(request.user, "allow_check_in", value)
-            return redirect("listing")
-        else:
-            return render(
-                request,
-                "web/pages/allow-check-in.jinja",
-                {"error": True, "data": request.session},
-            )
-
-    return render(
-        request,
-        "web/pages/allow-check-in.jinja",
-        {"data": request.session},
-    )
-
-
-def no_check_in(request: HttpRequest) -> HttpResponse:
-    """Show a page when user declines check-in."""
-    return render(
-        request,
-        "web/pages/no-check-in.jinja",
-    )
-
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
 
 def _validate_postcode(postcode: str) -> Dict[str, Any]:
     """Validate a postcode locally and against api.postcodes.io.
