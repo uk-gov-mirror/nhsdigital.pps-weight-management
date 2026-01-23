@@ -11,8 +11,9 @@ The journey is a multi-step form stored in the session. Rough order:
 6. details_contact_details
 7. goals, barriers      - goals and barriers
 8. preference_*         - preferences (who with / timetable / channel)
-9. listing              - show matching services from the API
-10. detail              - show a single service from the API
+9. allow-check-in       - user permission to check in
+10. listing             - show matching services from the API
+11. detail              - show a single service from the API
 
 All state is stored in request.session; the API is called at the listing/detail
 steps. Templates live under ``templates/jinja2/web/pages`` and are referenced
@@ -28,6 +29,7 @@ import requests
 from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
+from django.contrib import messages
 
 logger = logging.getLogger(__name__)
 
@@ -36,8 +38,8 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 POSTCODE_REGEX = re.compile(r"^[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2}$", re.I)
-EMAIL_REGEX    = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
-MOBILE_REGEX   = re.compile(r"^\+?[0-9][0-9\s\-]{7,}$")
+EMAIL_REGEX = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+MOBILE_REGEX = re.compile(r"^\+?[0-9][0-9\s\-]{7,}$")
 
 # Pagination
 PAGE_SIZE_OPTIONS = [5, 10, 15, 20]
@@ -47,19 +49,19 @@ DEFAULT_PAGE_SIZE = 10
 DISTANCE_OPTIONS = [5, 10, 15]
 DEFAULT_DISTANCE = 5
 
-CHECKBOX_UNCHECKED_VALUE     = "_unchecked"
-DONT_MIND_VALUE              = "dont_mind"
+CHECKBOX_UNCHECKED_VALUE = "_unchecked"
+DONT_MIND_VALUE = "dont_mind"
 
 SESSION_KEY_DETAILS_POSTCODE = "details-postcode"
-SESSION_KEY_CONTACT          = "contact"
-SESSION_KEY_EMAIL            = "emailInput"
-SESSION_KEY_MOBILE           = "mobileInput"
+SESSION_KEY_CONTACT = "contact"
+SESSION_KEY_EMAIL = "emailInput"
+SESSION_KEY_MOBILE = "mobileInput"
 
-POSTCODE_API_TEMPLATE        = "https://api.postcodes.io/postcodes/{postcode}/validate"
-POSTCODE_API_TIMEOUT         = 5
+POSTCODE_API_TEMPLATE = "https://api.postcodes.io/postcodes/{postcode}/validate"
+POSTCODE_API_TIMEOUT = 5
 
-SERVICE_SEARCH_TIMEOUT       = 10
-SERVICE_DETAIL_TIMEOUT       = 10
+SERVICE_SEARCH_TIMEOUT = 10
+SERVICE_DETAIL_TIMEOUT = 10
 
 FILTER_FIELDS: List[str] = [
     "goals",
@@ -131,31 +133,49 @@ def _hydrate_session_from_user_filter(request: HttpRequest) -> None:
 # Journey: start and consent
 # ---------------------------------------------------------------------------
 
+
 def start(request: HttpRequest) -> HttpResponse:
     """Don't call session.flush() !! It clears the logged in users sessionid"""
     from pilot_access.models import UserFilter
-    
+
     # request.session.flush()
     start_href = "details-contact-details"
-    
+    onboarding_complete = request.session.get("onboarding_complete", False)
+    opted_in = False
+    user_fields = {}
+
     # If user has already been through the wizard (has UserFilter data), go straight to listings
     if request.user.is_authenticated:
         try:
             uf = UserFilter.objects.get(user=request.user)
             if uf.data:
                 start_href = "listing"
+                opted_in = uf.data.get("allow_check_in") == "yes"
+                user_fields = uf.data
         except UserFilter.DoesNotExist:
             pass
-    
+
     # Legacy check for magic link flow
     if request.session.get("entry_flow") == "magiclink":
         start_href = "listing"
 
-    return render(request, "web/pages/index.jinja", {"data": request.session, "start_href": start_href})
+    return render(
+        request,
+        "web/pages/index.jinja",
+        {
+            "data": request.session,
+            "start_href": start_href,
+            "onboarding_complete": onboarding_complete,
+            "opted_in": opted_in,
+            "user_fields": user_fields,
+        },
+    )
+
 
 # ---------------------------------------------------------------------------
 # Journey: personal details
 # ---------------------------------------------------------------------------
+
 
 def details_contact_details(request: HttpRequest) -> HttpResponse:
     """Collect contact details and a preferred contact method.
@@ -173,7 +193,9 @@ def details_contact_details(request: HttpRequest) -> HttpResponse:
     initial = {
         "email": getattr(user, "email", "") or "",
         "phone": getattr(profile, "phone", "") if profile else "",
-        "preferred_contact_method": getattr(profile, "preferred_contact_method", "") if profile else "",
+        "preferred_contact_method": (
+            getattr(profile, "preferred_contact_method", "") if profile else ""
+        ),
     }
 
     if not initial["preferred_contact_method"]:
@@ -185,30 +207,56 @@ def details_contact_details(request: HttpRequest) -> HttpResponse:
     if request.method == "POST":
         values["email"] = (request.POST.get("email") or "").strip()
         values["phone"] = (request.POST.get("phone") or "").strip()
-        values["preferred_contact_method"] = (request.POST.get("preferred_contact_method") or "").strip()
+        values["preferred_contact_method"] = (
+            request.POST.get("preferred_contact_method") or ""
+        ).strip()
 
         pref = values["preferred_contact_method"]
 
         if pref not in (PilotProfile.CONTACT_EMAIL, PilotProfile.CONTACT_SMS):
             errors["preferred_contact_method"] = True
-            errors["list"].append({"text": "Please choose a preferred contact method", "href": "#preferredContact"})
+            errors["list"].append(
+                {
+                    "text": "Please choose a preferred contact method",
+                    "href": "#preferredContact",
+                }
+            )
 
         # Validate per preference
         if pref == PilotProfile.CONTACT_EMAIL:
             if not _is_valid_email(values["email"]):
                 errors["email"] = True
-                errors["list"].append({"text": "Please enter a valid email address", "href": "#emailInput"})
+                errors["list"].append(
+                    {
+                        "text": "Please enter a valid email address",
+                        "href": "#emailInput",
+                    }
+                )
         elif pref == PilotProfile.CONTACT_SMS:
             if not _is_valid_mobile(values["phone"]):
                 errors["phone"] = True
-                errors["list"].append({"text": "Please enter a valid mobile phone number", "href": "#phoneInput"})
+                errors["list"].append(
+                    {
+                        "text": "Please enter a valid mobile phone number",
+                        "href": "#phoneInput",
+                    }
+                )
 
         # If user changed their email, enforce uniqueness
         if not errors.get("email") and values["email"]:
             User = get_user_model()
-            if User.objects.filter(email__iexact=values["email"]).exclude(pk=user.pk).exists():
+            if (
+                User.objects.filter(email__iexact=values["email"])
+                .exclude(pk=user.pk)
+                .exists()
+            ):
                 errors["email"] = True
-                errors["list"].append({"text": "That email address is already in use", "href": "#emailInput"})
+                errors["list"].append(
+                    {
+                        "text": "That email address is already in use",
+                        "href": "#emailInput",
+                    }
+                )
 
         # If user entered/changed their phone, enforce uniqueness against PilotProfile
         if not errors.get("phone") and values["phone"]:
@@ -217,7 +265,12 @@ def details_contact_details(request: HttpRequest) -> HttpResponse:
                 qs = qs.exclude(pk=profile.pk)
             if qs.exists():
                 errors["phone"] = True
-                errors["list"].append({"text": "That mobile number is already in use", "href": "#phoneInput"})
+                errors["list"].append(
+                    {
+                        "text": "That mobile number is already in use",
+                        "href": "#phoneInput",
+                    }
+                )
 
         if not errors["list"]:
             # Persist to session (for existing journey behaviour)
@@ -287,49 +340,63 @@ def details_postcode(request: HttpRequest) -> HttpResponse:
         {"data": request.session},
     )
 
+
 # ---------------------------------------------------------------------------
 # Journey: goals and barriers
 # ---------------------------------------------------------------------------
 
+
 def goals(request: HttpRequest) -> HttpResponse:
     """Collect goals as a checkbox list."""
+    mode = request.GET.get("mode")
+    back_href = "/" if mode == "edit" else "details-postcode"
     if request.method == "POST":
         values = _clean_checkbox_list("goals", request)
         if not values:
             return render(
                 request,
                 "web/pages/goals.jinja",
-                {"error": True, "data": request.session},
+                {"error": True, "data": request.session, "back_href": back_href},
             )
         request.session["goals"] = values
         _persist_to_user_filter(request.user, "goals", values)
-        return redirect("barriers")
+        if mode == "edit":
+            messages.success(request, "Your goals have been updated.")
+            return redirect("/")
+        else:
+            return redirect("barriers")
 
     return render(
         request,
         "web/pages/goals.jinja",
-        {"data": request.session},
+        {"data": request.session, "back_href": back_href},
     )
 
 
 def barriers(request: HttpRequest) -> HttpResponse:
     """Collect barriers as a checkbox list."""
+    mode = request.GET.get("mode")
+    back_href = "/" if mode == "edit" else "/goals"
     if request.method == "POST":
         values = _clean_checkbox_list("barriers", request)
         if not values:
             return render(
                 request,
                 "web/pages/barriers.jinja",
-                {"error": True, "data": request.session},
+                {"error": True, "data": request.session, "back_href": back_href},
             )
         request.session["barriers"] = values
         _persist_to_user_filter(request.user, "barriers", values)
-        return redirect("preference_who_with")
+        if mode == "edit":
+            messages.success(request, "Your data has been updated.")
+            return redirect("/")
+        else:
+            return redirect("preference_who_with")
 
     return render(
         request,
         "web/pages/barriers.jinja",
-        {"data": request.session},
+        {"data": request.session, "back_href": back_href},
     )
 
 
@@ -337,72 +404,132 @@ def barriers(request: HttpRequest) -> HttpResponse:
 # Journey: preferences (who with / timetable / channel)
 # ---------------------------------------------------------------------------
 
+
 def preference_who_with(request: HttpRequest) -> HttpResponse:
     """Collect preference for who the participant wants to attend with."""
+    mode = request.GET.get("mode")
+    back_href = "/" if mode == "edit" else "/barriers"
     if request.method == "POST":
         value = request.POST.get("who_with")
         if value in (None, "", CHECKBOX_UNCHECKED_VALUE):
             return render(
                 request,
                 "web/pages/preference-who-with.jinja",
-                {"error": True, "data": request.session},
+                {"error": True, "data": request.session, "back_href": back_href},
             )
         request.session["who_with"] = value
         _persist_to_user_filter(request.user, "who_with", value)
-        return redirect("preference_timetable")
+        if mode == "edit":
+            messages.success(request, "Your data has been updated.")
+            return redirect("/")
+        else:
+            return redirect("preference_timetable")
 
     return render(
         request,
         "web/pages/preference-who-with.jinja",
-        {"data": request.session},
+        {"data": request.session, "back_href": back_href},
     )
 
 
 def preference_timetable(request: HttpRequest) -> HttpResponse:
     """Collect timetable preferences as a checkbox list."""
+    mode = request.GET.get("mode")
+    back_href = "/" if mode == "edit" else "/preference-who-with"
     if request.method == "POST":
         value = request.POST.get("timetable")
         if value in (None, "", CHECKBOX_UNCHECKED_VALUE):
             return render(
                 request,
                 "web/pages/preference-timetable.jinja",
-                {"error": True, "data": request.session},
+                {"error": True, "data": request.session, "back_href": back_href},
             )
         request.session["timetable"] = value
         _persist_to_user_filter(request.user, "timetable", value)
-        return redirect("preference_channel")
+        if mode == "edit":
+            messages.success(request, "Your data has been updated.")
+            return redirect("/")
+        else:
+            return redirect("preference_channel")
 
     return render(
         request,
         "web/pages/preference-timetable.jinja",
-        {"data": request.session},
+        {"data": request.session, "back_href": back_href},
     )
 
 
 def preference_channel(request: HttpRequest) -> HttpResponse:
     """Collect preferred contact channel."""
+    mode = request.GET.get("mode")
+    back_href = "/" if mode == "edit" else "/preference-timetable"
     if request.method == "POST":
         value = request.POST.get("channel")
         if value in (None, "", CHECKBOX_UNCHECKED_VALUE):
             return render(
                 request,
                 "web/pages/preference-channel.jinja",
-                {"error": True, "data": request.session},
+                {"error": True, "data": request.session, "back_href": back_href},
             )
         request.session["channel"] = value
         _persist_to_user_filter(request.user, "channel", value)
-        return redirect("listing")
+        if mode == "edit":
+            messages.success(request, "Your data has been updated.")
+            return redirect("/")
+        else:
+            return redirect("allow-check-in")
 
     return render(
         request,
         "web/pages/preference-channel.jinja",
-        {"data": request.session},
+        {"data": request.session, "back_href": back_href},
     )
 
+# ---------------------------------------------------------------------------
+# Journey: option to allow check-in
+# ---------------------------------------------------------------------------
+
+def allow_check_in(request: HttpRequest) -> HttpResponse:
+    """Collect user permission to check in."""
+    mode = request.GET.get("mode")
+    back_href = "/" if mode == "edit" else "/preference-channel"
+    if request.method == "POST":
+        
+        value = request.POST.get("allow_check_in")
+        request.session["allow_check_in"] = value
+        _persist_to_user_filter(request.user, "allow_check_in", value)
+        if mode == "edit" and value in ("yes", "no"):
+            messages.success(request, "Your data has been updated.")
+            return redirect("/")
+        elif value == "no":
+            return redirect("no_check_in")
+        elif value == "yes":
+            return redirect("listing")
+        else:
+            return render(
+                request,
+                "web/pages/allow-check-in.jinja",
+                {"error": True, "data": request.session, "back_href": back_href},
+            )
+
+    return render(
+        request,
+        "web/pages/allow-check-in.jinja",
+        {"data": request.session, "back_href": back_href},
+    )
+
+
+def no_check_in(request: HttpRequest) -> HttpResponse:
+    """Show a page when user declines check-in."""
+    return render(
+        request,
+        "web/pages/no-check-in.jinja",
+    )
 
 # ---------------------------------------------------------------------------
 # Journey: listing and detail (API-backed)
 # ---------------------------------------------------------------------------
+
 
 def listing(request: HttpRequest) -> HttpResponse:
     """Show the list of matching services from the API.
@@ -410,7 +537,7 @@ def listing(request: HttpRequest) -> HttpResponse:
     Filters are derived from the session and any POSTed checkbox values. The
     payload is transformed to the API format where each non-empty field becomes
     an ``{"or": [...]}`` filter clause.
-    
+
     Supports pagination via page_size and page form fields.
     Supports distance-based search via postcode from session.
     """
@@ -420,9 +547,17 @@ def listing(request: HttpRequest) -> HttpResponse:
     _hydrate_session_from_user_filter(request)
 
     user = request.user
-    profile = getattr(user, "pilot_profile", None) if getattr(user, "is_authenticated", False) else None
-    profile_postcode = (getattr(profile, "postcode", "") or "").strip() if profile else ""
-    session_postcode = (session_data.get(SESSION_KEY_DETAILS_POSTCODE, "") or "").strip()
+    profile = (
+        getattr(user, "pilot_profile", None)
+        if getattr(user, "is_authenticated", False)
+        else None
+    )
+    profile_postcode = (
+        (getattr(profile, "postcode", "") or "").strip() if profile else ""
+    )
+    session_postcode = (
+        session_data.get(SESSION_KEY_DETAILS_POSTCODE, "") or ""
+    ).strip()
 
     # If the user has a profile postcode and it differs, update session + persisted filter
     if profile_postcode and profile_postcode != session_postcode:
@@ -437,7 +572,11 @@ def listing(request: HttpRequest) -> HttpResponse:
     if request.method == "POST":
         # Get page_size from POST, store in session
         try:
-            page_size = int(request.POST.get("page_size") or session_data.get("listing_page_size") or DEFAULT_PAGE_SIZE)
+            page_size = int(
+                request.POST.get("page_size")
+                or session_data.get("listing_page_size")
+                or DEFAULT_PAGE_SIZE
+            )
             if page_size not in PAGE_SIZE_OPTIONS:
                 page_size = DEFAULT_PAGE_SIZE
         except (ValueError, TypeError):
@@ -454,7 +593,11 @@ def listing(request: HttpRequest) -> HttpResponse:
 
         # Get distance from POST, store in session
         try:
-            distance = int(request.POST.get("distance") or session_data.get("listing_distance") or DEFAULT_DISTANCE)
+            distance = int(
+                request.POST.get("distance")
+                or session_data.get("listing_distance")
+                or DEFAULT_DISTANCE
+            )
             if distance not in DISTANCE_OPTIONS:
                 distance = DEFAULT_DISTANCE
         except (ValueError, TypeError):
@@ -496,12 +639,12 @@ def listing(request: HttpRequest) -> HttpResponse:
     # Add pagination parameters to payload
     payload["limit"] = page_size
     payload["offset"] = offset
-    
+
     # Add postcode and distance to payload if postcode is available
     if postcode:
         payload["postcode"] = postcode
         payload["distance"] = distance
-    
+
     api_url = request.build_absolute_uri(reverse("v3:service-search"))
 
     results: Dict[str, Any] = {"total": 0, "results": []}
@@ -530,12 +673,14 @@ def listing(request: HttpRequest) -> HttpResponse:
 
     # Calculate pagination info
     total_results = results.get("total", 0)
-    total_pages = (total_results + page_size - 1) // page_size if total_results > 0 else 1
-    
+    total_pages = (
+        (total_results + page_size - 1) // page_size if total_results > 0 else 1
+    )
+
     # Ensure current_page doesn't exceed total_pages
     if current_page > total_pages:
         current_page = total_pages
-    
+
     # Build pagination context
     pagination = {
         "current_page": current_page,
@@ -569,38 +714,38 @@ def listing(request: HttpRequest) -> HttpResponse:
 
 def _get_page_range(current_page: int, total_pages: int, window: int = 2) -> List[int]:
     """Return a list of page numbers to display in pagination.
-    
+
     Shows pages around current page within the window, always including
     first and last pages. Returns a list where -1 represents an ellipsis.
     """
     if total_pages <= 1:
         return [1] if total_pages == 1 else []
-    
+
     pages = []
-    
+
     # Always include page 1
     pages.append(1)
-    
+
     # Calculate the range around current page
     start = max(2, current_page - window)
     end = min(total_pages - 1, current_page + window)
-    
+
     # Add ellipsis after page 1 if needed
     if start > 2:
         pages.append(-1)  # -1 represents ellipsis
-    
+
     # Add pages in the window
     for p in range(start, end + 1):
         pages.append(p)
-    
+
     # Add ellipsis before last page if needed
     if end < total_pages - 1:
         pages.append(-1)
-    
+
     # Always include last page (if not already included)
     if total_pages > 1:
         pages.append(total_pages)
-    
+
     return pages
 
 
@@ -623,7 +768,6 @@ def detail(request: HttpRequest, service_id: int) -> HttpResponse:
         "web/pages/detail.jinja",
         {"service": service, "data": request.session},
     )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -674,11 +818,7 @@ def _clean_checkbox_list(field_name: str, request: HttpRequest) -> List[str]:
     frontend.
     """
     values = request.POST.getlist(field_name)
-    return [
-        v
-        for v in values
-        if v and v not in [CHECKBOX_UNCHECKED_VALUE, ""]
-    ]
+    return [v for v in values if v and v not in [CHECKBOX_UNCHECKED_VALUE, ""]]
 
 
 def _transform_to_filter_format(filters: Dict[str, Any]) -> Dict[str, Any]:
@@ -711,3 +851,11 @@ def _is_valid_mobile(mobile: str) -> bool:
     if not mobile:
         return False
     return bool(MOBILE_REGEX.match(mobile.strip()))
+
+
+def success(request: HttpRequest) -> HttpResponse:
+    """Show a simple success page."""
+    return render(
+        request,
+        "web/pages/success.jinja",
+    )

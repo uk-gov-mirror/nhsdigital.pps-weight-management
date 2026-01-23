@@ -1,74 +1,173 @@
 {% extends "web/layout/base.jinja" %}
-
-{% from "web/macros/layout.jinja" import two_thirds_column_start, two_thirds_column_end %}
-{% from "web/macros/forms.jinja" import form_error_summary, continue_button, back_link %}
-
-
+{% from "web/macros/layout.jinja" import two_thirds_column_start, two_thirds_column_end, summary_row %}
+{% from "web/macros/forms.jinja" import form_error_summary, continue_button %}
 {% set pageName = "Get help to make healthy lifestyle changes that last" %}
-
+{% set endLinksHtml %}
+  <div class="nhsuk-u-padding-bottom-3">
+    <a href="{{ url('pilot_access:account') }}"
+       class="nhsuk-link nhsuk-link--no-visited-state">Edit my details</a>
+  </div>
+  <div>
+    <a href="{{ url('pilot_access:delete_account') }}"
+       class="nhsuk-link nhsuk-link--no-visited-state">Delete all my information</a>
+  </div>
+{% endset %}
 {% block main %}
-<main id="maincontent" class="app-magazine-style-start">
-
-  <div class="nhsuk-u-padding-top-6 nhsuk-u-padding-bottom-3">
-    <div class="nhsuk-width-container">
-      <div class="nhsuk-grid-row">
-        <div class="nhsuk-grid-column-two-thirds">
-          <h1 class="nhsuk-heading-xl">
-            Get help to make healthy lifestyle changes that last
-          </h1>
-          <p class="nhsuk-lede-text">From improving your mental health to upping your energy levels, exercising and eating well can make a big difference to your quality of life.</p>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="nhsuk-u-padding-top-6 nhsuk-u-padding-bottom-3">
-    <div class="nhsuk-width-container">
-      <div class="nhsuk-grid-row">
-        <div class="nhsuk-grid-column-two-thirds">
-          <h2>Find new ways to eat well and move more</h2>
-          <p>Choose from:</p>
-          <ul class="nhsuk-u-padding-bottom-3">
-            <li>exercise programmes, like Couch to Fitness</li>
-            <li>weight management programmes, like the NHS Weight Loss Plan</li>
-            <li>walking programmes, like NHS Active 10</li>
-          </ul>
-          <h2>We’ll show you the options that best meet your needs</h2>
-          <p>Tell us a bit about yourself and we'll match you to the activities we think will work best for you.</p>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="nhsuk-u-padding-top-6 nhsuk-u-padding-bottom-0">
-    <div class="nhsuk-width-container">
-      <div class="nhsuk-grid-row">
-        <div class="nhsuk-grid-column-two-thirds nhsuk-u-padding-bottom-6">
-          <div class="app-robo-mecc" style="background-image: url('/static/assets/images/bot/avatar-standard.svg')">
-            <div>
-              <h2>We’ll help you keep going</h2>
-              <p>We’ll check in with you to ask how you’re doing and encourage you to carry on.</p>
-            </div>
+  <main id="maincontent" class="app-magazine-style-start--return-user">
+    <div class="nhsuk-u-padding-top-6 nhsuk-u-padding-bottom-3">
+      <div class="nhsuk-width-container">
+        <div class="nhsuk-grid-row">
+          <div class="nhsuk-grid-column-two-thirds">
+            {% for message in messages %}
+              {% if "info" in message.tags %}
+                <div class="app-magazine-style-start--return-user-caption">
+                  <h3 class="nhsuk-heading-s">{{ message }}</h3>
+                </div>
+              {% endif %}
+            {% endfor %}
+            <h1 class="nhsuk-heading-xl">Get help to make healthy lifestyle changes that last</h1>
+            <p class="nhsuk-lede-text">
+              From improving your mental health to upping your energy levels, exercising and eating well can make a big difference to your quality of life.
+            </p>
           </div>
         </div>
       </div>
     </div>
-  </div>
-
-  <div class="nhsuk-u-padding-top-6 nhsuk-u-padding-bottom-3">
-    <div class="nhsuk-width-container">
-      <div class="nhsuk-grid-row">
-        <div class="nhsuk-grid-column-two-thirds">
-          <p>
-            {{ button({
-              "text": "Start now",
-              "href": start_href
+    {% if onboarding_complete %}
+      <div class="nhsuk-width-container">
+        <div class="nhsuk-grid-row">
+          <div class="nhsuk-grid-column-two-thirds">
+            <h2 class="nhsuk-heading-l nhsuk-u-padding-top-6 nhsuk-u-padding-bottom-3">How you'd like to stay healthy</h2>
+            {% for message in messages %}
+              <div class="nhsuk-inset-text">
+                <p>{{ message }}</p>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+        {{ summary_row("Changes you want to make",
+                user_fields.goals | map("replace", "goals.", "") 
+        | map("replace", "_", " ")
+        | map("capitalize"),
+        url("goals") ~ "?mode=edit"
+        ) }}
+        <hr class="nhsuk-section-break--m">
+        {{ summary_row("What makes it hard to stay healthy",
+                user_fields.barriers | map("replace", "-", " ") 
+        | map("capitalize"),
+        url("barriers") ~ "?mode=edit") }}
+        <hr class="nhsuk-section-break--m">
+        {{ summary_row("Doing things on your own or in a group",
+                user_fields.who_with.replace("_", " ").replace("dont", "don't ").replace("who with.", "").capitalize(),
+        url("preference_who_with") ~ "?mode=edit") }}
+        <hr class="nhsuk-section-break--m">
+        {{ summary_row("Following a schedule or at your own pace",
+                user_fields.timetable.replace("_", " ").replace("dont", "don't ").replace("timetable.", "").capitalize(),
+        url("preference_timetable") ~ "?mode=edit") }}
+        <hr class="nhsuk-section-break--m">
+        {{ summary_row("Digital or in-person activities",
+                user_fields.channel.replace("_", " ").replace("dont", "don't ").replace("channel.", "").capitalize(),
+        url("preference_channel") ~ "?mode=edit") }}
+      </div>
+      <hr class="nhsuk-section-break--m">
+      <div class="nhsuk-width-container">
+        <div class="nhsuk-grid-row">
+          <div class="nhsuk-grid-column-two-thirds">
+            {{ actionLink({
+              "text": "Show me some options to help me stay healthy",
+              "href": "/listing",
+              "classes": "nhsuk-link--no-visited-state"
             }) }}
-          </p>
+          </div>
         </div>
       </div>
-    </div>
-  </div>
-
-</main>
-{% endblock %}
+      <div class="nhsuk-u-padding-top-6 nhsuk-u-padding-bottom-3 app-magazine-style-start--robo-background">
+        <div class="nhsuk-width-container">
+          <div class="nhsuk-grid-row">
+            <div class="nhsuk-grid-column-two-thirds">
+              <div class="app-robo-mecc"
+                   style="background-image: url('/static/assets/images/bot/avatar-standard.svg')">
+                <div>
+                  {% if user_fields.allow_check_in == "yes" %}
+                    <h2>Helping you to keep going</h2>
+                    <p>We are checking in with you to ask how you're doing and encourage you to carry on.</p>
+                    <a href="{{ url('allow-check-in') ~ '?mode=edit' }}"
+                       class="nhsuk-link--no-visited-state">Stop checking in with me</a>
+                  {% else %}
+                    <h2>I can help you along the way!</h2>
+                    <p>I'm here to:</p>
+                    <ul>
+                      <li>check in on you to see how you're doing</li>
+                      <li>encourage you to keep going</li>
+                      <li>help you find something else if it isn't working for you</li>
+                    </ul>
+                    {{ actionLink({
+                      "text": "Start checking in with me",
+                      "href": "/allow-check-in?mode=edit",
+                      "classes": "nhsuk-link--no-visited-state"
+                    }) }}
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="nhsuk-u-padding-top-6 nhsuk-u-padding-bottom-6">
+        <div class="nhsuk-width-container">
+          <div class="nhsuk-grid-row">
+            <div class="nhsuk-grid-column-two-thirds">{{ endLinksHtml }}</div>
+          </div>
+        </div>
+      </div>
+    {% else %}
+      <div class="nhsuk-u-padding-top-6 nhsuk-u-padding-bottom-3">
+        <div class="nhsuk-width-container">
+          <div class="nhsuk-grid-row">
+            <div class="nhsuk-grid-column-two-thirds">
+              <h2>Find new ways to eat well and move more</h2>
+              <p>Choose from:</p>
+              <ul class="nhsuk-u-padding-bottom-3">
+                <li>exercise programmes, like Couch to Fitness</li>
+                <li>weight management programmes, like the NHS Weight Loss Plan</li>
+                <li>walking programmes, like NHS Active 10</li>
+              </ul>
+              <h2>We’ll show you the options that best meet your needs</h2>
+              <p>Tell us a bit about yourself and we'll match you to the activities we think will work best for you.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="nhsuk-u-padding-top-6 nhsuk-u-padding-bottom-0">
+        <div class="nhsuk-width-container">
+          <div class="nhsuk-grid-row">
+            <div class="nhsuk-grid-column-two-thirds nhsuk-u-padding-bottom-6">
+              <div class="app-robo-mecc"
+                   style="background-image: url('/static/assets/images/bot/avatar-standard.svg')">
+                <div>
+                  <h2>We’ll help you keep going</h2>
+                  <p>We’ll check in with you to ask how you’re doing and encourage you to carry on.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="nhsuk-u-padding-top-6 nhsuk-u-padding-bottom-3">
+        <div class="nhsuk-width-container">
+          <div class="nhsuk-grid-row">
+            <div class="nhsuk-grid-column-two-thirds">
+              <p>
+                {{ button({
+                                "text": "Start now",
+                                "href": start_href
+                                }) }}
+              </p>
+              {{ endLinksHtml }}
+            </div>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+  </main>
+{% endblock main %}

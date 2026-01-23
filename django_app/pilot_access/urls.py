@@ -13,4 +13,6 @@ urlpatterns = [
     path("login/", views.magic_link_request, name="magic_link_request"),
     path("account/", views.account, name="account"),
     path("account/delete/", views.delete_account, name="delete_account"),
+    path("returning/",views.returning, name="returning"),
+    path("details-not-shared/", views.details_not_shared, name="details_not_shared"),
 ]

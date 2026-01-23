@@ -1,137 +1,95 @@
 {% extends "web/layout/base.jinja" %}
-
+{% from "web/macros/layout.jinja" import two_thirds_column_start, two_thirds_column_end %}
+{% from "web/macros/forms.jinja" import form_error_summary, continue_button, back_link %}
+{% set pageName = "Get help to make healthy lifestyle changes that last" %}
 {% block pageTitle %}Pilot access{% endblock %}
-
-{% block content %}
-  <div class="nhsuk-width-container">
-    <main class="nhsuk-main-wrapper" id="maincontent" role="main">
-      <h1 class="nhsuk-heading-xl">Pilot site</h1>
-
-      {% if campaign %}
-        {# Valid campaign - show the campaign comment and disclaimer form #}
-        <div class="nhsuk-inset-text">
-          <p class="nhsuk-body">{{ campaign.comment }}</p>
-        </div>
-
-        <p class="nhsuk-body">
-          Before continuing, please read the pilot disclaimer and confirm you agree.
-        </p>
-
-        <p class="nhsuk-body">
-          <a class="nhsuk-link" href="#" id="open-disclaimer">Read pilot disclaimer</a>
-        </p>
-
-        <dialog id="disclaimer-dialog" class="nhsuk-u-padding-0" style="width: min(900px, 95vw);">
-          <div class="nhsuk-u-padding-4">
-            <div class="nhsuk-u-display-flex nhsuk-u-justify-content-space-between nhsuk-u-align-items-center">
-              <h2 class="nhsuk-heading-m nhsuk-u-margin-bottom-2">Pilot disclaimer</h2>
-              <button type="button" class="nhsuk-button nhsuk-button--secondary nhsuk-u-margin-bottom-0" id="close-disclaimer">
-                Close
-              </button>
-            </div>
-
-            <div style="height: min(70vh, 700px);">
-              <iframe
-                src="{{ url('pilot_access:disclaimer') }}"
-                title="Pilot disclaimer"
-                style="border: 0; width: 100%; height: 100%;"
-              ></iframe>
+{% block main %}
+  {% if campaign %}
+    <main id="maincontent" class="app-magazine-style-start">
+      <div class="nhsuk-u-padding-top-6 nhsuk-u-padding-bottom-3">
+        <div class="nhsuk-width-container">
+          <div class="nhsuk-grid-row">
+            <div class="nhsuk-grid-column-two-thirds">
+              <h1 class="nhsuk-heading-xl">Get help to make healthy lifestyle changes that last</h1>
+              <p class="nhsuk-lede-text">
+                From improving your mental health to upping your energy levels, exercising and eating well can make a big difference to your quality of life.
+              </p>
             </div>
           </div>
-        </dialog>
-
-        <script>
-          (function () {
-            var openBtn = document.getElementById("open-disclaimer");
-            var dlg = document.getElementById("disclaimer-dialog");
-            var closeBtn = document.getElementById("close-disclaimer");
-
-            if (!openBtn || !dlg || !closeBtn) return;
-
-            openBtn.addEventListener("click", function (e) {
-              e.preventDefault();
-              if (typeof dlg.showModal === "function") dlg.showModal();
-            });
-
-            closeBtn.addEventListener("click", function () {
-              dlg.close();
-            });
-
-            dlg.addEventListener("click", function (e) {
-              var rect = dlg.getBoundingClientRect();
-              var inDialog =
-                rect.top <= e.clientY && e.clientY <= rect.bottom &&
-                rect.left <= e.clientX && e.clientX <= rect.right;
-              if (!inDialog) dlg.close();
-            });
-          })();
-        </script>
-
-        {% if form.errors %}
-          {{ errorSummary({
-            "titleText": "There is a problem",
-            "errorList": [
-              {
-                "text": form.accept.errors[0],
-                "href": "#accept"
-              }
-            ]
-          }) }}
-        {% endif %}
-
-        <form method="post">
-          {{ csrf_input }}
-
-          <div class="nhsuk-form-group {% if form.accept.errors %}nhsuk-form-group--error{% endif %}">
-            {% if form.accept.errors %}
-              <span class="nhsuk-error-message">
-                <span class="nhsuk-u-visually-hidden">Error:</span> {{ form.accept.errors[0] }}
-              </span>
-            {% endif %}
-
-            <div class="nhsuk-checkboxes">
-              <div class="nhsuk-checkboxes__item">
-                <input
-                  class="nhsuk-checkboxes__input"
-                  id="accept"
-                  name="accept"
-                  type="checkbox"
-                  value="true"
-                  {% if form.accept.value() %}checked{% endif %}
-                >
-                <label class="nhsuk-label nhsuk-checkboxes__label" for="accept">
-                  I have read and agree to the beta disclaimer.
-                </label>
+        </div>
+      </div>
+      <div class="nhsuk-u-padding-top-6 nhsuk-u-padding-bottom-3">
+        <div class="nhsuk-width-container">
+          <div class="nhsuk-grid-row">
+            <div class="nhsuk-grid-column-two-thirds">
+              <div class="nhsuk-inset-text">
+                <p class="nhsuk-body">{{ campaign.comment }}</p>
               </div>
             </div>
           </div>
-
-          <button class="nhsuk-button" type="submit">Continue</button>
-        </form>
-
-      {% elif campaign_invalid %}
-        {# Invalid campaign code (doesn't exist or out of date range) #}
-        <div class="nhsuk-warning-callout">
-          <h2 class="nhsuk-warning-callout__label">Invalid campaign code</h2>
-          <p>The campaign code you provided is not valid or has expired.</p>
         </div>
-
-      {% elif show_magic_link %}
-        {# No campaign code - show login option #}
-        <p class="nhsuk-body">
-          This site is currently in a pilot/beta phase. Access is limited to invited users.
-        </p>
-
+      </div>
+      <div class="nhsuk-u-padding-top-6 nhsuk-u-padding-bottom-3">
+        <div class="nhsuk-width-container">
+          <div class="nhsuk-grid-row">
+            <div class="nhsuk-grid-column-two-thirds">
+              <h2>Find new ways to eat well and move more</h2>
+              <p>Choose from:</p>
+              <ul class="nhsuk-u-padding-bottom-3">
+                <li>exercise programmes, like Couch to Fitness</li>
+                <li>weight management programmes, like the NHS Weight Loss Plan</li>
+                <li>walking programmes, like NHS Active 10</li>
+              </ul>
+              <h2>We’ll show you the options that best meet your needs</h2>
+              <p>Tell us a bit about yourself and we'll match you to the activities we think will work best for you.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="nhsuk-u-padding-top-6 nhsuk-u-padding-bottom-0">
+        <div class="nhsuk-width-container">
+          <div class="nhsuk-grid-row">
+            <div class="nhsuk-grid-column-two-thirds nhsuk-u-padding-bottom-6">
+              <div class="app-robo-mecc"
+                   style="background-image: url('/static/assets/images/bot/avatar-standard.svg')">
+                <div>
+                  <h2>We’ll help you keep going</h2>
+                  <p>We’ll check in with you to ask how you’re doing and encourage you to carry on.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="nhsuk-u-padding-top-6 nhsuk-u-padding-bottom-3">
+        <div class="nhsuk-width-container">
+          <div class="nhsuk-grid-row">
+            <div class="nhsuk-grid-column-two-thirds">
+              <p>{{ button({"text": "Start now", "href": "/pilot/returning/"}) }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  {% elif campaign_invalid %}
+    <div class="nhsuk-warning-callout">
+      <h2 class="nhsuk-warning-callout__label">Invalid campaign code</h2>
+      <p>The campaign code you provided is not valid or has expired.</p>
+    </div>
+  {% else %}
+    <div class="nhsuk-width-container">
+      <main class="nhsuk-main-wrapper" id="maincontent" role="main">
+        <h1 class="nhsuk-heading-xl">Pilot site</h1>
+        <p class="nhsuk-body">This site is currently in a pilot/beta phase. Access is limited to invited users.</p>
         <h2 class="nhsuk-heading-m">Already accepted?</h2>
         <p class="nhsuk-body">
           If you have already been accepted, you can sign in using a one-time password sent to your email or phone.
         </p>
         <p class="nhsuk-body">
-          <a class="nhsuk-link" href="{{ url('pilot_access:magic_link_request') }}">
-            Sign in
-          </a>
+          <a class="nhsuk-link"
+             href="{{ url('pilot_access:magic_link_request') }}">Sign in</a>
         </p>
-      {% endif %}
-    </main>
-  </div>
-{% endblock %}
+      </main>
+    </div>
+  {% endif %}
+{% endblock main %}

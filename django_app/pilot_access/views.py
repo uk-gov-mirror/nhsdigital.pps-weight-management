@@ -15,10 +15,16 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 from django.db import transaction
 from django.utils.http import url_has_allowed_host_and_scheme
-from django.views.decorators.clickjacking import xframe_options_sameorigin
 
-from .forms import DisclaimerForm, CampaignContactForm, OTPForm
-from .forms import LoginRequestForm, PilotAccountForm, DeleteAccountForm
+from .forms import (
+    DisclaimerForm,
+    CampaignContactForm,
+    OTPForm,
+    LoginRequestForm,
+    PilotAccountForm,
+    DeleteAccountForm,
+    ReturningForm,
+)
 from .models import PilotProfile, MagicLink, UserFilter, Campaign, generate_username
 
 from .services.tokens import generate_otp, hash_token
@@ -92,11 +98,11 @@ def _increment_otp_attempt_count(user_id: int) -> int:
     key = _rate_limit_key_otp_attempts(user_id)
     count = cache.get(key, 0) + 1
     cache.set(key, count, timeout=OTP_ATTEMPT_WINDOW)
-    
+
     if count >= OTP_ATTEMPT_LIMIT:
         lockout_key = _rate_limit_key_otp_lockout(user_id)
         cache.set(lockout_key, True, timeout=OTP_LOCKOUT_DURATION)
-    
+
     return count
 
 
@@ -110,68 +116,71 @@ def _clear_otp_attempt_count(user_id: int) -> None:
 
 def _invalidate_existing_otps(user) -> None:
     """Mark all existing unused OTPs for this user as used."""
-    MagicLink.objects.filter(
-        user=user,
-        used_at__isnull=True
-    ).update(used_at=timezone.now())
+    MagicLink.objects.filter(user=user, used_at__isnull=True).update(
+        used_at=timezone.now()
+    )
 
 
 def _normalize_phone(phone: str) -> str:
     """Normalize phone number by removing spaces and common formatting."""
-    return re.sub(r'[\s\-\(\)]+', '', phone)
+    return re.sub(r"[\s\-\(\)]+", "", phone)
 
 
 def magic_link_request(request: HttpRequest) -> HttpResponse:
     """Request an OTP to be sent to a registered user via email or phone."""
     start_time = time.time()
-    
+
     if request.method == "POST":
         form = LoginRequestForm(request.POST)
         if form.is_valid():
             contact = form.cleaned_data["contact"].strip()
-            
+
             # Determine if contact is email or phone
-            is_email = '@' in contact
-            
+            is_email = "@" in contact
+
             if is_email:
                 contact = contact.lower()
             else:
                 contact = _normalize_phone(contact)
-            
+
             # Store contact info in session for OTP verify page display
             # (do this early so the otp_verify page can show consistent info)
-            request.session['otp_contact'] = contact
-            request.session['otp_is_email'] = is_email
-            request.session['otp_flow'] = 'login'
-            
+            request.session["otp_contact"] = contact
+            request.session["otp_is_email"] = is_email
+            request.session["otp_flow"] = "login"
+
             # Check rate limit for OTP generation
             if _check_otp_generation_rate_limit(contact):
                 # Redirect to same page to not reveal rate limiting
                 _ensure_min_response_time(start_time)
                 return redirect("pilot_access:otp_verify")
-            
+
             # Look up profile
             profile = None
             if is_email:
-                profile = PilotProfile.objects.select_related('user').filter(
-                    email__iexact=contact
-                ).first()
+                profile = (
+                    PilotProfile.objects.select_related("user")
+                    .filter(email__iexact=contact)
+                    .first()
+                )
             else:
-                profile = PilotProfile.objects.select_related('user').filter(
-                    phone=contact
-                ).first()
-            
+                profile = (
+                    PilotProfile.objects.select_related("user")
+                    .filter(phone=contact)
+                    .first()
+                )
+
             # Always increment rate limit counter, even if user not found
             # This prevents enumeration via rate limit behavior
             _increment_otp_generation_count(contact)
-            
+
             if not profile or not profile.disclaimer_accepted_at:
                 # Do not reveal whether the contact exists - redirect to same page
                 _ensure_min_response_time(start_time)
                 return redirect("pilot_access:otp_verify")
-            
+
             user = profile.user
-            
+
             # Invalidate any existing unused OTPs for this user
             _invalidate_existing_otps(user)
 
@@ -192,15 +201,15 @@ def magic_link_request(request: HttpRequest) -> HttpResponse:
                 sms_sender.send_otp(phone=contact, otp=otp)
 
             # Store user ID in session for OTP verification
-            request.session['otp_user_id'] = user.id
-            request.session['otp_flow'] = 'login'
-            request.session['otp_contact'] = contact
-            request.session['otp_is_email'] = is_email
-            
+            request.session["otp_user_id"] = user.id
+            request.session["otp_flow"] = "login"
+            request.session["otp_contact"] = contact
+            request.session["otp_is_email"] = is_email
+
             # In DEBUG mode, store OTP in session for testers to see
             if settings.DEBUG:
-                request.session['debug_otp'] = otp
-            
+                request.session["debug_otp"] = otp
+
             _ensure_min_response_time(start_time)
             return redirect("pilot_access:otp_verify")
     else:
@@ -218,28 +227,36 @@ def _ensure_min_response_time(start_time: float) -> None:
 
 def otp_verify(request: HttpRequest) -> HttpResponse:
     """Verify OTP code entered by user."""
-    user_id = request.session.get('otp_user_id')
-    otp_flow = request.session.get('otp_flow', 'login')
-    otp_contact = request.session.get('otp_contact', '')
-    otp_is_email = request.session.get('otp_is_email', True)
-    
+    user_id = request.session.get("otp_user_id")
+    otp_flow = request.session.get("otp_flow", "login")
+    otp_contact = request.session.get("otp_contact", "")
+    otp_is_email = request.session.get("otp_is_email", True)
+
     # If no contact info at all, redirect to start
     if not otp_contact and not user_id:
         return redirect("pilot_access:landing")
-    
+
     # Build contact display string
     if otp_is_email:
         contact_display = otp_contact
     else:
-        contact_display = f"mobile number ending in {otp_contact[-4:]}" if otp_contact else "your mobile"
-    
+        contact_display = (
+            f"mobile number ending in {otp_contact[-4:]}"
+            if otp_contact
+            else "your mobile"
+        )
+
     # Check if user is locked out (use contact as key if no user_id)
     lockout_key = user_id if user_id else otp_contact
     if _check_otp_attempt_lockout(lockout_key):
-        return render(request, "pilot_access/otp_locked.jinja", {
-            "lockout_minutes": OTP_LOCKOUT_DURATION // 60,
-        })
-    
+        return render(
+            request,
+            "pilot_access/otp_locked.jinja",
+            {
+                "lockout_minutes": OTP_LOCKOUT_DURATION // 60,
+            },
+        )
+
     # Try to get user and profile (may not exist for fake requests)
     user = None
     profile = None
@@ -250,17 +267,17 @@ def otp_verify(request: HttpRequest) -> HttpResponse:
         except (User.DoesNotExist, PilotProfile.DoesNotExist):
             user = None
             profile = None
-    
+
     # Get remaining attempts for display
     attempts_used = _get_otp_attempt_count(lockout_key)
     attempts_remaining = max(0, OTP_ATTEMPT_LIMIT - attempts_used)
-    
+
     if request.method == "POST":
         form = OTPForm(request.POST)
         if form.is_valid():
             otp = form.cleaned_data["otp"]
             otp_hash = hash_token(otp)
-            
+
             # Find valid OTP for this user (will always fail if user is None)
             ml = None
             if user:
@@ -269,58 +286,71 @@ def otp_verify(request: HttpRequest) -> HttpResponse:
                         user=user,
                         token_hash=otp_hash,
                         used_at__isnull=True,
-                        expires_at__gt=timezone.now()
+                        expires_at__gt=timezone.now(),
                     )
                 except MagicLink.DoesNotExist:
                     pass
-            
+
             if not ml:
                 # Increment failed attempt counter
                 new_count = _increment_otp_attempt_count(lockout_key)
                 attempts_remaining = max(0, OTP_ATTEMPT_LIMIT - new_count)
-                
+
                 if new_count >= OTP_ATTEMPT_LIMIT:
                     # User is now locked out
-                    return render(request, "pilot_access/otp_locked.jinja", {
-                        "lockout_minutes": OTP_LOCKOUT_DURATION // 60,
-                    })
-                
-                form.add_error("otp", f"Invalid or expired code. You have {attempts_remaining} attempt(s) remaining.")
-                return render(request, "pilot_access/otp_verify.jinja", {
-                    "form": form,
-                    "contact_display": contact_display,
-                    "attempts_remaining": attempts_remaining,
-                    "debug_otp": request.session.get('debug_otp') if settings.DEBUG else None,
-                })
-            
+                    return render(
+                        request,
+                        "pilot_access/otp_locked.jinja",
+                        {
+                            "lockout_minutes": OTP_LOCKOUT_DURATION // 60,
+                        },
+                    )
+
+                form.add_error(
+                    "otp",
+                    f"Invalid or expired code. You have {attempts_remaining} attempt(s) remaining.",
+                )
+                return render(
+                    request,
+                    "pilot_access/otp_verify.jinja",
+                    {
+                        "form": form,
+                        "contact_display": contact_display,
+                        "attempts_remaining": attempts_remaining,
+                        "debug_otp": (
+                            request.session.get("debug_otp") if settings.DEBUG else None
+                        ),
+                    },
+                )
+
             # Success! Mark OTP as used
             ml.used_at = timezone.now()
             ml.save(update_fields=["used_at"])
-            
+
             # Clear attempt counter on success
             _clear_otp_attempt_count(lockout_key)
-            
+
             # If this is a new signup, mark disclaimer as accepted
-            if otp_flow == 'signup' and not profile.disclaimer_accepted_at:
+            if otp_flow == "signup" and not profile.disclaimer_accepted_at:
                 profile.disclaimer_accepted_at = timezone.now()
                 profile.save(update_fields=["disclaimer_accepted_at"])
-            
+
             # Log the user in
             login(request, user)
-            
+
             # Regenerate session to prevent session fixation
             request.session.cycle_key()
-            
+
             request.session["entry_flow"] = "otp"
-            
+
             # Clear OTP session data
-            request.session.pop('otp_user_id', None)
-            request.session.pop('otp_flow', None)
-            request.session.pop('otp_contact', None)
-            request.session.pop('otp_is_email', None)
-            request.session.pop('campaign_code', None)
-            request.session.pop('disclaimer_accepted', None)
-            
+            request.session.pop("otp_user_id", None)
+            request.session.pop("otp_flow", None)
+            request.session.pop("otp_contact", None)
+            request.session.pop("otp_is_email", None)
+            request.session.pop("campaign_code", None)
+            request.session.pop("disclaimer_accepted", None)
+
             # Restore user's previous journey answers
             try:
                 uf = UserFilter.objects.get(user=user)
@@ -328,80 +358,80 @@ def otp_verify(request: HttpRequest) -> HttpResponse:
                     for key, value in uf.data.items():
                         request.session[key] = value
                     request.session.modified = True
+                if len(uf.data) == 7:
+                    # User has completed onboarding - redirect to listing
+                    request.session["onboarding_complete"] = True
+                    return redirect("/")
+                else:
+                    # User dropped out during onboarding - redirect to start
+                    messages.info(request, "Welcome back!")
+                    return redirect("/")
             except UserFilter.DoesNotExist:
-                pass
-            
-            return redirect("/")
+                return redirect("/success")
     else:
         form = OTPForm()
-    
-    return render(request, "pilot_access/otp_verify.jinja", {
-        "form": form,
-        "contact_display": contact_display,
-        "attempts_remaining": attempts_remaining,
-        "debug_otp": request.session.get('debug_otp') if settings.DEBUG else None,
-    })
+
+    return render(
+        request,
+        "pilot_access/otp_verify.jinja",
+        {
+            "form": form,
+            "contact_display": contact_display,
+            "attempts_remaining": attempts_remaining,
+            "debug_otp": request.session.get("debug_otp") if settings.DEBUG else None,
+        },
+    )
 
 
 @require_POST
 def logout_post(request: HttpRequest) -> HttpResponse:
     logout(request)
-    messages.success(request, "You have been logged out.")
+    # messages.success(request, "You have been logged out.")
     return redirect("pilot_access:landing")
 
 
 def landing(request: HttpRequest) -> HttpResponse:
-    cc = request.GET.get('cc', '').strip()
-    
+    cc = request.GET.get("cc", "").strip()
+
     context = {
-        'campaign_code': cc,
-        'campaign': None,
-        'campaign_invalid': False,
-        'show_magic_link': False,
-        'form': None,
+        "campaign_code": cc,
+        "campaign": None,
+        "campaign_invalid": False,
+        "show_magic_link": False,
+        "form": None,
     }
-    
+
     if cc:
         # Campaign code was provided - look it up
         try:
             campaign = Campaign.objects.get(campaign_code=cc)
             if campaign.is_valid_today():
-                # Valid campaign - show disclaimer form
-                context['campaign'] = campaign
-                
-                if request.method == "POST":
-                    form = DisclaimerForm(request.POST)
-                    if form.is_valid():
-                        # Store campaign code in session and redirect to contact info page
-                        request.session['campaign_code'] = cc
-                        request.session['disclaimer_accepted'] = True
-                        return redirect("pilot_access:campaign_contact_info")
-                    context['form'] = form
-                else:
-                    context['form'] = DisclaimerForm()
+                # Valid campaign
+                context["campaign"] = campaign
+                request.session["campaign_code"] = cc
             else:
                 # Campaign exists but is out of date range
-                context['campaign_invalid'] = True
+                context["campaign_invalid"] = True
         except Campaign.DoesNotExist:
             # Campaign code doesn't exist
-            context['campaign_invalid'] = True
+            context["campaign_invalid"] = True
     else:
         # No campaign code - show magic link request option
-        context['show_magic_link'] = True
-    
+        context["show_magic_link"] = True
+
     return render(request, "pilot_access/landing.jinja", context)
 
 
 def campaign_contact_info(request: HttpRequest) -> HttpResponse:
     """Page to collect user contact info after accepting disclaimer."""
     start_time = time.time()
-    
+
     # Check that user came through proper flow
-    if not request.session.get('disclaimer_accepted'):
+    if not request.session.get("disclaimer_accepted"):
         return redirect("pilot_access:landing")
-    
-    campaign_code = request.session.get('campaign_code', '')
-    
+
+    campaign_code = request.session.get("campaign_code", "")
+
     # Validate campaign still exists and is valid
     try:
         campaign = Campaign.objects.get(campaign_code=campaign_code)
@@ -409,47 +439,55 @@ def campaign_contact_info(request: HttpRequest) -> HttpResponse:
             return redirect("pilot_access:landing")
     except Campaign.DoesNotExist:
         return redirect("pilot_access:landing")
-    
+
     errors = {}
     data = {}
-    
+
     if request.method == "POST":
         form = CampaignContactForm(request.POST)
         data = {
-            'email': request.POST.get('email', ''),
-            'phone': request.POST.get('phone', ''),
-            'preferred_contact_method': request.POST.get('preferred_contact_method', ''),
+            "email": request.POST.get("email", ""),
+            "phone": request.POST.get("phone", ""),
+            "preferred_contact_method": request.POST.get(
+                "preferred_contact_method", ""
+            ),
         }
-        
+
         if form.is_valid():
-            email = form.cleaned_data['email']
-            phone = form.cleaned_data['phone']
-            pref = form.cleaned_data['preferred_contact_method']
-            
+            email = form.cleaned_data["email"]
+            phone = form.cleaned_data["phone"]
+            pref = form.cleaned_data["preferred_contact_method"]
+
             # Normalize phone number
             if phone:
                 phone = _normalize_phone(phone)
-            
+
             # Determine contact for rate limiting
             contact_for_limit = email if pref == PilotProfile.CONTACT_EMAIL else phone
-            
+
             # Check rate limit for OTP generation
             if _check_otp_generation_rate_limit(contact_for_limit):
                 if settings.DEBUG:
                     key = _rate_limit_key_otp_generation(contact_for_limit)
                     count = cache.get(key, 0)
-                    errors['__all__'] = f'Too many requests. Please try again later. (DEBUG: count={count}, limit={OTP_GENERATION_LIMIT})'
+                    errors["__all__"] = (
+                        f"Too many requests. Please try again later. (DEBUG: count={count}, limit={OTP_GENERATION_LIMIT})"
+                    )
                 else:
-                    errors['__all__'] = 'Too many requests. Please try again later.'
+                    errors["__all__"] = "Too many requests. Please try again later."
                 _ensure_min_response_time(start_time)
-                return render(request, "pilot_access/campaign_contact_info.jinja", {
-                    'campaign_code': campaign_code,
-                    'errors': errors,
-                    'data': data,
-                })
-            
+                return render(
+                    request,
+                    "pilot_access/campaign_contact_info.jinja",
+                    {
+                        "campaign_code": campaign_code,
+                        "errors": errors,
+                        "data": data,
+                    },
+                )
+
             _increment_otp_generation_count(contact_for_limit)
-            
+
             with transaction.atomic():
                 # Create Django user with random username
                 username = generate_username()
@@ -459,7 +497,7 @@ def campaign_contact_info(request: HttpRequest) -> HttpResponse:
                 )
                 user.set_unusable_password()
                 user.save()
-                
+
                 # Create PilotProfile
                 profile = PilotProfile.objects.create(
                     user=user,
@@ -469,7 +507,7 @@ def campaign_contact_info(request: HttpRequest) -> HttpResponse:
                     preferred_contact_method=pref,
                     # disclaimer_accepted_at will be set after OTP verification
                 )
-                
+
                 # Generate and send OTP
                 otp = generate_otp()
                 MagicLink.objects.create(
@@ -477,7 +515,7 @@ def campaign_contact_info(request: HttpRequest) -> HttpResponse:
                     token_hash=hash_token(otp),
                     expires_at=timezone.now() + timedelta(minutes=15),
                 )
-                
+
                 # Send OTP via preferred method
                 if pref == PilotProfile.CONTACT_SMS:
                     sms_sender = get_sms_sender()
@@ -489,34 +527,57 @@ def campaign_contact_info(request: HttpRequest) -> HttpResponse:
                     email_sender.send_otp(email=email, otp=otp)
                     otp_contact = email
                     otp_is_email = True
-                
+
                 # Store user ID in session for OTP verification
-                request.session['otp_user_id'] = user.id
-                request.session['otp_flow'] = 'signup'
-                request.session['otp_contact'] = otp_contact
-                request.session['otp_is_email'] = otp_is_email
-                
+                request.session["otp_user_id"] = user.id
+                request.session["otp_flow"] = "signup"
+                request.session["otp_contact"] = otp_contact
+                request.session["otp_is_email"] = otp_is_email
+
                 # In DEBUG mode, store OTP in session for testers to see
                 if settings.DEBUG:
-                    request.session['debug_otp'] = otp
-                
+                    request.session["debug_otp"] = otp
+
                 _ensure_min_response_time(start_time)
                 return redirect("pilot_access:otp_verify")
         else:
             # Extract errors for template
             for field, error_list in form.errors.items():
-                errors[field] = error_list[0] if error_list else ''
-    
-    return render(request, "pilot_access/campaign_contact_info.jinja", {
-        'campaign_code': campaign_code,
-        'errors': errors,
-        'data': data,
-    })
+                errors[field] = error_list[0] if error_list else ""
+
+    return render(
+        request,
+        "pilot_access/campaign_contact_info.jinja",
+        {
+            "campaign_code": campaign_code,
+            "errors": errors,
+            "data": data,
+        },
+    )
 
 
-@xframe_options_sameorigin
 def disclaimer(request: HttpRequest) -> HttpResponse:
-    return render(request, "pilot_access/disclaimer.jinja")
+    if request.method == "POST":
+        form = DisclaimerForm(request.POST)
+        if form.is_valid():
+            disclaimer_accepted = form.cleaned_data["disclaimer_accepted"]
+            if disclaimer_accepted == "accepted":
+                request.session["disclaimer_accepted"] = True
+                return redirect("pilot_access:campaign_contact_info")
+            else:
+                request.session["disclaimer_accepted"] = False
+                return redirect("pilot_access:details_not_shared")
+        return render(request, "pilot_access/disclaimer.jinja", {"form": form, "error": True})
+    else:
+        form = DisclaimerForm()
+
+    return render(request, "pilot_access/disclaimer.jinja", {"form": form})
+
+def details_not_shared(request: HttpRequest) -> HttpResponse:
+    """Page shown when user does not accept disclaimer."""
+    if request.session.get("disclaimer_accepted") == False:
+        return render(request, "pilot_access/details_not_shared.jinja")
+    return redirect("pilot_access:landing")
 
 
 def account(request: HttpRequest) -> HttpResponse:
@@ -526,8 +587,15 @@ def account(request: HttpRequest) -> HttpResponse:
     if profile is None:
         profile = PilotProfile.objects.get(user=user)
 
-    next_url = request.GET.get("next") or request.POST.get("next") or request.META.get("HTTP_REFERER") or ""
-    if next_url and not url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
+    next_url = (
+        request.GET.get("next")
+        or request.POST.get("next")
+        or request.META.get("HTTP_REFERER")
+        or ""
+    )
+    if next_url and not url_has_allowed_host_and_scheme(
+        next_url, allowed_hosts={request.get_host()}
+    ):
         next_url = ""
 
     if request.method == "POST":
@@ -577,3 +645,30 @@ def delete_account(request: HttpRequest) -> HttpResponse:
             "email": profile.email or user.email,
         },
     )
+
+
+def returning(request: HttpRequest) -> HttpResponse:
+    """Check if user is returning pilot user."""
+    if request.method == "POST":
+        form = ReturningForm(request.POST)
+        if form.is_valid():
+            is_returning_user = form.cleaned_data["returning"]
+            if is_returning_user == "returning":
+                return redirect("pilot_access:magic_link_request")
+            elif is_returning_user == "first-time":
+                return redirect("pilot_access:disclaimer")
+            else:
+                return render(
+                    request,
+                    "pilot_access/returning.jinja",
+                    {
+                        "error": True,
+                    },
+                )
+        return render(
+            request, "pilot_access/returning.jinja", {"form": form, "error": True}
+        )
+    else:
+        form = ReturningForm()
+
+    return render(request, "pilot_access/returning.jinja", {"form": form})

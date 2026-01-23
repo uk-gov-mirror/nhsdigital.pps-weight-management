@@ -3,12 +3,11 @@
 {% from "web/macros/layout.jinja" import two_thirds_column_start, two_thirds_column_end %}
 {% from "web/macros/forms.jinja" import form_error_summary, continue_button, back_link %}
 
-
 {% set pageName = "What changes do you want to make to stay healthy?" %}
 
 {% block beforeContent %}
-  {{ back_link("/details-postcode") }}
-{% endblock %}
+  {{ back_link(back_href) }}
+{% endblock beforeContent %}
 
 {% block content %}
   {{ two_thirds_column_start() }}
@@ -61,4 +60,4 @@
 
       </form>
   {{ two_thirds_column_end() }}
-{% endblock %}
+{% endblock content %}

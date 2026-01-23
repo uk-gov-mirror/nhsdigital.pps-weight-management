@@ -1,19 +1,42 @@
 from django import forms
 from django.core.exceptions import ValidationError
-from django.contrib.auth import get_user_model
 
 from .models import PilotProfile
 
 
 class DisclaimerForm(forms.Form):
-    accept = forms.BooleanField(
+    """Form for accepting the disclaimer to use personal information."""
+
+    disclaimer_accepted = forms.CharField(
         required=True,
-        label="I have read and agree to the beta disclaimer.",
+        widget=forms.RadioSelect(
+            choices=[
+                ("accepted", "Yes, that's OK"),
+                ("not-accepted", "No, I don't want to continue"),
+            ]
+        ),
+        label="We'll need your contact details and postcode. Is that OK?",
+    )
+
+
+class ReturningForm(forms.Form):
+    """Form for checking if user is a returning user."""
+
+    returning = forms.CharField(
+        required=True,
+        widget=forms.RadioSelect(
+            choices=[
+                ("first-time", "First time"),
+                ("returning", "I've used it before"),
+            ]
+        ),
+        label="Is this your first time using 'NHS Help to stay healthy'?",
     )
 
 
 class CampaignContactForm(forms.Form):
     """Form for collecting contact details during campaign signup."""
+
     CONTACT_EMAIL = "email"
     CONTACT_SMS = "sms"
 
@@ -42,15 +65,16 @@ class CampaignContactForm(forms.Form):
         phone = (self.cleaned_data.get("phone") or "").strip()
         if not phone:
             return ""
-        
+
         # Remove common formatting characters
         import re
-        normalized = re.sub(r'[\s\-\(\)]+', '', phone)
-        
+
+        normalized = re.sub(r"[\s\-\(\)]+", "", phone)
+
         # Basic validation: should be digits, optionally starting with +
-        if not re.match(r'^\+?[0-9]{10,15}$', normalized):
+        if not re.match(r"^\+?[0-9]{10,15}$", normalized):
             raise ValidationError("Please enter a valid mobile number.")
-        
+
         return normalized
 
     def clean(self):
@@ -61,15 +85,23 @@ class CampaignContactForm(forms.Form):
 
         # Preferred contact method is required
         if not pref:
-            self.add_error("preferred_contact_method", "Please choose a preferred contact method.")
+            self.add_error(
+                "preferred_contact_method", "Please choose a preferred contact method."
+            )
 
         # Based on preference, the corresponding field is required
         if pref == self.CONTACT_EMAIL:
             if not email:
-                self.add_error("email", "Enter an email address if email is your preferred contact method.")
+                self.add_error(
+                    "email",
+                    "Enter an email address if email is your preferred contact method.",
+                )
         elif pref == self.CONTACT_SMS:
             if not phone:
-                self.add_error("phone", "Enter a mobile number if text message is your preferred contact method.")
+                self.add_error(
+                    "phone",
+                    "Enter a mobile number if text message is your preferred contact method.",
+                )
 
         # Validate email uniqueness in PilotProfile
         if email:
@@ -88,6 +120,7 @@ class CampaignContactForm(forms.Form):
 
 class OTPForm(forms.Form):
     """Form for entering OTP code."""
+
     otp = forms.CharField(
         label="Enter the 6-digit code",
         max_length=6,
@@ -106,6 +139,7 @@ class OTPForm(forms.Form):
 
 class LoginRequestForm(forms.Form):
     """Form for requesting OTP login - accepts email or phone."""
+
     contact = forms.CharField(
         label="Email address or mobile number",
         required=True,
@@ -129,7 +163,12 @@ class PilotAccountForm(forms.Form):
 
     email = forms.EmailField(label="Email address", required=False)
     phone = forms.CharField(label="Mobile number", max_length=32, required=False)
-    postcode = forms.CharField(label="Postcode", max_length=16, required=True, help_text="For example, SW1A 1AA")
+    postcode = forms.CharField(
+        label="Postcode",
+        max_length=16,
+        required=True,
+        help_text="For example, SW1A 1AA",
+    )
 
     preferred_contact_method = forms.ChoiceField(
         label="Preferred contact method",
@@ -146,7 +185,8 @@ class PilotAccountForm(forms.Form):
             "email": getattr(profile, "email", "") or user.email or "",
             "phone": getattr(profile, "phone", "") or "",
             "postcode": getattr(profile, "postcode", "") or "",
-            "preferred_contact_method": getattr(profile, "preferred_contact_method", "") or "",
+            "preferred_contact_method": getattr(profile, "preferred_contact_method", "")
+            or "",
         }
 
         if not initial["preferred_contact_method"]:
@@ -168,6 +208,7 @@ class PilotAccountForm(forms.Form):
             self.add_error("postcode", "Enter a postcode.")
         else:
             import re as _re
+
             _pc_re = _re.compile(r"^[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2}$", _re.I)
             if not _pc_re.match(postcode):
                 self.add_error("postcode", "Enter a valid UK postcode.")
@@ -177,10 +218,16 @@ class PilotAccountForm(forms.Form):
 
         if pref == self.CONTACT_EMAIL:
             if not email:
-                self.add_error("email", "Enter an email address if email is your preferred contact method.")
+                self.add_error(
+                    "email",
+                    "Enter an email address if email is your preferred contact method.",
+                )
         elif pref == self.CONTACT_SMS:
             if not phone:
-                self.add_error("phone", "Enter a mobile number if text message is your preferred contact method.")
+                self.add_error(
+                    "phone",
+                    "Enter a mobile number if text message is your preferred contact method.",
+                )
 
         if not email and not phone:
             raise forms.ValidationError("Enter an email address or a mobile number.")
@@ -196,7 +243,11 @@ class PilotAccountForm(forms.Form):
             return ""
 
         # Check uniqueness in PilotProfile
-        if PilotProfile.objects.filter(email__iexact=email).exclude(pk=self.profile.pk).exists():
+        if (
+            PilotProfile.objects.filter(email__iexact=email)
+            .exclude(pk=self.profile.pk)
+            .exists()
+        ):
             raise ValidationError("That email address is already in use.")
 
         return email
@@ -206,7 +257,11 @@ class PilotAccountForm(forms.Form):
         if not phone:
             return ""
 
-        if PilotProfile.objects.filter(phone=phone).exclude(pk=self.profile.pk).exists():
+        if (
+            PilotProfile.objects.filter(phone=phone)
+            .exclude(pk=self.profile.pk)
+            .exists()
+        ):
             raise ValidationError("That mobile number is already in use.")
 
         return phone
@@ -220,11 +275,25 @@ class PilotAccountForm(forms.Form):
         self.profile.phone = phone
         self.profile.postcode = self.cleaned_data.get("postcode", "")
         self.profile.preferred_contact_method = pref
-        self.profile.save(update_fields=["email", "phone", "postcode", "preferred_contact_method"])
+        self.profile.save(
+            update_fields=["email", "phone", "postcode", "preferred_contact_method"]
+        )
 
 
 class DeleteAccountForm(forms.Form):
     confirm = forms.BooleanField(
         required=True,
         label="Yes, delete my account",
+    )
+
+
+class CheckReturningUserForm(forms.Form):
+    returning = forms.ChoiceField(
+        label="Are you a returning user?",
+        choices=(
+            ("yes", "First Time"),
+            ("no", "I've used it before"),
+        ),
+        widget=forms.RadioSelect,
+        required=True,
     )

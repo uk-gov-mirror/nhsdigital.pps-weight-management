@@ -1,25 +1,61 @@
 {% extends "web/layout/base.jinja" %}
-
 {% from "web/macros/layout.jinja" import two_thirds_column_start, two_thirds_column_end %}
-
+{% from "web/macros/forms.jinja" import form_error_summary, continue_button, back_link %}
 {% set pageName = "Disclaimer" %}
-
+{% block beforeContent %}
+  {{ back_link("/pilot/returning") }}
+{% endblock beforeContent %}
 {% block content %}
   {{ two_thirds_column_start() }}
-
-    <h1>Disclaimer</h1>
-
-    <p>As part of this pilot project we need to know a few details about you so we can:</p>
-    <ul>
-      <li>make suggestions that might work for you</li>
-      <li>check in with you to help you keep going</li>
-    </ul>
-    <p>To recommend services local to you we will ask for your postcode.</p>
-    <p>So we remain in contact with you during this pilot project we will ask for your preferred contact details.</p>
-    <p>You will be able to see, change, and delete any information you provide us at any time.</p>
-    <p>This information will not be disclosed to any 3rd parties.</p>
-    <p>One of our researchers will contact you periodicaly to ask you about your experience using this service.</p>
-    <p>By accepting this invitation to participate you agree to these terms.</p>
-    <p>You can widthdraw consent at any time by deleting your account.</p>
+  {% if error %}
+    {{ form_error_summary({
+      "titleText": "There is a problem",
+      "errorList": [
+        {
+          "text": "Please choose an option",
+          "href": "#disclaimer_accepted"
+        }
+      ]
+    }) }}
+  {% endif %}
+  <h1>Can we use your basic information?</h1>
+  <p>We need to know a few details about you so we can:</p>
+  <ul>
+    <li>make suggestions that might work for you</li>
+    <li>check in with you to help you keep going - we'll ask you if you're OK with this later</li>
+    <li>make sure only poeple who have been invited can use this service</li>
+  </ul>
+  <p>You can opt out of this service at any time, and anything you've told us will be deleted</p>
+  <p>
+    To find out more about how we'll use your information, <a href="/" target="_blank" rel="noopener noreferrer">read our privacy policy / terms (opens in a new tab)</a>
+  </p>
+  <form method="post">
+    {{ csrf_input }}
+    {{ radios({
+        "idPrefix": "disclaimer_accepted",
+        "name": "disclaimer_accepted",
+        "errorMessage": {
+        "text": "Please choose an option"
+        } if error else undefined,
+        "fieldset": {
+        "legend": {
+        "text": "We'll need your contact details and postcode. Is that OK?",
+        "classes": "nhsuk-fieldset__legend--l"
+        }
+        },
+        "items": [
+        {
+        "value": "accepted",
+        "text": "Yes, that's OK"
+        },
+        {
+        "value": "not-accepted",
+        "text": "No, I don't want to continue"
+        }
+        ],
+        "values": data.disclaimer if data.disclaimer else undefined
+        }) }}
+    {{ continue_button() }}
+  </form>
   {{ two_thirds_column_end() }}
-{% endblock %}
+{% endblock content %}
