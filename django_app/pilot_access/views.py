@@ -561,16 +561,23 @@ def disclaimer(request: HttpRequest) -> HttpResponse:
         form = DisclaimerForm(request.POST)
         if form.is_valid():
             disclaimer_accepted = form.cleaned_data["disclaimer_accepted"]
-            if disclaimer_accepted:
+            if disclaimer_accepted == "accepted":
                 request.session["disclaimer_accepted"] = True
                 return redirect("pilot_access:campaign_contact_info")
             else:
+                request.session["disclaimer_accepted"] = False
                 return redirect("pilot_access:details_not_shared")
         return render(request, "pilot_access/disclaimer.jinja", {"form": form, "error": True})
     else:
         form = DisclaimerForm()
 
     return render(request, "pilot_access/disclaimer.jinja", {"form": form})
+
+def details_not_shared(request: HttpRequest) -> HttpResponse:
+    """Page shown when user does not accept disclaimer."""
+    if request.session.get("disclaimer_accepted") == False:
+        return render(request, "pilot_access/details_not_shared.jinja")
+    return redirect("pilot_access:landing")
 
 
 def account(request: HttpRequest) -> HttpResponse:
