@@ -225,6 +225,7 @@ SPECTACULAR_SETTINGS = {
 PILOT_ACCESS_PUBLIC_PATH_PREFIXES = [
     # Specific pilot pages that don't require authentication
     "/pilot/landing/",      # login/signup landing page
+    "/pilot/contact-type/", # campaign signup contact type
     "/pilot/contact-info/", # campaign signup contact info
     "/pilot/otp/",          # OTP verification
     "/pilot/disclaimer/",   # disclaimer acceptance

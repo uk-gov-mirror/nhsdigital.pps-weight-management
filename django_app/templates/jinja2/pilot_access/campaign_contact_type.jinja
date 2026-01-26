@@ -1,0 +1,53 @@
+{% extends "web/layout/base.jinja" %}
+{% from "web/macros/layout.jinja" import two_thirds_column_start, two_thirds_column_end %}
+{% from "web/macros/forms.jinja" import form_error_summary, continue_button, back_link %}
+{% set pageName = "Contact" %}
+{% block content %}
+    {{ two_thirds_column_start() }}
+    {% if error %}
+        {{ form_error_summary({
+          "titleText": "There is a problem",
+          "errorList": [
+            {
+              "text": error,
+              "href": "#preferredContact"
+            }
+          ]
+        }) }}
+    {% endif %}
+    <h1>How would you like us to contact you?</h1>
+    <p>We need your contact details so we can:</p>
+    <ul>
+        <li>send you a security code to sign in with</li>
+        <li>check in with you to help you keep going - we'll ask you if you're OK with this later on</li>
+    </ul>
+    <form method="post">
+        {{ csrf_input }}
+        {{ radios({
+                "idPrefix": "preferredContact",
+                "name": "preferred_contact_method",
+                "errorMessage": {
+                "text": error
+                } if error else undefined,
+                "fieldset": {
+                "legend": {
+                "text": "Choose a contact method",
+                "classes": "nhsuk-fieldset__legend--l"
+                }
+                },
+                "items": [
+                {
+                "value": "email",
+                "text": "Email"
+                },
+                {
+                "value": "sms",
+                "text": "Mobile phone"
+                }
+                ],
+                "values": data.preferred_contact_method if data.preferred_contact_method else undefined
+                }) }}
+        {{ continue_button() }}
+    </form>
+    {{ two_thirds_column_end() }}
+{% endblock content %}

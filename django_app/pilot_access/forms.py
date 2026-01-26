@@ -33,9 +33,8 @@ class ReturningForm(forms.Form):
         label="Is this your first time using 'NHS Help to stay healthy'?",
     )
 
-
-class CampaignContactForm(forms.Form):
-    """Form for collecting contact details during campaign signup."""
+class CampaignContactTypeForm(forms.Form):
+    """Form for selecting preferred contact method during campaign signup."""
 
     CONTACT_EMAIL = "email"
     CONTACT_SMS = "sms"
@@ -46,18 +45,39 @@ class CampaignContactForm(forms.Form):
         (CONTACT_SMS, "Text message (SMS)"),
     )
 
+    preferred_contact_method = forms.ChoiceField(
+        label="How would you like us to contact you?",
+        choices=CONTACT_CHOICES,
+        widget=forms.RadioSelect,
+        required=True,
+    )
+
+class EmailInputForm(forms.Form):
+    """Form for collecting email input."""
+
     email = forms.EmailField(
         label="Email address",
-        required=False,
+        required=True,
     )
+
+    def clean(self):
+        cleaned = super().clean()
+        email = (cleaned.get("email") or "").strip().lower()
+
+        # Validate email uniqueness in PilotProfile
+        if email:
+            if PilotProfile.objects.filter(email__iexact=email).exists():
+                self.add_error("email", "That email address is already registered.")
+        cleaned["email"] = email
+        return cleaned
+
+
+class PhoneInputForm(forms.Form):
+    """Form for collecting contact details during campaign signup."""
+
     phone = forms.CharField(
         label="Mobile number",
         max_length=32,
-        required=False,
-    )
-    preferred_contact_method = forms.ChoiceField(
-        label="Preferred contact method",
-        choices=CONTACT_CHOICES,
         required=True,
     )
 
@@ -79,41 +99,13 @@ class CampaignContactForm(forms.Form):
 
     def clean(self):
         cleaned = super().clean()
-        email = (cleaned.get("email") or "").strip().lower()
         phone = cleaned.get("phone") or ""  # Already cleaned by clean_phone
-        pref = cleaned.get("preferred_contact_method") or ""
-
-        # Preferred contact method is required
-        if not pref:
-            self.add_error(
-                "preferred_contact_method", "Please choose a preferred contact method."
-            )
-
-        # Based on preference, the corresponding field is required
-        if pref == self.CONTACT_EMAIL:
-            if not email:
-                self.add_error(
-                    "email",
-                    "Enter an email address if email is your preferred contact method.",
-                )
-        elif pref == self.CONTACT_SMS:
-            if not phone:
-                self.add_error(
-                    "phone",
-                    "Enter a mobile number if text message is your preferred contact method.",
-                )
-
-        # Validate email uniqueness in PilotProfile
-        if email:
-            if PilotProfile.objects.filter(email__iexact=email).exists():
-                self.add_error("email", "That email address is already registered.")
 
         # Validate phone uniqueness in PilotProfile
         if phone:
             if PilotProfile.objects.filter(phone=phone).exists():
                 self.add_error("phone", "That mobile number is already registered.")
-
-        cleaned["email"] = email
+                
         cleaned["phone"] = phone
         return cleaned
 
