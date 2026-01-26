@@ -18,7 +18,9 @@ from django.utils.http import url_has_allowed_host_and_scheme
 
 from .forms import (
     DisclaimerForm,
-    CampaignContactForm,
+    CampaignContactTypeForm,
+    EmailInputForm,
+    PhoneInputForm,
     OTPForm,
     LoginRequestForm,
     PilotAccountForm,
@@ -421,6 +423,21 @@ def landing(request: HttpRequest) -> HttpResponse:
 
     return render(request, "pilot_access/landing.jinja", context)
 
+def campaign_contact_type(request: HttpRequest) -> HttpResponse:
+    """Page to choose contact method after accepting disclaimer."""
+    # Check that user came through proper flow
+    if not request.session.get("disclaimer_accepted"):
+        return redirect("pilot_access:landing")
+    
+    if request.method == "POST":
+        form = CampaignContactTypeForm(request.POST)
+        if form.is_valid():
+            preferred_contact_method = request.POST.get("preferred_contact_method", "")
+            if preferred_contact_method in ["email", "sms"]:
+                request.session["preferred_contact_method"] = preferred_contact_method
+                return redirect("pilot_access:campaign_contact_info")
+        return render(request, "pilot_access/campaign_contact_type.jinja", {"error": "Please select a contact method"})
+    return render(request, "pilot_access/campaign_contact_type.jinja")
 
 def campaign_contact_info(request: HttpRequest) -> HttpResponse:
     """Page to collect user contact info after accepting disclaimer."""
@@ -429,8 +446,11 @@ def campaign_contact_info(request: HttpRequest) -> HttpResponse:
     # Check that user came through proper flow
     if not request.session.get("disclaimer_accepted"):
         return redirect("pilot_access:landing")
+    if "preferred_contact_method" not in request.session:
+        return redirect("pilot_access:campaign_contact_type")
 
     campaign_code = request.session.get("campaign_code", "")
+    preferred_contact_method = request.session.get("preferred_contact_method")
 
     # Validate campaign still exists and is valid
     try:
@@ -444,26 +464,22 @@ def campaign_contact_info(request: HttpRequest) -> HttpResponse:
     data = {}
 
     if request.method == "POST":
-        form = CampaignContactForm(request.POST)
+        form = EmailInputForm(request.POST) if preferred_contact_method == PilotProfile.CONTACT_EMAIL else PhoneInputForm(request.POST)
         data = {
             "email": request.POST.get("email", ""),
             "phone": request.POST.get("phone", ""),
-            "preferred_contact_method": request.POST.get(
-                "preferred_contact_method", ""
-            ),
         }
 
         if form.is_valid():
             email = form.cleaned_data["email"]
             phone = form.cleaned_data["phone"]
-            pref = form.cleaned_data["preferred_contact_method"]
 
             # Normalize phone number
             if phone:
                 phone = _normalize_phone(phone)
 
             # Determine contact for rate limiting
-            contact_for_limit = email if pref == PilotProfile.CONTACT_EMAIL else phone
+            contact_for_limit = email if preferred_contact_method == PilotProfile.CONTACT_EMAIL else phone
 
             # Check rate limit for OTP generation
             if _check_otp_generation_rate_limit(contact_for_limit):
@@ -483,6 +499,7 @@ def campaign_contact_info(request: HttpRequest) -> HttpResponse:
                         "campaign_code": campaign_code,
                         "errors": errors,
                         "data": data,
+                        "preferred_contact_method": preferred_contact_method,
                     },
                 )
 
@@ -504,7 +521,7 @@ def campaign_contact_info(request: HttpRequest) -> HttpResponse:
                     campaign=campaign,
                     email=email,
                     phone=phone,
-                    preferred_contact_method=pref,
+                    preferred_contact_method=preferred_contact_method,
                     # disclaimer_accepted_at will be set after OTP verification
                 )
 
@@ -517,7 +534,7 @@ def campaign_contact_info(request: HttpRequest) -> HttpResponse:
                 )
 
                 # Send OTP via preferred method
-                if pref == PilotProfile.CONTACT_SMS:
+                if preferred_contact_method == PilotProfile.CONTACT_SMS:
                     sms_sender = get_sms_sender()
                     sms_sender.send_otp(phone=phone, otp=otp)
                     otp_contact = phone
@@ -552,6 +569,7 @@ def campaign_contact_info(request: HttpRequest) -> HttpResponse:
             "campaign_code": campaign_code,
             "errors": errors,
             "data": data,
+            "preferred_contact_method": preferred_contact_method,
         },
     )
 
@@ -563,7 +581,7 @@ def disclaimer(request: HttpRequest) -> HttpResponse:
             disclaimer_accepted = form.cleaned_data["disclaimer_accepted"]
             if disclaimer_accepted == "accepted":
                 request.session["disclaimer_accepted"] = True
-                return redirect("pilot_access:campaign_contact_info")
+                return redirect("pilot_access:campaign_contact_type")
             else:
                 request.session["disclaimer_accepted"] = False
                 return redirect("pilot_access:details_not_shared")
