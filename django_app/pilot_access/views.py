@@ -471,8 +471,8 @@ def campaign_contact_info(request: HttpRequest) -> HttpResponse:
         }
 
         if form.is_valid():
-            email = form.cleaned_data["email"]
-            phone = form.cleaned_data["phone"]
+            email = form.cleaned_data["email"] if preferred_contact_method == PilotProfile.CONTACT_EMAIL else ""
+            phone = form.cleaned_data["phone"] if preferred_contact_method == PilotProfile.CONTACT_SMS else ""
 
             # Normalize phone number
             if phone:
