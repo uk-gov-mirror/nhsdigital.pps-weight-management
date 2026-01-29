@@ -16,4 +16,6 @@ urlpatterns = [
     path("account/delete/", views.delete_account, name="delete_account"),
     path("returning/",views.returning, name="returning"),
     path("details-not-shared/", views.details_not_shared, name="details_not_shared"),
+    path("change-contact-info/", views.change_contact_info, name="change_contact_info"),
+    path("change-contact-type/", views.change_contact_type, name="change_contact_type"),
 ]

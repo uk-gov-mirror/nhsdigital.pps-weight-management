@@ -7,29 +7,3 @@
   </div>
 </div>
 {% endmacro %}
-
-{% macro summary_row(title, items, link) %}
-<div class="nhsuk-grid-row">
-  <div class="nhsuk-grid-column-one-third">
-    <div class="nhsuk-heading-xs">
-      <h4>{{ title }}</h4>
-    </div>
-  </div>
-
-  <div class="nhsuk-grid-column-one-third">
-    <ul>
-      {% if items is iterable and items is not string %}
-        {% for item in items %}
-          <li>{{ item }}</li>
-        {% endfor %}
-      {% else %}
-        <li>{{ items }}</li>  
-      {% endif %}
-    </ul>
-  </div>
-
-  <div class="nhsuk-grid-column-one-third">
-    <a href="{{ link }}" class="nhsuk-link nhsuk-link--no-visited-state">Change</a>
-  </div>
-</div>
-{% endmacro %}

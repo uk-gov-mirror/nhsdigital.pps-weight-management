@@ -360,7 +360,7 @@ def otp_verify(request: HttpRequest) -> HttpResponse:
                     for key, value in uf.data.items():
                         request.session[key] = value
                     request.session.modified = True
-                if len(uf.data) == 7:
+                if "allow_check_in" in uf.data:
                     # User has completed onboarding - redirect to listing
                     request.session["onboarding_complete"] = True
                     return redirect("/")
@@ -423,12 +423,13 @@ def landing(request: HttpRequest) -> HttpResponse:
 
     return render(request, "pilot_access/landing.jinja", context)
 
+
 def campaign_contact_type(request: HttpRequest) -> HttpResponse:
     """Page to choose contact method after accepting disclaimer."""
     # Check that user came through proper flow
     if not request.session.get("disclaimer_accepted"):
         return redirect("pilot_access:landing")
-    
+
     if request.method == "POST":
         form = CampaignContactTypeForm(request.POST)
         if form.is_valid():
@@ -436,8 +437,13 @@ def campaign_contact_type(request: HttpRequest) -> HttpResponse:
             if preferred_contact_method in ["email", "sms"]:
                 request.session["preferred_contact_method"] = preferred_contact_method
                 return redirect("pilot_access:campaign_contact_info")
-        return render(request, "pilot_access/campaign_contact_type.jinja", {"error": "Please select a contact method"})
+        return render(
+            request,
+            "pilot_access/campaign_contact_type.jinja",
+            {"error": "Please select a contact method"},
+        )
     return render(request, "pilot_access/campaign_contact_type.jinja")
+
 
 def campaign_contact_info(request: HttpRequest) -> HttpResponse:
     """Page to collect user contact info after accepting disclaimer."""
@@ -464,22 +470,38 @@ def campaign_contact_info(request: HttpRequest) -> HttpResponse:
     data = {}
 
     if request.method == "POST":
-        form = EmailInputForm(request.POST) if preferred_contact_method == PilotProfile.CONTACT_EMAIL else PhoneInputForm(request.POST)
+        form = (
+            EmailInputForm(request.POST)
+            if preferred_contact_method == PilotProfile.CONTACT_EMAIL
+            else PhoneInputForm(request.POST)
+        )
         data = {
             "email": request.POST.get("email", ""),
             "phone": request.POST.get("phone", ""),
         }
 
         if form.is_valid():
-            email = form.cleaned_data["email"] if preferred_contact_method == PilotProfile.CONTACT_EMAIL else ""
-            phone = form.cleaned_data["phone"] if preferred_contact_method == PilotProfile.CONTACT_SMS else ""
+            email = (
+                form.cleaned_data["email"]
+                if preferred_contact_method == PilotProfile.CONTACT_EMAIL
+                else ""
+            )
+            phone = (
+                form.cleaned_data["phone"]
+                if preferred_contact_method == PilotProfile.CONTACT_SMS
+                else ""
+            )
 
             # Normalize phone number
             if phone:
                 phone = _normalize_phone(phone)
 
             # Determine contact for rate limiting
-            contact_for_limit = email if preferred_contact_method == PilotProfile.CONTACT_EMAIL else phone
+            contact_for_limit = (
+                email
+                if preferred_contact_method == PilotProfile.CONTACT_EMAIL
+                else phone
+            )
 
             # Check rate limit for OTP generation
             if _check_otp_generation_rate_limit(contact_for_limit):
@@ -570,6 +592,7 @@ def campaign_contact_info(request: HttpRequest) -> HttpResponse:
             "errors": errors,
             "data": data,
             "preferred_contact_method": preferred_contact_method,
+            "back_href": reverse("pilot_access:campaign_contact_type"),
         },
     )
 
@@ -585,11 +608,14 @@ def disclaimer(request: HttpRequest) -> HttpResponse:
             else:
                 request.session["disclaimer_accepted"] = False
                 return redirect("pilot_access:details_not_shared")
-        return render(request, "pilot_access/disclaimer.jinja", {"form": form, "error": True})
+        return render(
+            request, "pilot_access/disclaimer.jinja", {"form": form, "error": True}
+        )
     else:
         form = DisclaimerForm()
 
     return render(request, "pilot_access/disclaimer.jinja", {"form": form})
+
 
 def details_not_shared(request: HttpRequest) -> HttpResponse:
     """Page shown when user does not accept disclaimer."""
@@ -690,3 +716,78 @@ def returning(request: HttpRequest) -> HttpResponse:
         form = ReturningForm()
 
     return render(request, "pilot_access/returning.jinja", {"form": form})
+
+
+def change_contact_info(request: HttpRequest) -> HttpResponse:
+    """Allow user to change contact info using the same forms as campaign_contact_info, updating their profile on POST."""
+    user = request.user
+    profile = getattr(user, "pilot_profile", None)
+    if profile is None:
+        profile = PilotProfile.objects.get(user=user)
+
+    preferred_contact_method = (
+        profile.preferred_contact_method or PilotProfile.CONTACT_EMAIL
+    )
+    errors = {}
+    data = {
+        "email": profile.email or "",
+        "phone": profile.phone or "",
+    }
+
+    if request.method == "POST":
+        form = (
+            EmailInputForm(request.POST)
+            if preferred_contact_method == PilotProfile.CONTACT_EMAIL
+            else PhoneInputForm(request.POST)
+        )
+        data = {
+            "email": request.POST.get("email", ""),
+            "phone": request.POST.get("phone", ""),
+        }
+        if form.is_valid():
+            if preferred_contact_method == PilotProfile.CONTACT_EMAIL:
+                profile.email = form.cleaned_data["email"]
+                user.email = form.cleaned_data["email"]
+                user.save(update_fields=["email"])
+                messages.success(request, "Your email address has been updated.")
+            elif preferred_contact_method == PilotProfile.CONTACT_SMS:
+                profile.phone = form.cleaned_data["phone"]
+                messages.success(request, "Your phone number has been updated.")
+            profile.save(update_fields=["email", "phone"])
+            return redirect("pilot_access:account")
+        else:
+            for field, error_list in form.errors.items():
+                errors[field] = error_list[0] if error_list else ""
+
+    return render(
+        request,
+        "pilot_access/campaign_contact_info.jinja",
+        {
+            "preferred_contact_method": preferred_contact_method,
+            "errors": errors,
+            "data": data,
+            "back_href": reverse("pilot_access:account"),
+        },
+    )
+
+def change_contact_type(request: HttpRequest) -> HttpResponse:
+    """Allow user to change preferred contact method."""
+    user = request.user
+    profile = getattr(user, "pilot_profile", None)
+    if profile is None:
+        profile = PilotProfile.objects.get(user=user)
+
+    if request.method == "POST":
+        form = CampaignContactTypeForm(request.POST)
+        if form.is_valid():
+            preferred_contact_method = form.cleaned_data["preferred_contact_method"]
+            profile.preferred_contact_method = preferred_contact_method
+            profile.save(update_fields=["preferred_contact_method"])
+            messages.success(request, "Your preferred contact method has been updated.")
+            return redirect("pilot_access:account")
+        return render(
+            request,
+            "pilot_access/campaign_contact_type.jinja",
+            {"error": "Please select a contact method"},
+        )
+    return render(request, "pilot_access/campaign_contact_type.jinja")
