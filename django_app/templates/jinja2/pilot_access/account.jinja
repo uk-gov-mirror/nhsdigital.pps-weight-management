@@ -2,11 +2,9 @@
 {% from "web/macros/layout.jinja" import two_thirds_column_start, two_thirds_column_end, summary_row %}
 {% from "nhsuk/components/button/macro.jinja" import format_datetime %}
 {% macro summary_row(title, item, link) %}
-  <div class="nhsuk-grid-row">
+  <div class="nhsuk-grid-row nhsuk-u-padding-top-3">
     <div class="nhsuk-grid-column-one-third">
-      <div class="nhsuk-heading-xs">
-        <p class="nhsuk-u-font-weight-bold">{{ title }}</p>
-      </div>
+      <p class="nhsuk-u-font-weight-bold">{{ title }}</p>
     </div>
     <div class="nhsuk-grid-column-one-third">{{ item }}</div>
     <div class="nhsuk-grid-column-one-third">
@@ -33,12 +31,13 @@
         url("pilot_access:change_contact_info") 
     ) }}
   {% endif %}
-  {{ summary_row("How we get in touch with you",
-    profile.preferred_contact_method,
-    url("pilot_access:change_contact_type") ) }}
+  <hr class="nhsuk-section-break nhsuk-section-break--visible">
   {{ summary_row("Your home postcode",
     profile.postcode,
     url("pilot_access:account") ) }}
-  <a class="nhsuk-link nhsuk-link--no-visited-state"
-     href="{{ url('pilot_access:delete_account') }}">Delete all my information</a>
+  <hr class="nhsuk-section-break nhsuk-section-break--visible">
+  <div class="nhsuk-u-padding-top-3">
+    <a class="nhsuk-link nhsuk-link--no-visited-state"
+       href="{{ url('pilot_access:delete_account') }}">Delete all my information</a>
+  </div>
 {% endblock content %}
