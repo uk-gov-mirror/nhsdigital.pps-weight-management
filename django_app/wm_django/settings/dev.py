@@ -10,7 +10,7 @@ DEBUG = True
 ENV_NAME = "Development"
 
 # Allow any CloudFront origin for ephemeral environments
-CSRF_TRUSTED_ORIGINS = ["https://*.cloudfront.net"]
+CSRF_TRUSTED_ORIGINS = ["https://*.cloudfront.net", "https://*.help-to-stay-healthy-pilot.service.nhs.uk"]
 
 # Useful when testing locally, too:
 ALLOWED_HOSTS = ["*", "localhost", "127.0.0.1"]
