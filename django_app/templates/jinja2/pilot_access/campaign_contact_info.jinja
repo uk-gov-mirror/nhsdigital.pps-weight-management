@@ -3,7 +3,7 @@
 {% from "web/macros/forms.jinja" import back_link %}
 {% set pageName = "Contact details" %}
 {% block beforeContent %}
-  {{ back_link("/pilot/contact-type") }}
+  {{ back_link(back_href) }}
 {% endblock beforeContent %}
 {% block content %}
   {{ two_thirds_column_start() }}

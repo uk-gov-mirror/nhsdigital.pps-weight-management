@@ -232,6 +232,8 @@ PILOT_ACCESS_PUBLIC_PATH_PREFIXES = [
     "/pilot/login/",        # request OTP for login
     "/pilot/returning/",     # check if first time or returning user
     "/pilot/details-not-shared/", # details not shared page
+    "/pilot/change-contact-info/", # change contact info page
+    "/pilot/change-contact-type/", # change contact type page
     # Other public paths
     "/health",          # health checks
     "/static/",         # static files
