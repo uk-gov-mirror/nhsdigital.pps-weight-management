@@ -10,6 +10,10 @@ on:
         required: false
         type: string        
         default: ""
+      include_app_vars:
+        required: false
+        type: boolean
+        default: false
       layer:
         required: true
         type: string
@@ -66,7 +70,12 @@ jobs:
           path: ${{ inputs.working_directory }}
 
       - name: Terraform Init
-        run: terraform init
+        run: |
+          if [ "${{ inputs.include_app_vars }}" == "true" ]; then
+            terraform init -backend-config="key=${{ inputs.environment }}/${{ inputs.layer }}-${{ inputs.environment_suffix }}.tfstate"
+          else
+            terraform init
+          fi
         working-directory: ${{ inputs.working_directory }}
 
       - name: Terraform Apply

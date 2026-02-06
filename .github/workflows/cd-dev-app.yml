@@ -25,11 +25,16 @@ on:
           - dev
           - sandbox
         default: poc
+      include_app_vars:
+        required: false
+        type: boolean
+        default: true
 
 env:
   PROJECT:           ${{ vars.PROJECT }}
   AWS_REGION:        ${{ vars.AWS_REGION }}
   GH_ENV:            dev
+  INCLUDE_APP_VARS:   ${{ inputs.include_app_vars }}
 
 jobs:
   plan-app-dev:
@@ -44,6 +49,7 @@ jobs:
       aws_account_id: 515424599516
       project: nhse-pps-htsh
       gh_env: dev
+      include_app_vars: ${{ inputs.include_app_vars }}
 
   apply-app-dev:
     if: inputs.action == 'apply'
@@ -58,3 +64,4 @@ jobs:
       aws_account_id: 515424599516
       project: nhse-pps-htsh
       gh_env: dev
+      include_app_vars: ${{ inputs.include_app_vars }}

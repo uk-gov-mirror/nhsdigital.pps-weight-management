@@ -10,6 +10,10 @@ on:
         required: false
         type: string
         default: ""
+      include_app_vars:
+        required: false
+        type: boolean
+        default: false
       layer:
         required: true
         type: string
@@ -59,8 +63,13 @@ jobs:
         with:
           terraform_version: "1.14.4"
 
-      - name: Terraform Init -backend-config="key=${{ inputs.environment }}/${{ inputs.layer }}-${{ inputs.environment_suffix }}.tfstate"
-        run: terraform init
+      - name: Terraform Init
+        run: |
+          if [ "${{ inputs.include_app_vars }}" == "true" ]; then
+            terraform init -backend-config="key=${{ inputs.environment }}/${{ inputs.layer }}-${{ inputs.environment_suffix }}.tfstate"
+          else
+            terraform init
+          fi
         working-directory: ${{ inputs.working_directory }}
 
       - name: Terraform Format
@@ -71,8 +80,14 @@ jobs:
         working-directory: ${{ inputs.working_directory }}
 
       - name: Terraform Plan
-        run: terraform plan --var="environment=${{ inputs.environment_suffix }}" --var="image_tag=${{ inputs.image_tag }}" -out=tfplan
+        run: |
+          if [ "${{ inputs.include_app_vars }}" == "true" ]; then
+            terraform plan --var="environment=${{ inputs.environment_suffix }}" --var="image_tag=${{ inputs.image_tag }}" -out=tfplan
+          else
+            terraform plan -out=tfplan
+          fi
         working-directory: ${{ inputs.working_directory }}
+
       - name: Upload Plan Artifact
         uses: actions/upload-artifact@v4
         with:
