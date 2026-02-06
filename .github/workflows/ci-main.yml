@@ -1,0 +1,63 @@
+name: ci-main
+
+on:
+  push:
+    branches: [ main ]
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  PROJECT:        ${{ vars.PROJECT }}
+  AWS_REGION:     ${{ vars.AWS_REGION }}
+  AWS_ACCOUNT_ID: 515424599516
+  ECR_REPO_NAME:  "pps-htsh-poc-ecr"
+  GH_ENV:         dev
+
+jobs:
+  build-test-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS creds
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/nhse-pps-htsh-poc-gh-oidc
+          role-session-name: gha-ci-main
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Compute image tags
+        id: meta
+        run: |
+          ECR="${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com"
+          IMAGE="${ECR}/${{ env.ECR_REPO_NAME }}"
+          echo "image=${IMAGE}"                 >> "$GITHUB_OUTPUT"
+          echo "tag_sha=${IMAGE}:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "tag_latest=${IMAGE}:latest"     >> "$GITHUB_OUTPUT"
+
+      - name: Build image
+        working-directory: django_app
+        run: |
+          docker build \
+            --target dev \
+            -t "${{ steps.meta.outputs.tag_sha }}" \
+            -t "${{ steps.meta.outputs.tag_latest }}" \
+            .
+
+      - name: Test image
+        run: |
+          docker run --rm \
+            -e DJANGO_SETTINGS_MODULE=wm_django.settings.dev \
+            -e DJANGO_ENV=dev \
+            "${{ steps.meta.outputs.tag_sha }}" \
+            python3 manage.py test
+
+      - name: Push image
+        run: |
+          docker push "${{ steps.meta.outputs.tag_sha }}"
+          docker push "${{ steps.meta.outputs.tag_latest }}"

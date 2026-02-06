@@ -1,0 +1,81 @@
+name: Terraform Plan
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+      environment_suffix:
+        required: false
+        type: string
+        default: ""
+      layer:
+        required: true
+        type: string
+      image_tag:
+        required: false
+        type: string
+        default: "latest"
+      working_directory:
+        required: true
+        type: string
+      aws_region:
+        required: false
+        type: string
+        default: "eu-west-2"
+      project:
+        required: true
+        type: string
+      gh_env:
+        required: true
+        type: string
+      aws_account_id:
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ inputs.aws_account_id }}:role/nhse-pps-htsh-poc-gh-oidc
+          aws-region: ${{ inputs.aws_region }}
+          role-session-name: ${{ github.run_id }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.14.4"
+
+      - name: Terraform Init -backend-config="key=${{ inputs.environment }}/${{ inputs.layer }}-${{ inputs.environment_suffix }}.tfstate"
+        run: terraform init
+        working-directory: ${{ inputs.working_directory }}
+
+      - name: Terraform Format
+        run: terraform fmt -check
+        working-directory: ${{ inputs.working_directory }}
+      - name: Terraform Validate
+        run: terraform validate
+        working-directory: ${{ inputs.working_directory }}
+
+      - name: Terraform Plan
+        run: terraform plan --var="environment=${{ inputs.environment_suffix }}" --var="image_tag=${{ inputs.image_tag }}" -out=tfplan
+        working-directory: ${{ inputs.working_directory }}
+      - name: Upload Plan Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-plan-${{ inputs.environment }}-${{ inputs.layer }}-${{ inputs.environment_suffix }}
+          path: ${{ inputs.working_directory }}/tfplan
+          retention-days: 30

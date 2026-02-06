@@ -1,0 +1,79 @@
+name: Terraform Apply
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+      environment_suffix:
+        required: false
+        type: string        
+        default: ""
+      layer:
+        required: true
+        type: string
+      working_directory:
+        required: true
+        type: string
+      plan_artifact_name:
+        required: false
+        type: string
+        default: ""
+      aws_region:
+        required: false
+        type: string
+        default: "eu-west-2"
+      project:
+        required: true
+        type: string
+      gh_env:
+        required: true
+        type: string
+      aws_account_id:
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ inputs.aws_account_id }}:role/nhse-pps-htsh-poc-gh-oidc
+          aws-region: ${{ inputs.aws_region }}
+          role-session-name: ${{ github.run_id }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.14.4"
+
+      - name: Download Plan Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.plan_artifact_name || format('terraform-plan-{0}-{1}-{2}', inputs.environment, inputs.layer, inputs.environment_suffix) }}
+          path: ${{ inputs.working_directory }}
+
+      - name: Terraform Init
+        run: terraform init
+        working-directory: ${{ inputs.working_directory }}
+
+      - name: Terraform Apply
+        run: terraform apply tfplan
+        working-directory: ${{ inputs.working_directory }}
+
+      - name: Clean up Plan File
+        if: always()
+        run: rm -f tfplan
+        working-directory: ${{ inputs.working_directory }}
