@@ -117,7 +117,7 @@ module "ecs" {
   docker_image           = "515424599516.dkr.ecr.eu-west-2.amazonaws.com/pps-htsh-poc-ecr"
   image_tag              = var.image_tag
   db_username            = "ppswmuser"
-  db_password            = "${data.aws_secretsmanager_secret_version.secrets.arn}:db_password::"
+  db_password            = "${data.aws_db_instance.datastore.master_user_secret[0].secret_arn}:password::"
   db_endpoint            = data.aws_db_instance.datastore.endpoint
   db_name                = data.aws_db_instance.datastore.db_name
   db_address             = data.aws_db_instance.datastore.address
