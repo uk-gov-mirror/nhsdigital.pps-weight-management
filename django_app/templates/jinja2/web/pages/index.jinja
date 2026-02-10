@@ -2,29 +2,25 @@
 {% from "web/macros/layout.jinja" import two_thirds_column_start, two_thirds_column_end %}
 {% from "web/macros/forms.jinja" import form_error_summary, continue_button %}
 {% macro summary_row(title, items, link) %}
-<div class="nhsuk-grid-row">
-  <div class="nhsuk-grid-column-one-third">
-    <div class="nhsuk-heading-xs">
-      <h4>{{ title }}</h4>
+  <div class="nhsuk-grid-row">
+    <div class="nhsuk-grid-column-one-third">
+      <div class="nhsuk-heading-xs">
+        <h4>{{ title }}</h4>
+      </div>
+    </div>
+    <div class="nhsuk-grid-column-one-third">
+      <ul>
+        {% if items is iterable and items is not string %}
+          {% for item in items %}<li>{{ item }}</li>{% endfor %}
+        {% else %}
+          <li>{{ items }}</li>
+        {% endif %}
+      </ul>
+    </div>
+    <div class="nhsuk-grid-column-one-third">
+      <a href="{{ link }}" class="nhsuk-link nhsuk-link--no-visited-state">Change</a>
     </div>
   </div>
-
-  <div class="nhsuk-grid-column-one-third">
-    <ul>
-      {% if items is iterable and items is not string %}
-        {% for item in items %}
-          <li>{{ item }}</li>
-        {% endfor %}
-      {% else %}
-        <li>{{ items }}</li>  
-      {% endif %}
-    </ul>
-  </div>
-
-  <div class="nhsuk-grid-column-one-third">
-    <a href="{{ link }}" class="nhsuk-link nhsuk-link--no-visited-state">Change</a>
-  </div>
-</div>
 {% endmacro %}
 {% set pageName = "Get help to make healthy lifestyle changes that last" %}
 {% set endLinksHtml %}
@@ -83,15 +79,15 @@
         url("barriers") ~ "?mode=edit") }}
         <hr class="nhsuk-section-break--m">
         {{ summary_row("Doing things on your own or in a group",
-                user_fields.who_with.replace("_", " ").replace("dont", "don't ").replace("who with.", "").capitalize(),
+                (user_fields.who_with[0] if user_fields.who_with is iterable and user_fields.who_with is not string else user_fields.who_with).replace("_", " ").replace("dont", "don't ").replace("who with.", "").capitalize(),
         url("preference_who_with") ~ "?mode=edit") }}
         <hr class="nhsuk-section-break--m">
         {{ summary_row("Following a schedule or at your own pace",
-                user_fields.timetable.replace("_", " ").replace("dont", "don't ").replace("timetable.", "").capitalize(),
+                (user_fields.timetable[0] if user_fields.timetable is iterable and user_fields.timetable is not string else user_fields.timetable).replace("_", " ").replace("dont", "don't ").replace("timetable.", "").capitalize(),
         url("preference_timetable") ~ "?mode=edit") }}
         <hr class="nhsuk-section-break--m">
         {{ summary_row("Digital or in-person activities",
-                user_fields.channel.replace("_", " ").replace("dont", "don't ").replace("channel.", "").capitalize(),
+                (user_fields.channel[0] if user_fields.channel is iterable and user_fields.channel is not string else user_fields.channel).replace("_", " ").replace("dont", "don't ").replace("channel.", "").capitalize(),
         url("preference_channel") ~ "?mode=edit") }}
       </div>
       <hr class="nhsuk-section-break--m">
