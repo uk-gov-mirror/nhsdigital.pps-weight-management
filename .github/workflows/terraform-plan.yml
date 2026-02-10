@@ -82,7 +82,7 @@ jobs:
       - name: Terraform Plan
         run: |
           if [ "${{ inputs.include_app_vars }}" == "true" ]; then
-            terraform plan --var="environment=${{ inputs.environment_suffix }}" --var="image_tag=${{ inputs.image_tag }}" -out=tfplan
+            terraform plan --var="environment_suffix=${{ inputs.environment_suffix }}" --var="image_tag=${{ inputs.image_tag }}" -out=tfplan
           else
             terraform plan -out=tfplan
           fi
