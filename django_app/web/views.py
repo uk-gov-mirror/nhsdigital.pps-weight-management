@@ -494,7 +494,7 @@ def allow_check_in(request: HttpRequest) -> HttpResponse:
     mode = request.GET.get("mode")
     back_href = "/" if mode == "edit" else "/preference-channel"
     if request.method == "POST":
-        
+
         value = request.POST.get("allow_check_in")
         request.session["allow_check_in"] = value
         _persist_to_user_filter(request.user, "allow_check_in", value)
@@ -502,8 +502,10 @@ def allow_check_in(request: HttpRequest) -> HttpResponse:
             messages.success(request, "Your data has been updated.")
             return redirect("/")
         elif value == "no":
+            request.session["onboarding_complete"] = True
             return redirect("no_check_in")
         elif value == "yes":
+            request.session["onboarding_complete"] = True
             return redirect("listing")
         else:
             return render(
