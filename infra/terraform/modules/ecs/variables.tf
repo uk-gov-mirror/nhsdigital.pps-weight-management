@@ -89,3 +89,8 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "service_api_base_url" {
+  description = "Internal base URL for API calls"
+  type        = string
+}

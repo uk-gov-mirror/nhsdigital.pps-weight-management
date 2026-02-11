@@ -23,6 +23,7 @@ ENV_NAME = os.getenv("DJANGO_ENV_NAME", "Unknown")
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-secret-key-change-me")
 DEBUG = os.getenv("DJANGO_DEBUG", "false").lower() == "true"
 ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "*").split(",")
+SERVICE_API_BASE_URL = os.getenv("SERVICE_API_BASE_URL")
 
 
 # -------------------------------------------------------------------
