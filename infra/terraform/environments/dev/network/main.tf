@@ -35,7 +35,7 @@ resource "aws_wafv2_ip_set" "admin_ipset" {
   description        = "Whitelisted IPs for /admin/ access"
   scope              = "CLOUDFRONT"
   ip_address_version = "IPV4"
-  addresses          = ["147.161.224.177/32", "172.187.228.0/24", "20.39.229.0/24", "136.226.191.99/32", "51.7.207.149/32", "35.178.243.23/32"]
+  addresses          = ["147.161.224.177/32", "172.187.228.0/24", "20.39.229.0/24", "136.226.191.99/32", "51.7.207.149/32"]
 
   provider = aws.us_east_1
 
