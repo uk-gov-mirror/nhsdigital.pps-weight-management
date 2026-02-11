@@ -27,6 +27,7 @@ resource "aws_ecs_task_definition" "app" {
         { name = "DATABASE_PORT", value = "5432" },
         { name = "DATABASE_NAME", value = var.db_name },
         { name = "DATABASE_USER", value = var.db_username },
+        { name = "SERVICE_API_BASE_URL", value = var.service_api_base_url },
         { name = "AWS_REGION", value = "eu-west-2" },
         { name = "PGSSLMODE", value = "require" }
       ]

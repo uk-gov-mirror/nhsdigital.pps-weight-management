@@ -121,6 +121,7 @@ module "ecs" {
   db_endpoint            = data.aws_db_instance.datastore.endpoint
   db_name                = data.aws_db_instance.datastore.db_name
   db_address             = data.aws_db_instance.datastore.address
+  service_api_base_url   = "http://${module.alb.lb_dns_name}"
   django_secret_key      = "${data.aws_secretsmanager_secret_version.secrets.arn}:django_secret_key::"
   region                 = "eu-west-2"
   private_ecs_subnet_ids = data.aws_subnets.private_ecs.ids

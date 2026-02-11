@@ -25,6 +25,7 @@ services:
       DJANGO_SETTINGS_MODULE: wm_django.settings.local
       DJANGO_SECRET_KEY: xxx-local-dev-secret-key-xxx
       DATABASE_URL: postgres://app:app@db:5432/app
+      SERVICE_API_BASE_URL: ${SERVICE_API_BASE_URL:-http://localhost:8000}
       DJANGO_SUPERUSER_USERNAME: admin
       DJANGO_SUPERUSER_EMAIL: admin@example.com
       DJANGO_SUPERUSER_PASSWORD: admin123
