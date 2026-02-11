@@ -20,6 +20,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install GitVersion
+        uses: gittools/actions/gitversion/setup@v4.2.0
+        with:
+          versionSpec: '6.4.x'
+
+      - name: Determine Version
+        id: version_step
+        uses: gittools/actions/gitversion/execute@v4.2.0
+
+      - run: |
+          echo "majorMinorPatch (env.majorMinorPatch) : ${{ env.majorMinorPatch }}"
+        name: Display GitVersion
 
       - name: Configure AWS creds
         uses: aws-actions/configure-aws-credentials@v4
@@ -39,6 +54,7 @@ jobs:
           echo "image=${IMAGE}"                 >> "$GITHUB_OUTPUT"
           echo "tag_sha=${IMAGE}:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
           echo "tag_latest=${IMAGE}:latest"     >> "$GITHUB_OUTPUT"
+          echo "majorMinorPatch=${IMAGE}:v${{ env.majorMinorPatch }}" >> "$GITHUB_OUTPUT"
 
       - name: Build image
         working-directory: django_app
@@ -47,6 +63,7 @@ jobs:
             --target dev \
             -t "${{ steps.meta.outputs.tag_sha }}" \
             -t "${{ steps.meta.outputs.tag_latest }}" \
+            -t "${{ steps.meta.outputs.majorMinorPatch }}" \
             .
 
       - name: Test image
@@ -61,3 +78,4 @@ jobs:
         run: |
           docker push "${{ steps.meta.outputs.tag_sha }}"
           docker push "${{ steps.meta.outputs.tag_latest }}"
+          docker push "${{ steps.meta.outputs.majorMinorPatch }}"
