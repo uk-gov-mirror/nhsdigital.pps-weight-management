@@ -2,6 +2,14 @@ locals {
   project        = "pps-htsh"
   environment    = "poc"
   context_string = "${local.project}-${local.environment}"
+
+  admin_ip_addresses = [
+    "147.161.224.177/32",
+    "172.187.228.0/24",
+    "20.39.229.0/24",
+    "136.226.191.99/32",
+    "51.7.207.149/32"
+  ]
 }
 
 module "vpc" {
@@ -35,7 +43,7 @@ resource "aws_wafv2_ip_set" "admin_ipset" {
   description        = "Whitelisted IPs for /admin/ access"
   scope              = "CLOUDFRONT"
   ip_address_version = "IPV4"
-  addresses          = ["147.161.224.177/32", "172.187.228.0/24", "20.39.229.0/24", "136.226.191.99/32", "51.7.207.149/32"]
+  addresses          = local.admin_ip_addresses
 
   provider = aws.us_east_1
 
