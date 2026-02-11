@@ -26,6 +26,7 @@ from json import JSONDecodeError
 from typing import Any, Dict, List
 
 import requests
+from django.conf import settings
 from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
@@ -647,7 +648,7 @@ def listing(request: HttpRequest) -> HttpResponse:
         payload["postcode"] = postcode
         payload["distance"] = distance
 
-    api_url = request.build_absolute_uri(reverse("v3:service-search"))
+    api_url = _build_internal_api_url(reverse("v3:service-search"))
 
     results: Dict[str, Any] = {"total": 0, "results": []}
     api_error: str | None = None
@@ -753,7 +754,7 @@ def _get_page_range(current_page: int, total_pages: int, window: int = 2) -> Lis
 
 def detail(request: HttpRequest, service_id: int) -> HttpResponse:
     """Show a single service's details, fetched from the API."""
-    api_url = request.build_absolute_uri(
+    api_url = _build_internal_api_url(
         reverse("v3:service-detail", kwargs={"id": service_id})
     )
 
@@ -774,6 +775,12 @@ def detail(request: HttpRequest, service_id: int) -> HttpResponse:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+def _build_internal_api_url(path: str) -> str:
+    base_url = settings.SERVICE_API_BASE_URL
+    if not path.startswith("/"):
+        path = f"/{path}"
+    return f"{base_url.rstrip('/')}{path}"
 
 def _validate_postcode(postcode: str) -> Dict[str, Any]:
     """Validate a postcode locally and against api.postcodes.io.
