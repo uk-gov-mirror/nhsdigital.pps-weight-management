@@ -51,7 +51,7 @@ module "cloudfront" {
   geo_restriction_locations = ["GB"]
 
   aliases             = ["${local.environment_suffix}.help-to-stay-healthy-pilot.service.nhs.uk"]
-  acm_certificate_arn = "arn:aws:acm:us-east-1:515424599516:certificate/f60ced84-7060-4916-bef9-49c2e3012bac"
+  acm_certificate_arn = "arn:aws:acm:us-east-1:515424599516:certificate/d88579b2-774c-4ae8-aa4e-b1b0e0cbf609"
 
   # Don't cache admin or API paths
   ordered_cache_behaviors = [

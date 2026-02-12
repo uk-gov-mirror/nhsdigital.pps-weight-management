@@ -24,6 +24,7 @@ on:
           - poc
           - dev
           - sandbox
+          - demo
         default: poc
       include_app_vars:
         required: false
