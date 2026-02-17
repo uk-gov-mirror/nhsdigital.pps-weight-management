@@ -24,6 +24,12 @@ variable "certificate_arn" {
   default     = ""
 }
 
+variable "custom_header_value" {
+  description = "Value for the custom header that CloudFront should send"
+  type        = string
+  sensitive   = true
+}
+
 variable "tags" {
   description = "Tags"
   type        = map(string)
