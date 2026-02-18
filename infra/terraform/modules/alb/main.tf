@@ -11,11 +11,14 @@ module "alb" {
   enable_deletion_protection = false
 
   listeners = {
-    http = {
+    http_listener = {
       port     = 80
       protocol = "HTTP"
-      forward = {
-        target_group_key = "ecs"
+
+      fixed_response = {
+        content_type = "text/plain"
+        message_body = "Access Denied"
+        status_code  = "401"
       }
     }
   }
@@ -40,6 +43,25 @@ module "alb" {
         unhealthy_threshold = 2
       }
     }
+  }
+
+  tags = var.tags
+}
+
+resource "aws_lb_listener_rule" "cloudfront_header" {
+  listener_arn = module.alb.listeners["http_listener"].arn
+  priority     = 100
+
+  condition {
+    http_header {
+      http_header_name = "X-Custom-Header"
+      values           = [var.custom_header_value]
+    }
+  }
+
+  action {
+    type             = "forward"
+    target_group_arn = module.alb.target_groups["ecs"].arn
   }
 
   tags = var.tags

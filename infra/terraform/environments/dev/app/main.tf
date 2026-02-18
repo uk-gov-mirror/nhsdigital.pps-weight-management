@@ -8,10 +8,11 @@ locals {
 module "alb" {
   source = "../../../modules/alb"
 
-  name              = local.context_string
-  vpc_id            = data.aws_vpc.network.id
-  public_subnet_ids = data.aws_subnets.public.ids
-  alb_sg_id         = data.aws_security_group.alb.id
+  name                = local.context_string
+  vpc_id              = data.aws_vpc.network.id
+  public_subnet_ids   = data.aws_subnets.public.ids
+  alb_sg_id           = data.aws_security_group.alb.id
+  custom_header_value = jsondecode(data.aws_secretsmanager_secret_version.secrets.secret_string)["cloudfront_custom_header"]
 
   tags = {
     Project     = local.project
