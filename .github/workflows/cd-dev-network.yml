@@ -10,7 +10,13 @@ on:
         options:
           - plan
           - apply
+          - destroy
         default: plan
+      dry_run:
+        description: 'Perform a dry run (destroy only)'
+        required: false
+        type: boolean
+        default: true
 
 env:
   PROJECT:           nhse-pps-htsh
@@ -43,3 +49,16 @@ jobs:
       gh_env: dev
       aws_account_id: 515424599516
 
+  destroy-network-dev:
+    if: inputs.action == 'destroy'
+    needs: plan-network-dev
+    uses: ./.github/workflows/terraform-destroy.yml
+    with:
+      environment: dev
+      layer: network
+      working_directory: infra/terraform/environments/dev/network
+      aws_region: ${{ vars.AWS_REGION }}
+      project: nhse-pps-htsh
+      gh_env: dev
+      aws_account_id: 515424599516
+      dry_run: ${{ inputs.dry_run }}

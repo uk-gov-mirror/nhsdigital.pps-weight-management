@@ -15,6 +15,7 @@ on:
         options:
           - plan
           - apply
+          - destroy
         default: plan
       environment_suffix:
         description: 'Target environment'
@@ -27,6 +28,11 @@ on:
           - demo
         default: poc
       include_app_vars:
+        required: false
+        type: boolean
+        default: true
+      dry_run:
+        description: 'Perform a dry run (destroy only)'
         required: false
         type: boolean
         default: true
@@ -66,3 +72,19 @@ jobs:
       project: nhse-pps-htsh
       gh_env: dev
       include_app_vars: ${{ inputs.include_app_vars }}
+
+  destroy-app-dev:
+    if: inputs.action == 'destroy'
+    needs: plan-app-dev
+    uses: ./.github/workflows/terraform-destroy.yml
+    with:
+      environment: dev
+      environment_suffix: ${{ inputs.environment_suffix }}
+      layer: app
+      working_directory: infra/terraform/environments/dev/app
+      aws_region: ${{ vars.AWS_REGION }}
+      aws_account_id: 515424599516
+      project: nhse-pps-htsh
+      gh_env: dev
+      include_app_vars: ${{ inputs.include_app_vars }}
+      dry_run: ${{ inputs.dry_run }}
