@@ -1,0 +1,206 @@
+name: Terraform Destroy
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: 'Target environment for destruction'
+        required: true
+        type: string
+      environment_suffix:
+        description: 'Environment suffix if applicable'
+        required: false
+        type: string        
+        default: ""
+      include_app_vars:
+        description: 'Include application variables in backend config'
+        required: false
+        type: boolean
+        default: false
+      layer:
+        description: 'Terraform layer to destroy'
+        required: true
+        type: string
+      working_directory:
+        description: 'Directory containing Terraform configuration'
+        required: true
+        type: string
+      aws_region:
+        description: 'AWS region to target'
+        required: false
+        type: string
+        default: "eu-west-2"
+      project:
+        description: 'Project identifier'
+        required: true
+        type: string
+      gh_env:
+        description: 'GitHub environment for approvals'
+        required: true
+        type: string
+      aws_account_id:
+        description: 'AWS Account ID to assume role in'
+        required: true
+        type: string
+      auto_approve:
+        description: 'Skip interactive approval for destroy (use with caution)'
+        required: false
+        type: boolean
+        default: false
+      dry_run:
+        description: 'Perform a dry run (plan destroy only)'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  plan-destroy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.gh_env }}
+    outputs:
+      plan-output: ${{ steps.plan.outputs.stdout }}
+    steps:
+      - name: Destroy Warning
+        run: |
+          echo "DANGER: Planning destruction of infrastructure in ${{ inputs.environment }}"
+          echo "Environment: ${{ inputs.environment }}"
+          echo "Layer: ${{ inputs.layer }}"
+          echo "Project: ${{ inputs.project }}"
+          echo "Working Directory: ${{ inputs.working_directory }}"
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ inputs.aws_account_id }}:role/nhse-pps-htsh-poc-gh-oidc
+          aws-region: ${{ inputs.aws_region }}
+          role-session-name: ${{ github.run_id }}-destroy
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.14.4"
+
+      - name: Terraform Init
+        run: |
+          if [ "${{ inputs.include_app_vars }}" == "true" ]; then
+            terraform init -backend-config="key=${{ inputs.environment }}/${{ inputs.layer }}-${{ inputs.environment_suffix }}.tfstate"
+          else
+            terraform init
+          fi
+        working-directory: ${{ inputs.working_directory }}
+
+      - name: Terraform Plan Destroy
+        id: plan
+        run: |
+          set -o pipefail
+          
+          destroy_cmd="terraform plan -destroy -detailed-exitcode -no-color"
+                    
+          # Execute plan and capture output
+          plan_output=$(eval "$destroy_cmd" 2>&1)
+          exit_code=$?
+          
+          echo "stdout<<EOF" >> $GITHUB_OUTPUT
+          echo "$plan_output" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
+          if [ $exit_code -ne 0 ] && [ $exit_code -ne 2 ]; then
+            echo "Terraform plan failed"
+            exit 1
+          fi
+        working-directory: ${{ inputs.working_directory }}
+
+      - name: Display Destroy Plan
+        run: |
+          echo "Terraform Destroy Plan Output:"
+          echo "=================================="
+          echo "${{ steps.plan.outputs.stdout }}"
+          echo "=================================="
+
+      - name: Create Destroy Plan Artifact
+        if: '!inputs.dry_run'
+        run: |
+          # Build destroy command for actual execution
+          destroy_cmd="terraform plan -destroy -out=destroy.tfplan"
+          
+          eval "$destroy_cmd"
+        working-directory: ${{ inputs.working_directory }}
+
+      - name: Upload Destroy Plan
+        if: '!inputs.dry_run'
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-destroy-plan-${{ inputs.environment }}-${{ inputs.layer }}-${{ inputs.environment_suffix }}
+          path: ${{ inputs.working_directory }}/destroy.tfplan
+          retention-days: 5
+
+  execute-destroy:
+    needs: plan-destroy
+    if: '!inputs.dry_run'
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.gh_env }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ inputs.aws_account_id }}:role/nhse-pps-htsh-poc-gh-oidc
+          aws-region: ${{ inputs.aws_region }}
+          role-session-name: ${{ github.run_id }}-destroy-execute
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.14.4"
+
+      - name: Download Destroy Plan
+        uses: actions/download-artifact@v4
+        with:
+          name: terraform-destroy-plan-${{ inputs.environment }}-${{ inputs.layer }}-${{ inputs.environment_suffix }}
+          path: ${{ inputs.working_directory }}
+
+      - name: Terraform Init
+        run: |
+          if [ "${{ inputs.include_app_vars }}" == "true" ]; then
+            terraform init -backend-config="key=${{ inputs.environment }}/${{ inputs.layer }}-${{ inputs.environment_suffix }}.tfstate"
+          else
+            terraform init
+          fi
+        working-directory: ${{ inputs.working_directory }}
+
+      - name: Final Confirmation
+        if: inputs.auto_approve != true
+        run: |
+          echo "FINAL WARNING: About to destroy infrastructure!"
+          echo "Environment: ${{ inputs.environment }}"
+          echo "Layer: ${{ inputs.layer }}"
+          echo "Project: ${{ inputs.project }}"
+          echo ""
+          echo "This action cannot be undone. Proceeding in 10 seconds..."
+          sleep 10
+
+      - name: Terraform Destroy
+        run: |
+          if [ "${{ inputs.auto_approve }}" == "true" ]; then
+            terraform apply -auto-approve destroy.tfplan
+          else
+            terraform apply destroy.tfplan
+          fi
+        working-directory: ${{ inputs.working_directory }}
+
+      - name: Clean up Destroy Plan
+        if: always()
+        run: rm -f destroy.tfplan
+        working-directory: ${{ inputs.working_directory }}
+
