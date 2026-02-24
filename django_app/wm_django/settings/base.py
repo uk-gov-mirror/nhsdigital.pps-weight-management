@@ -12,6 +12,8 @@ database credentials, etc.) are configured via environment variables.
 from pathlib import Path
 import os
 
+from wm_django.secret_store import get_database_password
+
 
 # -------------------------------------------------------------------
 # Paths and core environment
@@ -137,7 +139,7 @@ DATABASES = {
         "PORT": os.getenv("DATABASE_PORT", "5432"),
         "NAME": os.getenv("DATABASE_NAME", "app"),
         "USER": os.getenv("DATABASE_USER", "app"),
-        "PASSWORD": os.getenv("DATABASE_PASSWORD", "app"),
+        "PASSWORD": get_database_password(),
         "OPTIONS": {
             "connect_timeout": 5,
         },

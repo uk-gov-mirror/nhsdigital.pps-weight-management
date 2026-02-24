@@ -36,10 +36,15 @@ variable "db_address" {
   type        = string
 }
 
-variable "db_password" {
-  description = "DB password"
+variable "db_password_secret_arn" {
+  description = "ARN of the secret containing DB credentials"
   type        = string
-  sensitive   = true
+}
+
+variable "db_password_secret_key" {
+  description = "Key inside the DB credentials secret JSON"
+  type        = string
+  default     = "password"
 }
 
 variable "db_endpoint" {
