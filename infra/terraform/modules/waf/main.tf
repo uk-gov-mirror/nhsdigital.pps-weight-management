@@ -22,7 +22,7 @@ resource "aws_wafv2_web_acl" "main" {
         and_statement {
           statement {
             byte_match_statement {
-              search_string = "/"
+              search_string = "/admin/"
               # search_string = "/admin/"
               field_to_match {
                 uri_path {}
