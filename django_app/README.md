@@ -30,11 +30,11 @@ NHS UK Frontend https://github.com/nhsuk/nhsuk-frontend
 ## REST API Endpoints
 - `/health` → returns `ok` (for ALB health checks)
 - `/v1/services` → returns subset of details of services matching search criteria
-- `/v1/service/{id}` → returns Full details of a sepcific service
+- `/v1/service/{id}` → returns Full details of a specific service
 - `/v2/services` → returns subset of details of services matching search criteria
-- `/v2/service/{id}` → returns Full details of a sepcific service
+- `/v2/service/{id}` → returns Full details of a specific service
 - `/v3/services` → returns subset of details of services matching search criteria
-- `/v3/service/{id}` → returns Full details of a sepcific service
+- `/v3/service/{id}` → returns Full details of a specific service
 
 More information: https://nhsd-confluence.digital.nhs.uk/spaces/PPP/pages/1226685095/REST+API
 

@@ -27,12 +27,13 @@ resource "aws_ecs_task_definition" "app" {
         { name = "DATABASE_PORT", value = "5432" },
         { name = "DATABASE_NAME", value = var.db_name },
         { name = "DATABASE_USER", value = var.db_username },
+        { name = "DATABASE_PASSWORD_SECRET_ARN", value = var.db_password_secret_arn },
+        { name = "DATABASE_PASSWORD_SECRET_KEY", value = var.db_password_secret_key },
         { name = "SERVICE_API_BASE_URL", value = var.service_api_base_url },
         { name = "AWS_REGION", value = "eu-west-2" },
         { name = "PGSSLMODE", value = "require" }
       ]
       secrets = [
-        { name = "DATABASE_PASSWORD", valueFrom = var.db_password },
         { name = "DJANGO_SECRET_KEY", valueFrom = var.django_secret_key }
         # { name = "COGNITO_CLIENT_ID"   , valueFrom = aws_ssm_parameter.cognito_client_id.arn },
         # { name = "COGNITO_USER_POOL_ID", valueFrom = aws_ssm_parameter.cognito_user_pool_id.arn },
@@ -155,6 +156,36 @@ resource "aws_iam_role_policy" "task_ssm" {
           "ssmmessages:OpenDataChannel"
         ]
         Resource = ["*"]
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy" "task_db_secret" {
+  name = "${var.name}-ecs-task-db-secret"
+  role = aws_iam_role.task.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue"
+        ]
+        Resource = [var.db_password_secret_arn]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "kms:Decrypt"
+        ]
+        Resource = ["*"]
+        Condition = {
+          StringEquals = {
+            "kms:ViaService" = "secretsmanager.${var.region}.amazonaws.com"
+          }
+        }
       }
     ]
   })
