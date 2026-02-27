@@ -46,7 +46,9 @@ def _read_secret_string(secret_arn: str, region: str) -> str:
         binary_value = base64.b64decode(response["SecretBinary"])
         return binary_value.decode("utf-8")
 
-    raise ValueError(f"Secret {secret_arn} did not contain SecretString or SecretBinary")
+    raise ValueError(
+        f"Secret {secret_arn} did not contain SecretString or SecretBinary"
+    )
 
 
 def _extract_secret_value(secret_string: str, secret_key: str) -> str:
@@ -54,7 +56,7 @@ def _extract_secret_value(secret_string: str, secret_key: str) -> str:
         secret_payload = json.loads(secret_string)
     except json.JSONDecodeError as exc:
         raise ValueError("DB secret value is not valid JSON") from exc
-
+    print(f"Secret payload keys: {list(secret_payload.keys())}")
     if secret_key not in secret_payload:
         raise KeyError(f"Key '{secret_key}' not found in DB secret payload")
 
@@ -90,6 +92,8 @@ def get_database_password() -> str:
     password = _extract_secret_value(secret_string=secret_string, secret_key=secret_key)
 
     if ttl_seconds > 0:
-        _write_cached_value(cache_key=cache_key, value=password, ttl_seconds=ttl_seconds)
+        _write_cached_value(
+            cache_key=cache_key, value=password, ttl_seconds=ttl_seconds
+        )
 
     return password
