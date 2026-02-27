@@ -119,7 +119,7 @@ module "ecs" {
   image_tag              = var.image_tag
   db_username            = "ppswmuser"
   db_password_secret_arn = data.aws_db_instance.datastore.master_user_secret[0].secret_arn
-  db_password_secret_key = "db_password"
+  db_password_secret_key = "password"
   db_endpoint            = data.aws_db_instance.datastore.endpoint
   db_name                = data.aws_db_instance.datastore.db_name
   db_address             = data.aws_db_instance.datastore.address

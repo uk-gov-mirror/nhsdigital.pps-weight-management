@@ -56,7 +56,6 @@ def _extract_secret_value(secret_string: str, secret_key: str) -> str:
         secret_payload = json.loads(secret_string)
     except json.JSONDecodeError as exc:
         raise ValueError("DB secret value is not valid JSON") from exc
-    print(f"Secret payload keys: {list(secret_payload.keys())}")
     if secret_key not in secret_payload:
         raise KeyError(f"Key '{secret_key}' not found in DB secret payload")
 
