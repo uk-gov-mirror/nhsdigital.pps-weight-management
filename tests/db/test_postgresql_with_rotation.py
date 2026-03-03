@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 from django.db.backends.postgresql.base import DatabaseWrapper as PostgresDatabaseWrapper
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "django_app"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "django_app"))
 
 from wm_django.db_backends.postgresql_with_rotation.base import DatabaseWrapper
 
