@@ -134,7 +134,7 @@ WSGI_APPLICATION = "wm_django.wsgi.application"
 
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.postgresql",
+        "ENGINE": "wm_django.db_backends.postgresql_with_rotation",
         "HOST": os.getenv("DATABASE_HOST", "db"),
         "PORT": os.getenv("DATABASE_PORT", "5432"),
         "NAME": os.getenv("DATABASE_NAME", "app"),
