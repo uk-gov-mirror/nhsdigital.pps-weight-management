@@ -32,6 +32,18 @@ module "vpc" {
   }
 }
 
+module "flow_log" {
+  source = "terraform-aws-modules/vpc/aws//modules/flow-log"
+
+  name   = "${local.context_string}-flow-log"
+  vpc_id = module.vpc.vpc_id
+
+  tags = {
+    Project     = local.project
+    Environment = local.environment
+  }
+}
+
 module "security_groups" {
   source = "../../../modules/security_groups"
   vpc_id = module.vpc.vpc_id
