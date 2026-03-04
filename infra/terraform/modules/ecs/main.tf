@@ -15,9 +15,10 @@ resource "aws_ecs_task_definition" "app" {
 
   container_definitions = jsonencode([
     {
-      name      = "web"
-      image     = "${var.docker_image}:${var.image_tag}"
-      essential = true
+      name                   = "web"
+      image                  = "${var.docker_image}:${var.image_tag}"
+      essential              = true
+      readonlyRootFilesystem = true
       linuxParameters = {
         initProcessEnabled = true
       }
