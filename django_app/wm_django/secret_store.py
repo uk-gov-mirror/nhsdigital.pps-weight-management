@@ -66,7 +66,7 @@ def _extract_secret_value(secret_string: str, secret_key: str) -> str:
     return value
 
 
-def get_database_password() -> str:
+def get_database_password(force_refresh: bool = False) -> str:
     secret_arn = os.getenv("DATABASE_PASSWORD_SECRET_ARN", "").strip()
     if not secret_arn:
         return os.getenv("DATABASE_PASSWORD", "app")
@@ -82,7 +82,7 @@ def get_database_password() -> str:
     ttl_seconds = max(0, ttl_seconds)
 
     cache_key = _cache_key(secret_arn=secret_arn, secret_key=secret_key, region=region)
-    if ttl_seconds > 0:
+    if ttl_seconds > 0 and not force_refresh:
         cached_value = _read_cached_value(cache_key)
         if cached_value is not None:
             return cached_value
