@@ -37,6 +37,12 @@ on:
         type: boolean
         default: true
 
+  schedule:
+    # Destroy at 18:00 UTC (weekdays)
+    - cron: '0 18 * * 1-5'
+    # Apply at 08:00 UTC (weekdays)
+    - cron: '0 8 * * 1-5'
+
 env:
   PROJECT:           ${{ vars.PROJECT }}
   AWS_REGION:        ${{ vars.AWS_REGION }}
@@ -57,6 +63,55 @@ jobs:
       project: nhse-pps-htsh
       gh_env: dev
       include_app_vars: ${{ inputs.include_app_vars }}
+
+  scheduled-destroy:
+    if: github.event_name == 'schedule' && github.event.schedule == '0 18 * * 1-5'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        environment_suffix: [poc]
+    steps:
+      - name: Trigger destroy for ${{ matrix.environment_suffix }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'cd-dev-app.yml',
+              ref: context.ref,
+              inputs: {
+                image_tag: 'latest',
+                action: 'destroy',
+                environment_suffix: '${{ matrix.environment_suffix }}',
+                include_app_vars: 'true',
+                dry_run: 'false'
+              }
+            })
+
+  scheduled-apply:
+    if: github.event_name == 'schedule' && github.event.schedule == '0 8 * * 1-5'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        environment_suffix: [poc]
+    steps:
+      - name: Trigger apply for ${{ matrix.environment_suffix }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'cd-dev-app.yml',
+              ref: context.ref,
+              inputs: {
+                image_tag: 'latest',
+                action: 'apply',
+                environment_suffix: '${{ matrix.environment_suffix }}',
+                include_app_vars: 'true'
+              }
+            })
 
   apply-app-dev:
     if: inputs.action == 'apply'
