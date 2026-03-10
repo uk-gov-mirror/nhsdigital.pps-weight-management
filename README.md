@@ -1,28 +1,37 @@
-# PPS Weight Management
+<div align="center">
+<br/>
 
-##Project Structure
+# PPS Help to Stay Healthy
+
+[![ci-main](https://github.com/NHSDigital/pps-weight-management/actions/workflows/ci-main.yml/badge.svg)](https://github.com/NHSDigital/pps-weight-management/actions/workflows/ci-main.yml)
+
+</div>
+<br>
+<div align="left">
+
+This repository contains the Help to Stay Healthy application and infrastructure code.
+
+## Django application
 ```
-.
-├── .github/
-│   └── workflows/                    # GitHub Actions
-├── .vscode/                          # VS Code launch debugging
-├── django_app/                       # Django app
-├── docs/                             # Documentation
-├── infra/
-│   └── terraform/
-│       ├── bootstrap/                # Create AWS resources (run once)
-│       ├── envs/                     # Environment configuration files
-│       │   └── poc/                  
-│       │       └── poc.tfvars        # Variables for poc environment
-│       └── main.tf                   # The main Terraform configuration file
-├── scripts/                          # Scripts
-├── tests/                            # 
-│   ├── api/                          # API tests
-│   └── ui/                           # UI tests
-└── README.md                         # README file for project.
++-------------------------------------------------------------+
+|                     Django Application                      |
+|-------------------------------------------------------------|
+|   Runs inside ECS Fargate (Gunicorn + Django)               |
+|   Serves both HTML web views and REST API endpoints         |
++----------------------+--------------------------------------+
+|      Web Frontend    |      REST API                        |
+|----------------------|--------------------------------------|
+| - /                  | - /v1/                               |
+|                      | - /v2/                               |
+|                      | - /v3/                               |
+|                      | - /admin/      # Administration Site |
+|                      | - /apidocs/    # Swagger UI          |
+|                      | - /health/     # Service health      |
+|----------------------|--------------------------------------|
 ```
 
 ## Infrastructure
+
 ```
                     +-------------------------------------+
                     |           (Public Internet)         |
@@ -31,7 +40,6 @@
                                          v
 +-----------------------+       only CloudFront        +-----------------------+
 |  AWS WAF (CLOUDFRONT) | <==========================> |  Amazon CloudFront    |
-|  Web ACL: site_waf    |                              |  (distribution)*      |
 +-----------+-----------+                              +-----------+-----------+
             | (filters)                                             |
             |                                                       v
@@ -44,7 +52,7 @@
                                               HTTP:80 -> TG  | forwards to target group
                                                              v
 +---------------------------------------------------------------------------------------------+
-|                                  VPC (from module.vpc)                                      |
+|                                           VPC                                               |
 |                                                                                             |
 |  Subnets:                                                                                   |
 |    - PUBLIC  : ALB                                                                          |
@@ -66,29 +74,5 @@
 |              | Amazon ECR: django repo |  <-- Images pushed by CI via IAM OIDC role         |
 |              +------------------------+                                                     |
 |                                                                                             |
-|   Scheduled jobs (private subnets, no public IP):                                           |
-|   +-----------------------------------+                                                     |
-|   |  EventBridge Scheduler (daily)    | --> runs --> Fargate TaskDef: cron (container 'job')|
-|   |  IAM role: scheduler_run_ecs      |       in ECS Cluster: app, SG: svc                  |
-|   +-----------------------------------+                                                     |
 +---------------------------------------------------------------------------------------------+
-```
-
-## Django application
-```
-+-------------------------------------------------------------+
-|                     Django Application                      |
-|-------------------------------------------------------------|
-|   Runs inside ECS Fargate (Gunicorn + Django)               |
-|   Serves both HTML web views and REST API endpoints         |
-+----------------------+--------------------------------------+
-|      Web Frontend    |      REST API                        |
-|----------------------|--------------------------------------|
-| - /                  | - /v1/                               |
-|                      | - /v2/                               |
-|                      | - /v3/                               |
-|                      | - /admin/      # Administration Site |
-|                      | - /apidocs/    # Swagger UI          |
-|                      | - /health/     # Service health      |
-|----------------------|--------------------------------------|
 ```
