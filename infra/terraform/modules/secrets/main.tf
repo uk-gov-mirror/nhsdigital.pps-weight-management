@@ -9,8 +9,7 @@ resource "random_password" "cloudfront_custom_header" {
 }
 
 module "secrets_manager" {
-  source  = "terraform-aws-modules/secrets-manager/aws"
-  version = "~> 1.0"
+  source = "git::https://github.com/terraform-aws-modules/terraform-aws-secrets-manager.git?ref=1e7ccd78d5d0fa24543e306b907244a46077fda2"
 
   name                    = "${var.name}-secrets-manager"
   description             = "Secrets for ${var.name}"

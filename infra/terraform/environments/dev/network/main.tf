@@ -13,8 +13,7 @@ locals {
 }
 
 module "vpc" {
-  source  = "terraform-aws-modules/vpc/aws"
-  version = "~> 5.0"
+  source = "git::https://github.com/terraform-aws-modules/terraform-aws-vpc.git?ref=26c38a66f12e7c6c93b6a2ba127ad68981a48671"
 
   name = "${local.context_string}-vpc"
   cidr = "10.0.0.0/16"
@@ -33,7 +32,7 @@ module "vpc" {
 }
 
 module "flow_log" {
-  source = "terraform-aws-modules/vpc/aws//modules/flow-log"
+  source = "git::https://github.com/terraform-aws-modules/terraform-aws-vpc.git//modules/flow-log?ref=26c38a66f12e7c6c93b6a2ba127ad68981a48671"
 
   name   = "${local.context_string}-flow-log"
   vpc_id = module.vpc.vpc_id

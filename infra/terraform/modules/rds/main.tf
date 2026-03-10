@@ -9,8 +9,7 @@ resource "aws_db_parameter_group" "postgres" {
 }
 
 module "rds" {
-  source  = "terraform-aws-modules/rds/aws"
-  version = "~> 6.0"
+  source = "git::https://github.com/terraform-aws-modules/terraform-aws-rds.git?ref=ec9c2e37ccca2a41aeb89ba78f858270a9ac9381"
 
   identifier = "${var.name}-rds"
 

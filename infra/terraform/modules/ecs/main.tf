@@ -1,6 +1,11 @@
 resource "aws_ecs_cluster" "main" {
   name = "${var.name}-cluster"
 
+  setting {
+    name  = "containerInsights"
+    value = "enabled"
+  }
+
   tags = var.tags
 }
 
@@ -115,10 +120,12 @@ resource "aws_iam_role_policy" "execution_secrets" {
       {
         Effect = "Allow"
         Action = [
-          "secretsmanager:GetSecretValue",
-          "kms:Decrypt"
+          "secretsmanager:GetSecretValue"
         ]
-        Resource = ["*"]
+        Resource = [
+          var.db_password_secret_arn,
+          var.django_secret_key
+        ]
       }
     ]
   })
@@ -192,9 +199,53 @@ resource "aws_iam_role_policy" "task_db_secret" {
   })
 }
 
+data "aws_caller_identity" "current" {}
+
+data "aws_iam_policy_document" "ecs_logs_kms" {
+  statement {
+    sid    = "EnableRootPermissions"
+    effect = "Allow"
+
+    principals {
+      type        = "AWS"
+      identifiers = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"]
+    }
+
+    actions   = ["kms:*"]
+    resources = ["*"]
+  }
+
+  statement {
+    sid    = "AllowCloudWatchLogsUse"
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["logs.${var.region}.amazonaws.com"]
+    }
+
+    actions = [
+      "kms:Encrypt",
+      "kms:Decrypt",
+      "kms:ReEncrypt*",
+      "kms:GenerateDataKey*",
+      "kms:DescribeKey"
+    ]
+
+    resources = ["*"]
+  }
+}
+
+resource "aws_kms_key" "ecs_logs" {
+  description         = "KMS key for ECS CloudWatch log group encryption"
+  enable_key_rotation = true
+  policy              = data.aws_iam_policy_document.ecs_logs_kms.json
+}
+
 resource "aws_cloudwatch_log_group" "ecs" {
   name              = "/ecs/${var.name}-app"
-  retention_in_days = 7
+  retention_in_days = 365
+  kms_key_id        = aws_kms_key.ecs_logs.arn
 
   tags = var.tags
 }

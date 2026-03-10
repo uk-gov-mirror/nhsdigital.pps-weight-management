@@ -123,9 +123,53 @@ resource "aws_wafv2_web_acl" "main" {
   tags = var.tags
 }
 
+data "aws_caller_identity" "current" {}
+
+data "aws_iam_policy_document" "waf_logs_kms" {
+  statement {
+    sid    = "EnableRootPermissions"
+    effect = "Allow"
+
+    principals {
+      type        = "AWS"
+      identifiers = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"]
+    }
+
+    actions   = ["kms:*"]
+    resources = ["*"]
+  }
+
+  statement {
+    sid    = "AllowCloudWatchLogsUse"
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["logs.amazonaws.com"]
+    }
+
+    actions = [
+      "kms:Encrypt",
+      "kms:Decrypt",
+      "kms:ReEncrypt*",
+      "kms:GenerateDataKey*",
+      "kms:DescribeKey"
+    ]
+
+    resources = ["*"]
+  }
+}
+
+resource "aws_kms_key" "waf_logs" {
+  description         = "KMS key for WAF CloudWatch log group encryption"
+  enable_key_rotation = true
+  policy              = data.aws_iam_policy_document.waf_logs_kms.json
+}
+
 resource "aws_cloudwatch_log_group" "waf" {
   name              = "aws-waf-logs-${var.name}"
   retention_in_days = 7
+  kms_key_id        = aws_kms_key.waf_logs.arn
 
   tags = var.tags
 }

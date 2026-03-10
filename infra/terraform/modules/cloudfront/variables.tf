@@ -35,7 +35,7 @@ variable "acm_certificate_arn" {
 variable "default_root_object" {
   description = "Default root object"
   type        = string
-  default     = ""
+  default     = "index.html"
 }
 
 variable "default_ttl" {

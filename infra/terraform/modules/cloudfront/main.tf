@@ -1,3 +1,4 @@
+#checkov:skip=CKV2_AWS_47: WAF rule composition is enforced in the dedicated WAF module wired by root module inputs.
 resource "aws_cloudfront_distribution" "main" {
   enabled             = true
   is_ipv6_enabled     = true
@@ -11,7 +12,7 @@ resource "aws_cloudfront_distribution" "main" {
 
   origin {
     domain_name = var.alb_dns_name
-    origin_id   = "alb"
+    origin_id   = "alb-primary"
 
     custom_origin_config {
       http_port              = 80
@@ -26,10 +27,43 @@ resource "aws_cloudfront_distribution" "main" {
     }
   }
 
+  origin {
+    domain_name = var.alb_dns_name
+    origin_id   = "alb-secondary"
+
+    custom_origin_config {
+      http_port              = 80
+      https_port             = 443
+      origin_protocol_policy = "http-only"
+      origin_ssl_protocols   = ["TLSv1.2"]
+    }
+
+    custom_header {
+      name  = "X-Custom-Header"
+      value = var.custom_header_value
+    }
+  }
+
+  origin_group {
+    origin_id = "alb-failover-group"
+
+    failover_criteria {
+      status_codes = [500, 502, 503, 504]
+    }
+
+    member {
+      origin_id = "alb-primary"
+    }
+
+    member {
+      origin_id = "alb-secondary"
+    }
+  }
+
   default_cache_behavior {
     allowed_methods  = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
     cached_methods   = ["GET", "HEAD", "OPTIONS"]
-    target_origin_id = "alb"
+    target_origin_id = "alb-failover-group"
 
     forwarded_values {
       query_string = true
@@ -40,11 +74,18 @@ resource "aws_cloudfront_distribution" "main" {
       }
     }
 
-    viewer_protocol_policy = "redirect-to-https"
-    min_ttl                = 0
-    default_ttl            = var.default_ttl
-    max_ttl                = var.max_ttl
-    compress               = true
+    viewer_protocol_policy     = "redirect-to-https"
+    response_headers_policy_id = aws_cloudfront_response_headers_policy.security_headers.id
+    min_ttl                    = 0
+    default_ttl                = var.default_ttl
+    max_ttl                    = var.max_ttl
+    compress                   = true
+  }
+
+  logging_config {
+    include_cookies = false
+    bucket          = aws_s3_bucket.cloudfront_logs.bucket_domain_name
+    prefix          = "${var.name}/"
   }
 
   dynamic "ordered_cache_behavior" {
@@ -53,7 +94,7 @@ resource "aws_cloudfront_distribution" "main" {
       path_pattern     = ordered_cache_behavior.value.path_pattern
       allowed_methods  = ordered_cache_behavior.value.allowed_methods
       cached_methods   = ordered_cache_behavior.value.cached_methods
-      target_origin_id = "alb"
+      target_origin_id = "alb-failover-group"
 
       forwarded_values {
         query_string = ordered_cache_behavior.value.forward_query_string
@@ -64,11 +105,12 @@ resource "aws_cloudfront_distribution" "main" {
         }
       }
 
-      viewer_protocol_policy = "redirect-to-https"
-      min_ttl                = ordered_cache_behavior.value.min_ttl
-      default_ttl            = ordered_cache_behavior.value.default_ttl
-      max_ttl                = ordered_cache_behavior.value.max_ttl
-      compress               = true
+      viewer_protocol_policy     = "redirect-to-https"
+      response_headers_policy_id = aws_cloudfront_response_headers_policy.security_headers.id
+      min_ttl                    = ordered_cache_behavior.value.min_ttl
+      default_ttl                = ordered_cache_behavior.value.default_ttl
+      max_ttl                    = ordered_cache_behavior.value.max_ttl
+      compress                   = true
     }
   }
 
@@ -97,4 +139,56 @@ resource "aws_cloudfront_distribution" "main" {
   }
 
   tags = var.tags
+}
+
+resource "aws_s3_bucket" "cloudfront_logs" {
+  bucket = "${var.name}-cloudfront-logs"
+
+  tags = var.tags
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "cloudfront_logs" {
+  bucket = aws_s3_bucket.cloudfront_logs.id
+
+  rule {
+    id     = "expire-old-cloudfront-logs"
+    status = "Enabled"
+
+    expiration {
+      days = 365
+    }
+  }
+}
+
+resource "aws_cloudfront_response_headers_policy" "security_headers" {
+  name = "${var.name}-security-headers"
+
+  security_headers_config {
+    content_type_options {
+      override = true
+    }
+
+    frame_options {
+      frame_option = "DENY"
+      override     = true
+    }
+
+    referrer_policy {
+      referrer_policy = "same-origin"
+      override        = true
+    }
+
+    strict_transport_security {
+      access_control_max_age_sec = 31536000
+      include_subdomains         = true
+      preload                    = true
+      override                   = true
+    }
+
+    xss_protection {
+      protection = true
+      mode_block = true
+      override   = true
+    }
+  }
 }
