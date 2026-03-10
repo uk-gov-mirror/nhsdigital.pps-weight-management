@@ -33,7 +33,7 @@ jobs:
       aws_region: ${{ vars.AWS_REGION }}
       project: nhse-pps-htsh
       gh_env: dev
-      aws_account_id: 515424599516
+      aws_account_id: ${{ vars.AWS_ACCOUNT_ID }}
 
 
   apply-network-dev:
@@ -47,7 +47,7 @@ jobs:
       aws_region: ${{ vars.AWS_REGION }}
       project: nhse-pps-htsh
       gh_env: dev
-      aws_account_id: 515424599516
+      aws_account_id: ${{ vars.AWS_ACCOUNT_ID }}
 
   destroy-network-dev:
     if: inputs.action == 'destroy'
@@ -60,5 +60,5 @@ jobs:
       aws_region: ${{ vars.AWS_REGION }}
       project: nhse-pps-htsh
       gh_env: dev
-      aws_account_id: 515424599516
+      aws_account_id: ${{ vars.AWS_ACCOUNT_ID }}
       dry_run: ${{ inputs.dry_run }}
