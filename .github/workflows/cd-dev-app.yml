@@ -59,7 +59,7 @@ jobs:
       working_directory: infra/terraform/environments/dev/app
       image_tag: ${{ inputs.image_tag }}
       aws_region: ${{ vars.AWS_REGION }}
-      aws_account_id: 515424599516
+      aws_account_id: ${{ vars.AWS_ACCOUNT_ID }}
       project: nhse-pps-htsh
       gh_env: dev
       include_app_vars: ${{ inputs.include_app_vars }}
@@ -123,7 +123,7 @@ jobs:
       layer: app
       working_directory: infra/terraform/environments/dev/app
       aws_region: ${{ vars.AWS_REGION }}
-      aws_account_id: 515424599516
+      aws_account_id: ${{ vars.AWS_ACCOUNT_ID }}
       project: nhse-pps-htsh
       gh_env: dev
       include_app_vars: ${{ inputs.include_app_vars }}
@@ -138,7 +138,7 @@ jobs:
       layer: app
       working_directory: infra/terraform/environments/dev/app
       aws_region: ${{ vars.AWS_REGION }}
-      aws_account_id: 515424599516
+      aws_account_id: ${{ vars.AWS_ACCOUNT_ID }}
       project: nhse-pps-htsh
       gh_env: dev
       include_app_vars: ${{ inputs.include_app_vars }}
