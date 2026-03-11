@@ -51,6 +51,7 @@ env:
 
 jobs:
   plan-app-dev:
+    if: github.event_name == 'workflow_dispatch'
     uses: ./.github/workflows/terraform-plan.yml
     with:
       environment: dev
@@ -63,6 +64,37 @@ jobs:
       project: nhse-pps-htsh
       gh_env: dev
       include_app_vars: ${{ inputs.include_app_vars }}
+
+  apply-app-dev:
+    if: github.event_name == 'workflow_dispatch' && inputs.action == 'apply'
+    needs: plan-app-dev
+    uses: ./.github/workflows/terraform-apply.yml
+    with:
+      environment: dev
+      environment_suffix: ${{ inputs.environment_suffix }}
+      layer: app
+      working_directory: infra/terraform/environments/dev/app
+      aws_region: ${{ vars.AWS_REGION }}
+      aws_account_id: ${{ vars.AWS_ACCOUNT_ID }}
+      project: nhse-pps-htsh
+      gh_env: dev
+      include_app_vars: ${{ inputs.include_app_vars }}
+
+  destroy-app-dev:
+    if: github.event_name == 'workflow_dispatch' && inputs.action == 'destroy'
+    needs: plan-app-dev
+    uses: ./.github/workflows/terraform-destroy.yml
+    with:
+      environment: dev
+      environment_suffix: ${{ inputs.environment_suffix }}
+      layer: app
+      working_directory: infra/terraform/environments/dev/app
+      aws_region: ${{ vars.AWS_REGION }}
+      aws_account_id: ${{ vars.AWS_ACCOUNT_ID }}
+      project: nhse-pps-htsh
+      gh_env: dev
+      include_app_vars: ${{ inputs.include_app_vars }}
+      dry_run: ${{ inputs.dry_run }}
 
   scheduled-destroy:
     if: github.event_name == 'schedule' && github.event.schedule == '0 18 * * 1-5'
@@ -113,33 +145,3 @@ jobs:
               }
             })
 
-  apply-app-dev:
-    if: inputs.action == 'apply'
-    needs: plan-app-dev
-    uses: ./.github/workflows/terraform-apply.yml
-    with:
-      environment: dev
-      environment_suffix: ${{ inputs.environment_suffix }}
-      layer: app
-      working_directory: infra/terraform/environments/dev/app
-      aws_region: ${{ vars.AWS_REGION }}
-      aws_account_id: ${{ vars.AWS_ACCOUNT_ID }}
-      project: nhse-pps-htsh
-      gh_env: dev
-      include_app_vars: ${{ inputs.include_app_vars }}
-
-  destroy-app-dev:
-    if: inputs.action == 'destroy'
-    needs: plan-app-dev
-    uses: ./.github/workflows/terraform-destroy.yml
-    with:
-      environment: dev
-      environment_suffix: ${{ inputs.environment_suffix }}
-      layer: app
-      working_directory: infra/terraform/environments/dev/app
-      aws_region: ${{ vars.AWS_REGION }}
-      aws_account_id: ${{ vars.AWS_ACCOUNT_ID }}
-      project: nhse-pps-htsh
-      gh_env: dev
-      include_app_vars: ${{ inputs.include_app_vars }}
-      dry_run: ${{ inputs.dry_run }}
