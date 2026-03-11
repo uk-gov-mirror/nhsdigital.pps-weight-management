@@ -13,6 +13,17 @@ resource "aws_ecs_task_definition" "app" {
   execution_role_arn       = aws_iam_role.execution.arn
   task_role_arn            = aws_iam_role.task.arn
 
+  dynamic "ephemeral_storage" {
+    for_each = var.ephemeral_storage_gib == null ? [] : [var.ephemeral_storage_gib]
+    content {
+      size_in_gib = ephemeral_storage.value
+    }
+  }
+
+  volume {
+    name = "tmp"
+  }
+
   container_definitions = jsonencode([
     {
       name                   = "web"
@@ -22,6 +33,13 @@ resource "aws_ecs_task_definition" "app" {
       linuxParameters = {
         initProcessEnabled = true
       }
+      mountPoints = [
+        {
+          sourceVolume  = "tmp"
+          containerPath = "/tmp"
+          readOnly      = false
+        }
+      ]
       portMappings = [{ containerPort = 8000, hostPort = 8000, protocol = "tcp" }]
       environment = [
         { name = "DATABASE_HOST", value = var.db_address },

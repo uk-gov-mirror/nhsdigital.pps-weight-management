@@ -21,6 +21,17 @@ variable "memory" {
   default     = "512"
 }
 
+variable "ephemeral_storage_gib" {
+  description = "Optional ECS task ephemeral storage size in GiB (Fargate supports 21-200). Null uses AWS default (20 GiB)."
+  type        = number
+  default     = null
+
+  validation {
+    condition     = var.ephemeral_storage_gib == null || (var.ephemeral_storage_gib >= 21 && var.ephemeral_storage_gib <= 200)
+    error_message = "ephemeral_storage_gib must be null or between 21 and 200 GiB."
+  }
+}
+
 variable "docker_image" {
   description = "Docker image URI"
   type        = string
