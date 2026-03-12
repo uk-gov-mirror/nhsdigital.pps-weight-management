@@ -1,0 +1,20 @@
+mode: ContinuousDelivery
+tag-prefix: '[vV]?'
+commit-message-incrementing: Enabled
+
+# Conventional Commits mapping:
+# - major: breaking changes (type! or BREAKING CHANGE footer)
+# - minor: feat
+# - patch: fix/perf/refactor/revert
+# - no bump: docs/chore/style/test/build/ci
+major-version-bump-message: '^(?:.+!:\s|.*\n\n(?:.*\n)*BREAKING CHANGE:\s.+)'
+minor-version-bump-message: '^feat(?:\([^)]+\))?:'
+patch-version-bump-message: '^(?:fix|perf|refactor|revert)(?:\([^)]+\))?:'
+no-bump-message: '^(?:docs|chore|style|test|build|ci)(?:\([^)]+\))?:'
+
+branches:
+  main:
+    regex: ^main$
+    increment: Patch
+    prevent-increment:
+      when-current-commit-tagged: true
