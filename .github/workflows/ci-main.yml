@@ -105,3 +105,20 @@ jobs:
           docker push "${{ steps.meta.outputs.tag_sha }}"
           docker push "${{ steps.meta.outputs.tag_latest }}"
           docker push "${{ steps.meta.outputs.majorMinorPatch }}"
+
+      - name: Push Git tag
+        env:
+          VERSION: ${{ steps.version_step.outputs.majorMinorPatch }}
+        run: |
+          TAG="v${VERSION}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
+            echo "Tag ${TAG} already exists, skipping."
+            exit 0
+          fi
+
+          git tag -a "${TAG}" "${GITHUB_SHA}" -m "Release ${TAG}"
+          git push origin "${TAG}"
