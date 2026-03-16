@@ -122,3 +122,4 @@ jobs:
 
           git tag -a "${TAG}" "${GITHUB_SHA}" -m "Release ${TAG}"
           git push origin "${TAG}"
+          
