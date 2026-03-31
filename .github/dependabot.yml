@@ -1,0 +1,17 @@
+version: 2
+updates:
+	- package-ecosystem: "npm"
+		directories:
+			- "/"
+			- "/django_app"
+		schedule:
+			interval: "weekly"
+		cooldown:
+			default-days: 7
+
+	- package-ecosystem: "pip"
+		directory: "/django_app"
+		schedule:
+			interval: "weekly"
+		cooldown:
+			default-days: 7
