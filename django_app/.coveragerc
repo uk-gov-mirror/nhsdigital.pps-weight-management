@@ -1,0 +1,25 @@
+[run]
+source = .
+omit =
+    */migrations/*
+    */tests/*
+    */testing/*
+    manage.py
+    wm_django/wsgi.py
+    wm_django/asgi.py
+    wm_django/settings/*
+    wm_django/db_backends/*
+
+[report]
+show_missing = True
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    if __name__ == .__main__
+    raise NotImplementedError
+
+[html]
+directory = htmlcov
+
+[xml]
+output = coverage.xml

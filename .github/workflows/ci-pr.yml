@@ -75,13 +75,12 @@ jobs:
             -t "${{ steps.meta.outputs.tag_pr }}" \
             .
 
-      - name: Test image
+      - name: Test with coverage
         run: |
           docker run --rm \
-            -e DJANGO_SETTINGS_MODULE=wm_django.settings.dev \
-            -e DJANGO_ENV=dev \
+            -e DJANGO_SETTINGS_MODULE=wm_django.settings.test \
             "${{ steps.meta.outputs.tag_pr }}" \
-            python3 manage.py test
+            sh -c "coverage run manage.py test"
 
       - name: Push image
         run: docker push "${{ steps.meta.outputs.tag_pr }}"
