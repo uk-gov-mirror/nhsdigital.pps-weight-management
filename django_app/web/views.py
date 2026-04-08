@@ -842,6 +842,7 @@ def detail(request: HttpRequest, service_id: int) -> HttpResponse:
 def toggle_favourite(request: HttpRequest, service_id: int) -> HttpResponse:
     """Toggle a service in the user's favourites. POST only, redirects back."""
     if not request.user.is_authenticated:
+        request.session.pop("account_prompt_dismissed", None)
         return redirect(reverse("detail", kwargs={"service_id": service_id}))
 
     from pilot_access.models import FavouriteService
