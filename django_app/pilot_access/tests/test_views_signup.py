@@ -20,12 +20,13 @@ class LandingViewTests(TestCase):
     """Tests for the landing page view."""
 
     def test_landing_get_valid_campaign_code(self):
-        """GET /pilot/landing/?cc=CODE with valid campaign shows campaign context."""
+        """GET /pilot/landing/?cc=CODE with valid campaign redirects to /."""
         campaign = make_campaign()
         response = self.client.get(
             reverse("pilot_access:landing"), {"cc": campaign.campaign_code}
         )
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, "/")
         # Campaign code stored in session
         self.assertEqual(self.client.session.get("campaign_code"), campaign.campaign_code)
 
@@ -418,3 +419,72 @@ class OtpVerifyViewTests(TestCase):
         )
         self.profile.refresh_from_db()
         self.assertIsNotNone(self.profile.disclaimer_accepted_at)
+
+
+@patch("pilot_access.views._ensure_min_response_time")
+class InterstitialSignupSessionMigrationTests(TestCase):
+    """Tests for session data migration during interstitial signup OTP verify."""
+
+    def setUp(self):
+        cache.clear()
+        self.user = make_user()
+        self.profile = make_pilot_profile(
+            user=self.user,
+            disclaimer_accepted_at=None,
+        )
+        self.otp = generate_otp()
+        MagicLink.objects.create(
+            user=self.user,
+            token_hash=hash_token(self.otp),
+            expires_at=timezone.now() + timedelta(minutes=15),
+        )
+
+    def _set_otp_session(self, **extra):
+        """Set OTP session keys for signup flow with questionnaire data."""
+        session = self.client.session
+        session["otp_user_id"] = self.user.id
+        session["otp_flow"] = "signup"
+        session["otp_contact"] = self.profile.email
+        session["otp_is_email"] = True
+        session["disclaimer_accepted"] = True
+        # Questionnaire session data
+        session["goals"] = ["lose_weight"]
+        session["barriers"] = ["time"]
+        session["details-postcode"] = "SW1A 1AA"
+        for k, v in extra.items():
+            session[k] = v
+        session.save()
+
+    def test_signup_migrates_session_to_user_filter(self, mock_timing):
+        """OTP signup migrates questionnaire session data to UserFilter."""
+        self._set_otp_session()
+        self.client.post(
+            reverse("pilot_access:otp_verify"),
+            {"otp": self.otp},
+        )
+        from pilot_access.models import UserFilter
+
+        uf = UserFilter.objects.get(user=self.user)
+        self.assertEqual(uf.data.get("goals"), ["lose_weight"])
+        self.assertEqual(uf.data.get("barriers"), ["time"])
+        self.assertEqual(uf.data.get("details-postcode"), "SW1A 1AA")
+
+    def test_interstitial_signup_redirects_to_allow_check_in(self, mock_timing):
+        """OTP signup with account_prompt_service_id → redirect to /allow-check-in."""
+        self._set_otp_session(account_prompt_service_id=42)
+        response = self.client.post(
+            reverse("pilot_access:otp_verify"),
+            {"otp": self.otp},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/allow-check-in", response.url)
+
+    def test_standard_signup_redirects_to_success(self, mock_timing):
+        """OTP signup without account_prompt_service_id → redirect to /success."""
+        self._set_otp_session()
+        response = self.client.post(
+            reverse("pilot_access:otp_verify"),
+            {"otp": self.otp},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/success", response.url)

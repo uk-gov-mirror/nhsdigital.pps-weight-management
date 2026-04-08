@@ -222,31 +222,35 @@ SPECTACULAR_SETTINGS = {
 }
 
 # -------------------------------------------------------------------
-# Pilot Access - URL prefixes that are publicly accessible
+# Session configuration (explicit for anonymous user support — MID-03)
 # -------------------------------------------------------------------
 
-PILOT_ACCESS_PUBLIC_PATH_PREFIXES = [
-    # Specific pilot pages that don't require authentication
-    "/pilot/landing/",      # login/signup landing page
-    "/pilot/contact-type/", # campaign signup contact type
-    "/pilot/contact-info/", # campaign signup contact info
-    "/pilot/otp/",          # OTP verification
-    "/pilot/disclaimer/",   # disclaimer acceptance
-    "/pilot/login/",        # request OTP for login
-    "/pilot/returning/",     # check if first time or returning user
-    "/pilot/details-not-shared/", # details not shared page
-    "/pilot/change-contact-info/", # change contact info page
-    "/pilot/change-contact-type/", # change contact type page
-    # Other public paths
-    "/health",          # health checks
-    "/static/",         # static files
-    "/admin/",          # admin (login still guarded by Django)
-    "/apidocs/",        # Swagger UI
-    "/redoc/",          # API Documentation
-    "/schema.yaml",     # REST API Schema
-    "/v1/",             # REST api v1
-    "/v2/",             # REST api v2
-    "/v3/",             # REST api v3
+SESSION_ENGINE = "django.contrib.sessions.backends.db"
+SESSION_COOKIE_AGE = 1209600  # 2 weeks in seconds
+SESSION_SAVE_EVERY_REQUEST = False  # Save only when session is modified
+SESSION_COOKIE_HTTPONLY = True
+
+# -------------------------------------------------------------------
+# Pilot Access - Protected route model
+# -------------------------------------------------------------------
+
+# Paths requiring full authentication (user + pilot profile + disclaimer)
+PILOT_ACCESS_AUTH_REQUIRED_PREFIXES = [
+    "/pilot/account/",
+    "/favourites",
+]
+
+# System/infrastructure paths exempt from ALL pilot access checks
+PILOT_ACCESS_EXEMPT_PREFIXES = [
+    "/health",
+    "/static/",
+    "/admin/",
+    "/apidocs/",
+    "/redoc/",
+    "/schema.yaml",
+    "/v1/",
+    "/v2/",
+    "/v3/",
 ]
 
 # -------------------------------------------------------------------

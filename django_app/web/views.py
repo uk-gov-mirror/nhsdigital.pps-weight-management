@@ -24,13 +24,16 @@ import logging
 import re
 from json import JSONDecodeError
 from typing import Any, Dict, List
+from urllib.parse import urlparse
 
 import requests
 from django.conf import settings
 from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.contrib import messages
+from django.views.decorators.http import require_POST
 
 logger = logging.getLogger(__name__)
 
@@ -140,13 +143,13 @@ def start(request: HttpRequest) -> HttpResponse:
     from pilot_access.models import UserFilter
 
     # request.session.flush()
-    start_href = "details-contact-details"
     onboarding_complete = request.session.get("onboarding_complete", False)
     opted_in = False
     user_fields = {}
 
-    # If user has already been through the wizard (has UserFilter data), go straight to listings
     if request.user.is_authenticated:
+        start_href = "details-contact-details"
+        # If user has already been through the wizard (has UserFilter data), go straight to listings
         try:
             uf = UserFilter.objects.get(user=request.user)
             if uf.data:
@@ -155,6 +158,14 @@ def start(request: HttpRequest) -> HttpResponse:
                 user_fields = uf.data
         except UserFilter.DoesNotExist:
             pass
+    else:
+        # Anonymous campaign user — skip contact details, start at postcode
+        start_href = "details-postcode"
+        # Populate user_fields from session so the summary renders correctly
+        if onboarding_complete:
+            for key in PERSISTED_SESSION_KEYS:
+                if key in request.session:
+                    user_fields[key] = request.session[key]
 
     # Legacy check for magic link flow
     if request.session.get("entry_flow") == "magiclink":
@@ -477,6 +488,9 @@ def preference_channel(request: HttpRequest) -> HttpResponse:
         if mode == "edit":
             messages.success(request, "Your data has been updated.")
             return redirect("/")
+        elif not request.user.is_authenticated:
+            request.session["onboarding_complete"] = True
+            return redirect("listing")
         else:
             return redirect("allow-check-in")
 
@@ -499,6 +513,12 @@ def allow_check_in(request: HttpRequest) -> HttpResponse:
         value = request.POST.get("allow_check_in")
         request.session["allow_check_in"] = value
         _persist_to_user_filter(request.user, "allow_check_in", value)
+
+        service_id = request.session.pop("account_prompt_service_id", None)
+        if service_id and value in ("yes", "no"):
+            request.session["onboarding_complete"] = True
+            return redirect("detail", service_id=service_id)
+
         if mode == "edit" and value in ("yes", "no"):
             messages.success(request, "Your data has been updated.")
             return redirect("/")
@@ -700,6 +720,15 @@ def listing(request: HttpRequest) -> HttpResponse:
         "showing_to": min(offset + page_size, total_results),
     }
 
+    # Favourite state for star icons
+    favourite_ids = set()
+    if request.user.is_authenticated:
+        from pilot_access.models import FavouriteService
+        favourite_ids = set(
+            FavouriteService.objects.filter(user=request.user)
+            .values_list("service_id", flat=True)
+        )
+
     return render(
         request,
         "web/pages/listing.jinja",
@@ -711,6 +740,7 @@ def listing(request: HttpRequest) -> HttpResponse:
             "postcode": postcode,
             "distance": distance,
             "distance_options": DISTANCE_OPTIONS,
+            "favourite_ids": favourite_ids,
         },
     )
 
@@ -754,6 +784,33 @@ def _get_page_range(current_page: int, total_pages: int, window: int = 2) -> Lis
 
 def detail(request: HttpRequest, service_id: int) -> HttpResponse:
     """Show a single service's details, fetched from the API."""
+    if request.GET.get("skip_prompt"):
+        request.session["account_prompt_dismissed"] = True
+        next_url = request.GET.get("next", "")
+        if next_url and url_has_allowed_host_and_scheme(
+            next_url, allowed_hosts={request.get_host()}
+        ):
+            return redirect(next_url)
+
+    if (not request.user.is_authenticated
+            and not request.session.get("account_prompt_dismissed")):
+        if request.method == "POST" and request.POST.get("action") == "create_account":
+            request.session["account_prompt_service_id"] = service_id
+            request.session["disclaimer_accepted"] = True
+            return redirect("pilot_access:campaign_contact_type")
+        if not request.GET.get("skip_prompt"):
+            prompt_next = ""
+            referer = request.META.get("HTTP_REFERER", "")
+            if referer and url_has_allowed_host_and_scheme(
+                referer, allowed_hosts={request.get_host()}
+            ):
+                prompt_next = urlparse(referer).path
+            return render(request, "web/pages/account-prompt.jinja", {
+                "service_id": service_id,
+                "prompt_next": prompt_next,
+            })
+    # --- End interstitial gate ---
+
     api_url = _build_internal_api_url(
         reverse("v3:service-detail", kwargs={"id": service_id})
     )
@@ -766,11 +823,61 @@ def detail(request: HttpRequest, service_id: int) -> HttpResponse:
         logger.exception("Service detail API error")
         raise Http404("Service not found")
 
+    # Favourite state for star icon
+    is_favourited = False
+    if request.user.is_authenticated:
+        from pilot_access.models import FavouriteService
+        is_favourited = FavouriteService.objects.filter(
+            user=request.user, service_id=service_id
+        ).exists()
+
     return render(
         request,
         "web/pages/detail.jinja",
-        {"service": service, "data": request.session},
+        {"service": service, "data": request.session, "is_favourited": is_favourited},
     )
+
+
+@require_POST
+def toggle_favourite(request: HttpRequest, service_id: int) -> HttpResponse:
+    """Toggle a service in the user's favourites. POST only, redirects back."""
+    if not request.user.is_authenticated:
+        return redirect(reverse("detail", kwargs={"service_id": service_id}))
+
+    from pilot_access.models import FavouriteService
+
+    obj, created = FavouriteService.objects.get_or_create(
+        user=request.user, service_id=service_id
+    )
+    if not created:
+        obj.delete()
+
+    # Redirect to referer if same host, otherwise listing
+    referer = request.META.get("HTTP_REFERER", "")
+    if referer and request.get_host() in referer:
+        return redirect(referer)
+    return redirect(reverse("listing"))
+
+
+def favourites_list(request: HttpRequest) -> HttpResponse:
+    """Show the user's saved (favourited) services as cards."""
+    from pilot_access.models import FavouriteService
+    from api.models_v3 import V3_Service
+    from api.v3.serializers import V3_ServiceSummarySerializer
+
+    service_ids = list(
+        FavouriteService.objects.filter(user=request.user)
+        .values_list("service_id", flat=True)
+    )
+    services = V3_Service.objects.filter(id__in=service_ids).select_related("service_type")
+    serialized = V3_ServiceSummarySerializer(services, many=True).data
+
+    return render(
+        request,
+        "web/pages/favourites.jinja",
+        {"services": serialized, "data": request.session},
+    )
+
 
 # ---------------------------------------------------------------------------
 # Helpers

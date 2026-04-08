@@ -160,3 +160,24 @@ class UserFilter(models.Model):
 
     def get_value(self, key: str, default=None):
         return (self.data or {}).get(key, default)
+
+
+class FavouriteService(models.Model):
+    """A user's favourited service. service_id references V3_Service.id (unmanaged)."""
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="favourite_services",
+    )
+    service_id = models.PositiveIntegerField(
+        help_text="V3_Service.id — not a FK because the service table is unmanaged"
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        unique_together = ("user", "service_id")
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"User {self.user_id} ♥ Service {self.service_id}"

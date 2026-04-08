@@ -23,6 +23,7 @@
   </div>
 {% endmacro %}
 {% set pageName = "Get help to make healthy lifestyle changes that last" %}
+{% if request.user.is_authenticated %}
 {% set endLinksHtml %}
   <div class="nhsuk-u-padding-bottom-3">
     <a href="{{ url('pilot_access:account') }}"
@@ -33,6 +34,7 @@
        class="nhsuk-link nhsuk-link--no-visited-state">Delete all my information</a>
   </div>
 {% endset %}
+{% endif %}
 {% block main %}
   <main id="maincontent" class="app-magazine-style-start--return-user">
     <div class="nhsuk-u-padding-top-6 nhsuk-u-padding-bottom-3">
@@ -102,6 +104,7 @@
           </div>
         </div>
       </div>
+      {% if request.user.is_authenticated %}
       <div class="nhsuk-u-padding-top-6 nhsuk-u-padding-bottom-3 app-magazine-style-start--robo-background">
         <div class="nhsuk-width-container">
           <div class="nhsuk-grid-row">
@@ -134,6 +137,7 @@
           </div>
         </div>
       </div>
+      {% endif %}
       <div class="nhsuk-u-padding-top-6 nhsuk-u-padding-bottom-6">
         <div class="nhsuk-width-container">
           <div class="nhsuk-grid-row">

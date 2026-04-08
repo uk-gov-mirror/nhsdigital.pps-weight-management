@@ -353,6 +353,21 @@ def otp_verify(request: HttpRequest) -> HttpResponse:
             request.session.pop("campaign_code", None)
             request.session.pop("disclaimer_accepted", None)
 
+            if otp_flow == "signup":
+                from web.views import PERSISTED_SESSION_KEYS, _persist_to_user_filter
+
+                for key in PERSISTED_SESSION_KEYS:
+                    val = request.session.get(key)
+                    if val is not None:
+                        _persist_to_user_filter(request.user, key, val)
+
+                # If interstitial signup, route to check-in opt-in → then service detail
+                if request.session.get("account_prompt_service_id"):
+                    return redirect("allow-check-in")
+
+                # Standard new signup (non-interstitial) — existing behavior
+                return redirect("/success")
+
             # Restore user's previous journey answers
             try:
                 uf = UserFilter.objects.get(user=user)
@@ -408,9 +423,9 @@ def landing(request: HttpRequest) -> HttpResponse:
         try:
             campaign = Campaign.objects.get(campaign_code=cc)
             if campaign.is_valid_today():
-                # Valid campaign
-                context["campaign"] = campaign
+                # Valid campaign — store in session and redirect to questionnaire start
                 request.session["campaign_code"] = cc
+                return redirect("/")
             else:
                 # Campaign exists but is out of date range
                 context["campaign_invalid"] = True

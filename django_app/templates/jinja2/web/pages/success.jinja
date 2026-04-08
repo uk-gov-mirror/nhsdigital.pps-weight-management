@@ -4,8 +4,13 @@
 
 {% set pageName = "Success" %}
 {% set bannerHtml %}
+    {% if request.user.is_authenticated %}
     <h3 class="nhsuk-notification-banner__heading">You've successfully signed in</h3>
     <p>Welcome to NHS Help to stay healthy.</p>
+    {% else %}
+    <h3 class="nhsuk-notification-banner__heading">Thank you</h3>
+    <p>We hope you find a service that works for you.</p>
+    {% endif %}
     {{ button({"text": "Continue", "href": "/details-postcode"}) }}
 {% endset %}
 {% block content %}

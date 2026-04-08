@@ -223,3 +223,139 @@ class AllowCheckInViewTests(_AuthenticatedTestCase):
         """POST with no value shows error."""
         response = self.client.post(self.url, {})
         self.assertEqual(response.status_code, 200)
+
+
+class _AnonymousCampaignTestCase(TestCase):
+    """Base class for anonymous users with valid campaign session."""
+
+    def setUp(self):
+        session = self.client.session
+        session["campaign_code"] = "TESTCAMP"
+        session.save()
+
+
+class AnonymousStartViewTests(_AnonymousCampaignTestCase):
+    """Tests for start() with anonymous campaign users."""
+
+    def test_start_anonymous_with_campaign_shows_postcode_href(self):
+        """GET / as anonymous campaign user → start_href is details-postcode."""
+        response = self.client.get(reverse("home"))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"details-postcode", response.content)
+
+    def test_start_anonymous_with_campaign_no_contact_details(self):
+        """GET / as anonymous campaign user → start_href is NOT details-contact-details."""
+        response = self.client.get(reverse("home"))
+        self.assertEqual(response.status_code, 200)
+        # The start_href should not be contact details for anonymous
+        self.assertNotIn(b'href="/details-contact-details"', response.content)
+
+
+class AnonymousDetailsPostcodeTests(_AnonymousCampaignTestCase):
+    """Tests for details-postcode with anonymous campaign users."""
+
+    def test_get_renders(self):
+        """GET /details-postcode as anonymous campaign user → 200."""
+        response = self.client.get(reverse("details_postcode"))
+        self.assertEqual(response.status_code, 200)
+
+    @mock_postcodes_io(is_valid=True)
+    def test_post_valid_postcode_redirects_to_goals(self, mock_get):
+        """POST /details-postcode with valid postcode → 302 to /goals."""
+        response = self.client.post(
+            reverse("details_postcode"), {"details-postcode": "SW1A 1AA"}
+        )
+        self.assertRedirects(
+            response, reverse("goals"), fetch_redirect_response=False
+        )
+
+    @mock_postcodes_io(is_valid=True)
+    def test_post_does_not_persist_to_user_filter(self, mock_get):
+        """POST with valid postcode does not create a UserFilter (anonymous)."""
+        from pilot_access.models import UserFilter
+
+        self.client.post(
+            reverse("details_postcode"), {"details-postcode": "SW1A 1AA"}
+        )
+        self.assertEqual(UserFilter.objects.count(), 0)
+
+
+class AnonymousGoalsTests(_AnonymousCampaignTestCase):
+    """Tests for goals with anonymous campaign users."""
+
+    def test_get_renders(self):
+        """GET /goals as anonymous campaign user → 200."""
+        response = self.client.get(reverse("goals"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_post_valid_redirects_to_barriers(self):
+        """POST /goals with valid values → 302 to /barriers."""
+        response = self.client.post(reverse("goals"), {"goals": ["lose_weight"]})
+        self.assertRedirects(
+            response, reverse("barriers"), fetch_redirect_response=False
+        )
+
+
+class AnonymousBarriersTests(_AnonymousCampaignTestCase):
+    """Tests for barriers with anonymous campaign users."""
+
+    def test_get_renders(self):
+        """GET /barriers as anonymous campaign user → 200."""
+        response = self.client.get(reverse("barriers"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_post_valid_redirects_to_preference_who_with(self):
+        """POST /barriers with valid values → 302 to /preference-who-with."""
+        response = self.client.post(
+            reverse("barriers"), {"barriers": ["time"]}
+        )
+        self.assertRedirects(
+            response, reverse("preference_who_with"), fetch_redirect_response=False
+        )
+
+
+class AnonymousPreferenceWhoWithTests(_AnonymousCampaignTestCase):
+    """Tests for preference-who-with with anonymous campaign users."""
+
+    def test_get_renders(self):
+        """GET /preference-who-with as anonymous campaign user → 200."""
+        response = self.client.get(reverse("preference_who_with"))
+        self.assertEqual(response.status_code, 200)
+
+
+class AnonymousPreferenceChannelTests(_AnonymousCampaignTestCase):
+    """Tests for preference_channel() with anonymous campaign users."""
+
+    def test_post_redirects_to_listing(self):
+        """POST preference-channel as anonymous → redirects to listing."""
+        response = self.client.post(
+            reverse("preference_channel"), {"channel": "online"}
+        )
+        self.assertRedirects(
+            response, reverse("listing"), fetch_redirect_response=False
+        )
+
+    def test_post_sets_onboarding_complete(self):
+        """POST preference-channel as anonymous → sets onboarding_complete in session."""
+        self.client.post(reverse("preference_channel"), {"channel": "online"})
+        self.assertTrue(self.client.session.get("onboarding_complete"))
+
+    def test_post_does_not_redirect_to_allow_check_in(self):
+        """POST preference-channel as anonymous → does NOT redirect to allow-check-in."""
+        response = self.client.post(
+            reverse("preference_channel"), {"channel": "online"}
+        )
+        self.assertNotIn("allow-check-in", response.url)
+
+
+class AuthenticatedPreferenceChannelTests(_AuthenticatedTestCase):
+    """Regression guard: preference_channel() still redirects auth users to allow-check-in."""
+
+    def test_post_redirects_to_allow_check_in(self):
+        """POST preference-channel as authenticated → redirects to allow-check-in."""
+        response = self.client.post(
+            reverse("preference_channel"), {"channel": "online"}
+        )
+        self.assertRedirects(
+            response, reverse("allow-check-in"), fetch_redirect_response=False
+        )

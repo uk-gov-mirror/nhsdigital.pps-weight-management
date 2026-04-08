@@ -1,6 +1,7 @@
 """Tests for PilotAccessMiddleware."""
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AnonymousUser
 from django.http import HttpResponse
 from django.test import RequestFactory, TestCase
 from django.urls import reverse
@@ -12,156 +13,285 @@ from testing.helpers import make_pilot_profile, make_user
 User = get_user_model()
 
 
-class PilotAccessMiddlewarePublicPathTests(TestCase):
-    """Tests that public paths are accessible without authentication."""
+class PilotAccessMiddlewareAuthRequiredTests(TestCase):
+    """Tests for auth-required paths (/pilot/account/)."""
 
-    def test_public_path_landing(self):
-        """GET /pilot/landing/ returns 200 (not redirect)."""
+    def setUp(self):
+        self.factory = RequestFactory()
+        self.middleware = PilotAccessMiddleware(
+            get_response=lambda r: HttpResponse("OK")
+        )
+
+    def test_unauthenticated_account_redirects_to_landing(self):
+        request = self.factory.get("/pilot/account/")
+        request.user = AnonymousUser()
+        request.session = {}
+        response = self.middleware.process_request(request)
+        self.assertIsNotNone(response)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/pilot/landing/", response.url)
+
+    def test_authenticated_no_profile_account_redirects(self):
+        request = self.factory.get("/pilot/account/")
+        request.user = make_user()
+        request.session = {}
+        response = self.middleware.process_request(request)
+        self.assertIsNotNone(response)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/pilot/landing/", response.url)
+
+    def test_authenticated_no_disclaimer_account_redirects(self):
+        user = make_user()
+        make_pilot_profile(user=user, disclaimer_accepted_at=None)
+        request = self.factory.get("/pilot/account/")
+        request.user = user
+        request.session = {}
+        response = self.middleware.process_request(request)
+        self.assertIsNotNone(response)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/pilot/landing/", response.url)
+
+    def test_staff_user_account_redirects(self):
+        request = self.factory.get("/pilot/account/")
+        request.user = make_user(is_staff=True)
+        request.session = {}
+        response = self.middleware.process_request(request)
+        self.assertIsNotNone(response)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/pilot/landing/", response.url)
+
+    def test_authenticated_with_full_profile_account_passes(self):
+        user = make_user()
+        make_pilot_profile(user=user, disclaimer_accepted_at=timezone.now())
+        request = self.factory.get("/pilot/account/")
+        request.user = user
+        request.session = {}
+        response = self.middleware.process_request(request)
+        self.assertIsNone(response)
+        self.assertTrue(hasattr(request, "pilot_access_profile"))
+        self.assertTrue(request.pilot_access_registered)
+
+    def test_account_delete_requires_auth(self):
+        request = self.factory.get("/pilot/account/delete/")
+        request.user = AnonymousUser()
+        request.session = {}
+        response = self.middleware.process_request(request)
+        self.assertIsNotNone(response)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/pilot/landing/", response.url)
+
+
+class PilotAccessMiddlewareExemptTests(TestCase):
+    """Tests for system exempt paths."""
+
+    def setUp(self):
+        self.factory = RequestFactory()
+        self.middleware = PilotAccessMiddleware(
+            get_response=lambda r: HttpResponse("OK")
+        )
+
+    def test_health_exempt(self):
+        request = self.factory.get("/health")
+        request.user = AnonymousUser()
+        request.session = {}
+        response = self.middleware.process_request(request)
+        self.assertIsNone(response)
+
+    def test_static_exempt(self):
+        request = self.factory.get("/static/nonexistent.css")
+        request.user = AnonymousUser()
+        request.session = {}
+        response = self.middleware.process_request(request)
+        self.assertIsNone(response)
+
+    def test_admin_exempt(self):
+        request = self.factory.get("/admin/")
+        request.user = AnonymousUser()
+        request.session = {}
+        response = self.middleware.process_request(request)
+        self.assertIsNone(response)
+
+    def test_api_v3_exempt(self):
+        request = self.factory.get("/v3/")
+        request.user = AnonymousUser()
+        request.session = {}
+        response = self.middleware.process_request(request)
+        self.assertIsNone(response)
+
+    def test_apidocs_exempt(self):
+        request = self.factory.get("/apidocs/")
+        request.user = AnonymousUser()
+        request.session = {}
+        response = self.middleware.process_request(request)
+        self.assertIsNone(response)
+
+
+class PilotAccessMiddlewarePilotFlowTests(TestCase):
+    """Tests for pilot auth flow passthrough (/pilot/* except /pilot/account/)."""
+
+    def setUp(self):
+        self.factory = RequestFactory()
+        self.middleware = PilotAccessMiddleware(
+            get_response=lambda r: HttpResponse("OK")
+        )
+
+    def test_landing_passes_through(self):
         response = self.client.get(reverse("pilot_access:landing"))
         self.assertEqual(response.status_code, 200)
 
-    def test_public_path_health(self):
-        """GET /health returns 200."""
-        response = self.client.get("/health")
-        self.assertEqual(response.status_code, 200)
-
-    def test_public_path_static(self):
-        """GET /static/ path should NOT redirect to landing."""
-        response = self.client.get("/static/nonexistent.css")
-        # May 404 but should NOT redirect to /pilot/landing/
-        self.assertNotEqual(response.status_code, 302)
-
-    def test_public_path_api_v3(self):
-        """GET /v3/ returns response (not redirect to pilot landing)."""
-        response = self.client.get("/v3/")
-        # Should not redirect to landing
-        if response.status_code == 302:
-            self.assertNotIn(
-                "/pilot/landing/", response.url
-            )
-
-
-class PilotAccessMiddlewareAuthTests(TestCase):
-    """Tests that middleware enforces authentication on protected paths."""
-
-    def test_unauthenticated_protected_path_redirects(self):
-        """Unauthenticated GET to protected path redirects to landing."""
-        factory = RequestFactory()
-        from django.contrib.auth.models import AnonymousUser
-
-        request = factory.get("/some-protected-path/")
+    def test_otp_page_not_redirected_to_landing(self):
+        request = self.factory.get("/pilot/otp/")
         request.user = AnonymousUser()
         request.session = {}
+        response = self.middleware.process_request(request)
+        self.assertIsNone(response)
 
-        middleware = PilotAccessMiddleware(
-            get_response=lambda r: HttpResponse("OK")
-        )
-        response = middleware.process_request(request)
-        self.assertIsNotNone(response)
-        self.assertEqual(response.status_code, 302)
-        self.assertIn("/pilot/landing/", response.url)
-
-    def test_authenticated_no_profile_redirects(self):
-        """Authenticated user without PilotProfile redirects to landing."""
-        factory = RequestFactory()
-        user = make_user()
-        request = factory.get("/some-protected-path/")
-        request.user = user
+    def test_login_page_not_redirected_to_landing(self):
+        request = self.factory.get("/pilot/login/")
+        request.user = AnonymousUser()
         request.session = {}
+        response = self.middleware.process_request(request)
+        self.assertIsNone(response)
 
-        middleware = PilotAccessMiddleware(
-            get_response=lambda r: HttpResponse("OK")
-        )
-        response = middleware.process_request(request)
-        self.assertIsNotNone(response)
-        self.assertEqual(response.status_code, 302)
-        self.assertIn("/pilot/landing/", response.url)
-
-    def test_authenticated_no_disclaimer_redirects(self):
-        """User with profile but no disclaimer_accepted_at redirects."""
-        factory = RequestFactory()
-        user = make_user()
-        make_pilot_profile(user=user, disclaimer_accepted_at=None)
-        request = factory.get("/some-protected-path/")
-        request.user = user
+    def test_disclaimer_page_not_redirected_to_landing(self):
+        request = self.factory.get("/pilot/disclaimer/")
+        request.user = AnonymousUser()
         request.session = {}
+        response = self.middleware.process_request(request)
+        self.assertIsNone(response)
 
-        middleware = PilotAccessMiddleware(
+
+class PilotAccessMiddlewareWebJourneyTests(TestCase):
+    """Tests for campaign-gated web journey routes."""
+
+    def setUp(self):
+        self.factory = RequestFactory()
+        self.middleware = PilotAccessMiddleware(
             get_response=lambda r: HttpResponse("OK")
         )
-        response = middleware.process_request(request)
+
+    def test_anonymous_with_campaign_session_passes(self):
+        request = self.factory.get("/")
+        request.user = AnonymousUser()
+        request.session = {"campaign_code": "123456"}
+        response = self.middleware.process_request(request)
+        self.assertIsNone(response)
+        self.assertFalse(request.pilot_access_registered)
+
+    def test_anonymous_with_campaign_accesses_details(self):
+        request = self.factory.get("/details-postcode")
+        request.user = AnonymousUser()
+        request.session = {"campaign_code": "123456"}
+        response = self.middleware.process_request(request)
+        self.assertIsNone(response)
+
+    def test_anonymous_without_campaign_redirects_from_root(self):
+        request = self.factory.get("/")
+        request.user = AnonymousUser()
+        request.session = {}
+        response = self.middleware.process_request(request)
         self.assertIsNotNone(response)
         self.assertEqual(response.status_code, 302)
         self.assertIn("/pilot/landing/", response.url)
 
-    def test_authenticated_with_profile_and_disclaimer_passes(self):
-        """User with full profile and disclaimer passes through."""
-        factory = RequestFactory()
+    def test_anonymous_without_campaign_redirects_from_goals(self):
+        request = self.factory.get("/goals")
+        request.user = AnonymousUser()
+        request.session = {}
+        response = self.middleware.process_request(request)
+        self.assertIsNotNone(response)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/pilot/landing/", response.url)
+
+    def test_authenticated_user_with_profile_passes(self):
         user = make_user()
         make_pilot_profile(user=user, disclaimer_accepted_at=timezone.now())
-        request = factory.get("/some-protected-path/")
+        request = self.factory.get("/")
         request.user = user
         request.session = {}
+        response = self.middleware.process_request(request)
+        self.assertIsNone(response)
+        self.assertTrue(hasattr(request, "pilot_access_profile"))
+        self.assertTrue(request.pilot_access_registered)
 
-        middleware = PilotAccessMiddleware(
-            get_response=lambda r: HttpResponse("OK")
-        )
-        response = middleware.process_request(request)
-        # process_request returns get_response result when allowed through
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.content, b"OK")
-
-    def test_staff_user_redirects_to_landing(self):
-        """Staff user redirects to landing (staff are not pilot users)."""
-        factory = RequestFactory()
-        user = make_user(is_staff=True)
-        request = factory.get("/some-protected-path/")
-        request.user = user
-        request.session = {}
-
-        middleware = PilotAccessMiddleware(
-            get_response=lambda r: HttpResponse("OK")
-        )
-        response = middleware.process_request(request)
-        self.assertIsNotNone(response)
-        self.assertEqual(response.status_code, 302)
-        self.assertIn("/pilot/landing/", response.url)
+    def test_authenticated_no_profile_with_campaign_passes(self):
+        request = self.factory.get("/")
+        request.user = make_user()
+        request.session = {"campaign_code": "123456"}
+        response = self.middleware.process_request(request)
+        self.assertIsNone(response)
 
 
 class PilotAccessMiddlewareCacheHeaderTests(TestCase):
     """Tests for cache control headers on responses."""
 
-    def test_protected_path_has_no_cache_headers(self):
-        """Authenticated protected path response has no-cache headers."""
-        factory = RequestFactory()
+    def setUp(self):
+        self.factory = RequestFactory()
+
+    def test_web_route_has_cache_headers(self):
         user = make_user()
         make_pilot_profile(user=user, disclaimer_accepted_at=timezone.now())
-
         inner_response = HttpResponse("OK")
-        request = factory.get("/some-protected-path/")
+        middleware = PilotAccessMiddleware(get_response=lambda r: inner_response)
+        request = self.factory.get("/")
         request.user = user
         request.session = {}
-
-        middleware = PilotAccessMiddleware(
-            get_response=lambda r: inner_response
-        )
         response = middleware(request)
         self.assertIn("no-cache", response.get("Cache-Control", ""))
-        self.assertIn("no-store", response.get("Cache-Control", ""))
 
-    def test_public_path_no_cache_headers(self):
-        """Public path response does NOT have no-cache headers."""
-        factory = RequestFactory()
-        from django.contrib.auth.models import AnonymousUser
-
+    def test_account_route_has_cache_headers(self):
+        user = make_user()
+        make_pilot_profile(user=user, disclaimer_accepted_at=timezone.now())
         inner_response = HttpResponse("OK")
-        request = factory.get("/pilot/landing/")
+        middleware = PilotAccessMiddleware(get_response=lambda r: inner_response)
+        request = self.factory.get("/pilot/account/")
+        request.user = user
+        request.session = {}
+        response = middleware(request)
+        self.assertIn("no-cache", response.get("Cache-Control", ""))
+
+    def test_exempt_route_no_cache_headers(self):
+        inner_response = HttpResponse("OK")
+        middleware = PilotAccessMiddleware(get_response=lambda r: inner_response)
+        request = self.factory.get("/health")
         request.user = AnonymousUser()
         request.session = {}
-
-        middleware = PilotAccessMiddleware(
-            get_response=lambda r: inner_response
-        )
         response = middleware(request)
-        cache_control = response.get("Cache-Control", "")
-        self.assertNotIn("no-cache", cache_control)
+        self.assertNotIn("no-cache", response.get("Cache-Control", ""))
+
+
+class FavouritesAuthGateTests(TestCase):
+    """Tests for /favourites auth gating via middleware."""
+
+    def setUp(self):
+        self.factory = RequestFactory()
+        self.middleware = PilotAccessMiddleware(
+            get_response=lambda r: HttpResponse("OK")
+        )
+
+    def test_unauthenticated_favourites_redirects_to_landing(self):
+        request = self.factory.get("/favourites")
+        request.user = AnonymousUser()
+        request.session = {}
+        response = self.middleware.process_request(request)
+        self.assertIsNotNone(response)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/pilot/landing/", response.url)
+
+    def test_unauthenticated_favourites_trailing_slash_redirects(self):
+        request = self.factory.get("/favourites/")
+        request.user = AnonymousUser()
+        request.session = {}
+        response = self.middleware.process_request(request)
+        self.assertIsNotNone(response)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/pilot/landing/", response.url)
+
+    def test_pilot_flow_no_cache_headers(self):
+        inner_response = HttpResponse("OK")
+        middleware = PilotAccessMiddleware(get_response=lambda r: inner_response)
+        request = self.factory.get("/pilot/landing/")
+        request.user = AnonymousUser()
+        request.session = {}
+        response = middleware(request)
+        self.assertNotIn("no-cache", response.get("Cache-Control", ""))

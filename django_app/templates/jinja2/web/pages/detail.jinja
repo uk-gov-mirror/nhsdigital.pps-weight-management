@@ -9,6 +9,26 @@
 
 {% set pageName = service.serviceName %}
 
+{% block head %}
+  {{ super() }}
+  <style>
+    .app-favourite-button {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 4px;
+      line-height: 1;
+    }
+    .app-favourite-button:hover svg {
+      transform: scale(1.15);
+    }
+    .app-favourite-toggle {
+      flex-shrink: 0;
+      align-self: flex-start;
+    }
+  </style>
+{% endblock %}
+
 {% block beforeContent %}
   {{ back_link("/listing") }}
 {% endblock %}
@@ -27,6 +47,22 @@
         <p class="nhsuk-body-l">
           {{ service.description | default('description') | striptags | safe }}
         </p>
+      </div>
+      <div class="app-favourite-toggle nhsuk-u-margin-top-2">
+        <form method="post" action="/favourite/toggle/{{ service.id }}">
+          {{ csrf_input }}
+          <button type="submit" class="app-favourite-button" aria-label="{{ 'Remove from favourites' if is_favourited else 'Add to favourites' }}">
+            {% if is_favourited %}
+            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="#FFB800" aria-hidden="true" focusable="false">
+              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+            </svg>
+            {% else %}
+            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#768692" stroke-width="2" aria-hidden="true" focusable="false">
+              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+            </svg>
+            {% endif %}
+          </button>
+        </form>
       </div>
     </div>
   </div>

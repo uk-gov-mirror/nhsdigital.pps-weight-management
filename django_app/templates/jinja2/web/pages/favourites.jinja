@@ -1,0 +1,91 @@
+{% extends "web/layout/base.jinja" %}
+{% from "web/macros/layout.jinja" import two_thirds_column_start, two_thirds_column_end %}
+{% from "web/macros/forms.jinja" import back_link %}
+
+{% set pageName = "Your saved services" %}
+
+{% block head %}
+  {{ super() }}
+  <style>
+    .app-favourite-button {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 4px;
+      line-height: 1;
+    }
+    .app-favourite-button:hover svg {
+      transform: scale(1.15);
+    }
+    .app-favourite-toggle {
+      flex-shrink: 0;
+      align-self: flex-start;
+    }
+  </style>
+{% endblock %}
+
+{% block beforeContent %}
+  {{ back_link("/listing") }}
+{% endblock %}
+
+{% block content %}
+<div class="nhsuk-grid-row">
+  <div class="nhsuk-grid-column-full">
+    <h1>Your saved services</h1>
+
+    {% if services %}
+
+      {% for service in services %}
+      <div class="nhsuk-card nhsuk-card--clickable">
+        <div class="nhsuk-card__content">
+
+          <div class="app-handy-flex-container app-collapser">
+            <div>
+              <div class="app-roundel app-listing">
+                <img src=" {{ static('assets/images/services/') }}{{ service.logoImage }}" alt="{{ service.serviceName | default('Service name') }} logo" />
+              </div>
+            </div>
+            <div>
+              <h2 class="nhsuk-card__heading nhsuk-heading-s">
+                <a class="nhsuk-card__link" href="detail/{{ service.id }}">{{ service.serviceName | default('Service name') }}</a>
+              </h2>
+              <div class="nhsuk-card__description">
+                <p>{{ service.description | default('description') | striptags | safe }}</p>
+                <div class="nhsuk-grid-row">
+                  <dl class="nhsuk-grid-column-one-third app-u-definition-list">
+                    <dt class="nhsuk-body-s">What</dt>
+                    <dd class="nhsuk-body-m">{{ service.serviceType | default('service type') }}</dd>
+                  </dl>
+                  <dl class="nhsuk-grid-column-one-third app-u-definition-list">
+                    <dt class="nhsuk-body-s">Cost</dt>
+                    <dd class="nhsuk-body-m">{{ service.costText | default('cost') }}</dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+            <div class="app-favourite-toggle">
+              <form method="post" action="/favourite/toggle/{{ service.id }}">
+                {{ csrf_input }}
+                <button type="submit" class="app-favourite-button" aria-label="Remove from favourites">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="#FFB800" aria-hidden="true" focusable="false">
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                  </svg>
+                </button>
+              </form>
+            </div>
+          </div>
+
+        </div>
+      </div>
+      {% endfor %}
+
+    {% else %}
+
+      <p>You haven't saved any services yet.</p>
+      <p><a href="/listing" class="nhsuk-link">Browse activities</a></p>
+
+    {% endif %}
+
+  </div>
+</div>
+{% endblock %}

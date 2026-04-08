@@ -87,6 +87,17 @@ def make_v3_category(**kwargs):
     return V3_Category.objects.create(**defaults)
 
 
+def make_favourite_service(user=None, service_id=1, **kwargs):
+    """Create and return a saved FavouriteService instance."""
+    from pilot_access.models import FavouriteService
+
+    if user is None:
+        user = make_user()
+    defaults = {"service_id": service_id}
+    defaults.update(kwargs)
+    return FavouriteService.objects.create(user=user, **defaults)
+
+
 def make_v3_helps_with(**kwargs):
     """Create and return a saved V3_HelpsWith instance."""
     defaults = {
