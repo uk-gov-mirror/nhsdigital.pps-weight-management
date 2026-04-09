@@ -1,5 +1,5 @@
 gunicorn==22.0.0
-Django==4.2.29
+Django==4.2.30
 requests==2.33.0
 cryptography>=41.0.0
 psycopg[binary]==3.2.1; python_version < "3.14"
