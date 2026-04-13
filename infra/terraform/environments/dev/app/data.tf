@@ -27,7 +27,7 @@ data "aws_subnets" "private_ecs" {
 }
 
 data "aws_route53_zone" "main" {
-  name         = "help-to-stay-healthy-pilot.service.nhs.uk"
+  name         = "help-to-stay-healthy.service.nhs.uk"
   private_zone = false
 }
 
