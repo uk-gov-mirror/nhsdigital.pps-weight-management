@@ -51,7 +51,7 @@ module "cloudfront" {
   max_ttl                   = 86400
   geo_restriction_locations = ["GB"]
 
-  aliases             = ["${local.environment_suffix}.help-to-stay-healthy-pilot.service.nhs.uk"]
+  aliases             = ["${local.environment_suffix}.help-to-stay-healthy.service.nhs.uk"]
   acm_certificate_arn = "arn:aws:acm:us-east-1:515424599516:certificate/d88579b2-774c-4ae8-aa4e-b1b0e0cbf609"
 
   # Don't cache admin or API paths
@@ -89,7 +89,7 @@ module "cloudfront" {
 
 resource "aws_route53_record" "app_a" {
   zone_id = data.aws_route53_zone.main.zone_id
-  name    = "${local.environment_suffix}.help-to-stay-healthy-pilot.service.nhs.uk"
+  name    = "${local.environment_suffix}.help-to-stay-healthy.service.nhs.uk"
   type    = "A"
 
   alias {
@@ -101,7 +101,7 @@ resource "aws_route53_record" "app_a" {
 
 resource "aws_route53_record" "app_aaaa" {
   zone_id = data.aws_route53_zone.main.zone_id
-  name    = "${local.environment_suffix}.help-to-stay-healthy-pilot.service.nhs.uk"
+  name    = "${local.environment_suffix}.help-to-stay-healthy.service.nhs.uk"
   type    = "AAAA"
 
   alias {
