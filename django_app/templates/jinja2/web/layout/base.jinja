@@ -17,7 +17,7 @@
   <link rel="stylesheet" href="{{ static('assets/css/main.css') }}">
 {% endblock %}
 {% block header %}
-  {% set showPilotAccount = request.user.is_authenticated and (not request.user.is_staff) and request.pilot_access_registered %}
+  {% set showPilotAccount = request.user.is_authenticated and (not request.user.is_staff) and request.htsh_registered %}
   {{ header({
     "service": {
     "text": serviceName,
@@ -25,8 +25,8 @@
   },
   "account": ({
   "items": [
-  { "text": "Edit my details", "icon": true, "href": url("pilot_access:account") },
-  { "text": "Sign out", "href": url("pilot_access:logout") },
+  { "text": "Edit my details", "icon": true, "href": url("htsh:account") },
+  { "text": "Sign out", "href": url("htsh:logout") },
   ]
   } if showPilotAccount else none)
   }) }}
@@ -46,9 +46,9 @@
       ]
     }
   }) }}
-  <form id="pilot-logout-form"
+  <form id="htsh-logout-form"
         method="post"
-        action="{{ url('pilot_access:logout') }}"
+        action="{{ url('htsh:logout') }}"
         style="display:none">
     {{ csrf_input }}
   </form>
@@ -60,8 +60,8 @@
     initAll();
 
     function interceptLogoutLink() {
-      const logoutLink = document.querySelector('.nhsuk-header__account-link[href="/pilot/logout/"]');
-      const logoutForm = document.getElementById('pilot-logout-form');
+      const logoutLink = document.querySelector('.nhsuk-header__account-link[href="/logout/"]');
+      const logoutForm = document.getElementById('htsh-logout-form');
 
       if (!logoutLink || !logoutForm) {
         return;

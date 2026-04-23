@@ -23,16 +23,18 @@
   </div>
 {% endmacro %}
 {% set pageName = "Get help to make healthy lifestyle changes that last" %}
+{% if request.user.is_authenticated %}
 {% set endLinksHtml %}
   <div class="nhsuk-u-padding-bottom-3">
-    <a href="{{ url('pilot_access:account') }}"
+    <a href="{{ url('htsh:account') }}"
        class="nhsuk-link nhsuk-link--no-visited-state">Edit my details</a>
   </div>
   <div>
-    <a href="{{ url('pilot_access:delete_account') }}"
+    <a href="{{ url('htsh:delete_account') }}"
        class="nhsuk-link nhsuk-link--no-visited-state">Delete all my information</a>
   </div>
 {% endset %}
+{% endif %}
 {% block main %}
   <main id="maincontent" class="app-magazine-style-start--return-user">
     <div class="nhsuk-u-padding-top-6 nhsuk-u-padding-bottom-3">
@@ -66,29 +68,30 @@
             {% endfor %}
           </div>
         </div>
-        {{ summary_row("Changes you want to make",
-                user_fields.goals | map("replace", "goals.", "") 
-        | map("replace", "_", " ")
-        | map("capitalize"),
-        url("goals") ~ "?mode=edit"
+        {{ summary_row("What prompted you to look for support",
+                (user_fields.motivation if user_fields.motivation else "Not set").replace("_", " ").capitalize(),
+        url("motivation") ~ "?mode=edit"
         ) }}
         <hr class="nhsuk-section-break--m">
-        {{ summary_row("What makes it hard to stay healthy",
-                user_fields.barriers | map("replace", "-", " ") 
-        | map("capitalize"),
-        url("barriers") ~ "?mode=edit") }}
+        {{ summary_row("Biggest difference to your health",
+                (user_fields.priority_behaviour if user_fields.priority_behaviour else "Not set").replace("_", " ").capitalize(),
+        url("priority_behaviour") ~ "?mode=edit") }}
         <hr class="nhsuk-section-break--m">
-        {{ summary_row("Doing things on your own or in a group",
-                (user_fields.who_with[0] if user_fields.who_with is iterable and user_fields.who_with is not string else user_fields.who_with).replace("_", " ").replace("dont", "don't ").replace("who with.", "").capitalize(),
-        url("preference_who_with") ~ "?mode=edit") }}
+        {{ summary_row("Past barriers",
+                user_fields.past_barriers | map("replace", "_", " ") | map("capitalize") if user_fields.past_barriers else ["Not set"],
+        url("past_barriers") ~ "?mode=edit") }}
         <hr class="nhsuk-section-break--m">
-        {{ summary_row("Following a schedule or at your own pace",
-                (user_fields.timetable[0] if user_fields.timetable is iterable and user_fields.timetable is not string else user_fields.timetable).replace("_", " ").replace("dont", "don't ").replace("timetable.", "").capitalize(),
-        url("preference_timetable") ~ "?mode=edit") }}
+        {{ summary_row("Current barriers",
+                user_fields.current_barriers | map("replace", "_", " ") | map("capitalize") if user_fields.current_barriers else ["Not set"],
+        url("current_barriers") ~ "?mode=edit") }}
         <hr class="nhsuk-section-break--m">
-        {{ summary_row("Digital or in-person activities",
-                (user_fields.channel[0] if user_fields.channel is iterable and user_fields.channel is not string else user_fields.channel).replace("_", " ").replace("dont", "don't ").replace("channel.", "").capitalize(),
-        url("preference_channel") ~ "?mode=edit") }}
+        {{ summary_row("Confidence and readiness",
+                (user_fields.confidence_readiness if user_fields.confidence_readiness else "Not set").replace("_", " ").capitalize(),
+        url("confidence_readiness") ~ "?mode=edit") }}
+        <hr class="nhsuk-section-break--m">
+        {{ summary_row("What helps you stay on track",
+                user_fields.enablers | map("replace", "_", " ") | map("capitalize") if user_fields.enablers else ["Not set"],
+        url("enablers") ~ "?mode=edit") }}
       </div>
       <hr class="nhsuk-section-break--m">
       <div class="nhsuk-width-container">
@@ -102,6 +105,7 @@
           </div>
         </div>
       </div>
+      {% if request.user.is_authenticated %}
       <div class="nhsuk-u-padding-top-6 nhsuk-u-padding-bottom-3 app-magazine-style-start--robo-background">
         <div class="nhsuk-width-container">
           <div class="nhsuk-grid-row">
@@ -134,6 +138,7 @@
           </div>
         </div>
       </div>
+      {% endif %}
       <div class="nhsuk-u-padding-top-6 nhsuk-u-padding-bottom-6">
         <div class="nhsuk-width-container">
           <div class="nhsuk-grid-row">

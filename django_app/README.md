@@ -1,4 +1,4 @@
-# Weight Management Site — Django project (Web, REST API, Scheduler, Admin)
+# HTSH — Django project (Web, REST API, Scheduler, Admin)
 
 ## Project Structure
 ```
@@ -10,7 +10,7 @@ django_app/
   ├── static/                       # Static files (e.g. images)
   ├── templates/                    # Jinja2 templates
   ├── web/                          # Website
-  ├── wm_django/                    # App settings
+  ├── config/                    # App settings
   ├── Dockerfile
   ├── manage.py
   ├── README.md

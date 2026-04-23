@@ -1,0 +1,88 @@
+{% extends "web/layout/base.jinja" %}
+
+{% from "web/macros/layout.jinja" import two_thirds_column_start, two_thirds_column_end %}
+{% from "web/macros/forms.jinja" import form_error_summary, continue_button, back_link %}
+
+{% set pageName = "What prompted you to look for support with your health today?" %}
+
+{% block beforeContent %}
+  {{ back_link(back_href) }}
+{% endblock beforeContent %}
+
+{% block content %}
+  {{ two_thirds_column_start() }}
+
+    {% if error %}
+    {{ form_error_summary({
+      "titleText": "There is a problem",
+      "errorList": [
+        {
+          "text": "Please choose an option",
+          "href": "#motivation"
+        }
+      ]
+    }) }}
+    {% endif %}
+
+    <form method="post">
+      {{ csrf_input }}
+
+      {{ radios({
+        "idPrefix": "motivation",
+        "name": "motivation",
+        "errorMessage": {
+          "text": "Please choose an option"
+        } if error else undefined,
+        "fieldset": {
+          "legend": {
+            "text": "What prompted you to look for support with your health today?",
+            "classes": "nhsuk-fieldset__legend--l",
+            "isPageHeading": true
+          }
+        },
+        "items": [
+          {
+            "value": "motivation.want_to_feel_better",
+            "text": "I want to feel better in myself"
+          },
+          {
+            "value": "motivation.noticed_changes",
+            "text": "I've noticed changes in my weight or fitness"
+          },
+          {
+            "value": "motivation.health_professional",
+            "text": "A health professional suggested it"
+          },
+          {
+            "value": "motivation.social_encouragement",
+            "text": "A friend or family member encouraged me"
+          },
+          {
+            "value": "motivation.health_scare",
+            "text": "I've had a health scare or diagnosis"
+          },
+          {
+            "value": "motivation.setting_example",
+            "text": "I want to set a good example for others"
+          },
+          {
+            "value": "motivation.tried_before",
+            "text": "I've tried before and want to try again"
+          },
+          {
+            "value": "motivation.life_transition",
+            "text": "I'm at a point in my life where I want to make a change"
+          },
+          {
+            "value": "motivation.just_exploring",
+            "text": "I'm not sure — I'm just exploring"
+          }
+        ],
+        "value": data.motivation if data.motivation else undefined
+      }) }}
+
+      {{ continue_button() }}
+
+    </form>
+  {{ two_thirds_column_end() }}
+{% endblock content %}

@@ -95,7 +95,7 @@ jobs:
       - name: Test with coverage
         run: |
           docker run --rm \
-            -e DJANGO_SETTINGS_MODULE=wm_django.settings.test \
+            -e DJANGO_SETTINGS_MODULE=config.settings.test \
             "${{ steps.meta.outputs.tag_sha }}" \
             sh -c "coverage run manage.py test"
 

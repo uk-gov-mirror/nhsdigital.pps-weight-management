@@ -383,10 +383,10 @@
 
 #           # Map gh_env -> Django settings
 #           if [ "$GH_ENV" = "poc" ]; then
-#             DJANGO_SETTINGS="wm_django.settings.dev"
+#             DJANGO_SETTINGS="config.settings.dev"
 #             DJANGO_ENV="dev"
 #           else
-#             DJANGO_SETTINGS="wm_django.settings.prod"
+#             DJANGO_SETTINGS="config.settings.prod"
 #             DJANGO_ENV="prod"
 #           fi
 

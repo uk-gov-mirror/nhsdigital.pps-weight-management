@@ -1,5 +1,5 @@
 """
-Version 3 database models for the weight management API.
+Version 3 database models for the HTSH API.
 
 These models map onto database tables/views with names starting "V3_".
 They represent the current iteration of the service catalogue, including

@@ -1,5 +1,5 @@
 """
-Version 1 database models for the weight management API.
+Version 1 database models for the HTSH API.
 
 These models map onto existing database tables/views with names starting "V1_".
 They are:

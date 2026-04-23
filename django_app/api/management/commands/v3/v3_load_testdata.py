@@ -30,36 +30,36 @@ from api.models_v3 import (
     V3_Service_Location,
 )
 
-from pilot_access.models import (
+from htsh.models import (
     Campaign,
-    PilotProfile,
+    UserProfile,
     MagicLink,
     UserFilter,
 )
 
 
 class Command(BaseCommand):
-    help = "Replace all V3_* data and pilot_access test data with deterministic test fixture data."
+    help = "Replace all V3_* data and htsh test data with deterministic test fixture data."
 
     # Test campaign code - must match the value in v3_testdata.json
     TEST_CAMPAIGN_CODE = "999999"
 
     def add_arguments(self, parser):
         parser.add_argument(
-            '--skip-pilot-cleanup',
+            '--skip-htsh-cleanup',
             action='store_true',
-            help='Skip cleanup of test pilot users (useful for debugging)',
+            help='Skip cleanup of test HTSH users (useful for debugging)',
         )
 
     def handle(self, *args, **options):
         User = get_user_model()
-        skip_pilot_cleanup = options.get('skip_pilot_cleanup', False)
+        skip_htsh_cleanup = options.get('skip_htsh_cleanup', False)
 
         # =====================================================================
-        # 1) Clean up pilot_access test data
+        # 1) Clean up htsh test data
         # =====================================================================
-        if not skip_pilot_cleanup:
-            self.stdout.write("Cleaning up pilot_access test data...")
+        if not skip_htsh_cleanup:
+            self.stdout.write("Cleaning up htsh test data...")
             
             # Delete test users created by E2E tests (identified by email pattern)
             # E2E tests create users with emails like: test_<timestamp>@example.com
@@ -82,10 +82,10 @@ class Command(BaseCommand):
                 'nonexistent_%@example.com',
             ]
             
-            # Delete PilotProfiles and their associated users for test emails
+            # Delete UserProfiles and their associated users for test emails
             for pattern in test_email_patterns:
                 # Get profiles matching the pattern
-                profiles = PilotProfile.objects.filter(email__regex=pattern.replace('%', '.*'))
+                profiles = UserProfile.objects.filter(email__regex=pattern.replace('%', '.*'))
                 user_ids = list(profiles.values_list('user_id', flat=True))
                 
                 # Delete the profiles first (due to FK constraints)

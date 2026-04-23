@@ -81,6 +81,13 @@ class Command(BaseCommand):
                     cur.execute(f'DELETE FROM "{table}";')
             self.stdout.write(self.style.WARNING("Cleared all V3_* tables."))
 
+            # Clear htsh activity-attribute tables (also seeded from v3_seed.json)
+            self.stdout.write(self.style.HTTP_INFO("Clearing activity attribute tables..."))
+            with connection.cursor() as cur:
+                cur.execute('DELETE FROM "service_activity_attribute";')
+                cur.execute('DELETE FROM "activity_attribute";')
+            self.stdout.write(self.style.WARNING("Cleared activity attribute tables."))
+
             self.stdout.write(self.style.HTTP_INFO("Loading V3 fixture (v3_seed)..."))
             # This expects api/fixtures/v3_seed.json to be present in the repo.
             call_command("loaddata", "v3_seed")
@@ -98,5 +105,19 @@ class Command(BaseCommand):
                         f'SELECT setval(%s, COALESCE((SELECT MAX(id) FROM "{table}"), 1))',
                         [seq_name],
                     )
+
+            # Reset sequences for activity attribute tables
+            for table in ["activity_attribute", "service_activity_attribute"]:
+                try:
+                    cur = connection.cursor()
+                    cur.execute("SELECT pg_get_serial_sequence(%s, 'id')", [table])
+                    seq_name = cur.fetchone()[0]
+                    if seq_name:
+                        cur.execute(
+                            f'SELECT setval(%s, COALESCE((SELECT MAX(id) FROM "{table}"), 1))',
+                            [seq_name],
+                        )
+                except Exception:
+                    pass  # Table may not have a sequence (e.g., SQLite in tests)
 
         self.stdout.write(self.style.SUCCESS("V3_* tables reseeded from v3_seed.json."))

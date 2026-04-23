@@ -1,5 +1,5 @@
 """
-Django admin wiring for the Weight Management API.
+Django admin wiring for the HTSH API.
 
 Responsibilities of this module:
 
@@ -109,7 +109,7 @@ def _env_suffix() -> str:
 env_suffix = _env_suffix()
 
 # Rebrand the *default* admin site used at /admin/
-admin.site.site_header = f"Weight Management API admin{env_suffix}"
+admin.site.site_header = f"HTSH API admin{env_suffix}"
 admin.site.site_title = admin.site.site_header
 admin.site.index_title = "Admin"
 
@@ -119,8 +119,8 @@ class VersionedAdminSite(admin.AdminSite):
     def __init__(self, version_label: str | None = None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         label = f" - {version_label}" if version_label else ""
-        # e.g. "Weight Management API admin – v3 (Development)"
-        self.site_header = f"Weight Management API admin{label}{env_suffix}"
+        # e.g. "HTSH API admin – v3 (Development)"
+        self.site_header = f"HTSH API admin{label}{env_suffix}"
         self.site_title = self.site_header
         self.index_title = "Admin"
 

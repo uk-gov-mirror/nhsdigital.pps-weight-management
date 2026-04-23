@@ -1,0 +1,87 @@
+{% extends "web/layout/base.jinja" %}
+
+{% from "web/macros/layout.jinja" import two_thirds_column_start, two_thirds_column_end %}
+{% from "web/macros/forms.jinja" import form_error_summary, continue_button, back_link %}
+
+{% set pageName = "What would make it easier for you to take that first step?" %}
+
+{% block beforeContent %}
+  {{ back_link(back_href) }}
+{% endblock beforeContent %}
+
+{% block content %}
+  {{ two_thirds_column_start() }}
+
+    {% if error %}
+    {{ form_error_summary({
+      "titleText": "There is a problem",
+      "errorList": [
+        {
+          "text": "Please choose an option",
+          "href": "#enablers"
+        }
+      ]
+    }) }}
+    {% endif %}
+
+    <form method="post">
+      {{ csrf_input }}
+
+      {{ checkboxes({
+        "idPrefix": "enablers",
+        "name": "enablers",
+        "errorMessage": {
+          "text": "Please choose an option"
+        } if error else undefined,
+        "fieldset": {
+          "legend": {
+            "text": "What would make it easier for you to take that first step?",
+            "classes": "nhsuk-fieldset__legend--l",
+            "isPageHeading": true
+          }
+        },
+        "hint": {
+          "text": "Choose all that apply"
+        },
+        "items": [
+          {
+            "value": "enablers.wont_take_too_much_time",
+            "text": "Knowing it won't take up too much time"
+          },
+          {
+            "value": "enablers.affordable",
+            "text": "Finding something affordable"
+          },
+          {
+            "value": "enablers.support_from_others",
+            "text": "Having support from other people"
+          },
+          {
+            "value": "enablers.start_slowly",
+            "text": "Doing something I can start slowly and build up"
+          },
+          {
+            "value": "enablers.suitable_for_me",
+            "text": "Knowing it's suitable for someone like me"
+          },
+          {
+            "value": "enablers.home_online",
+            "text": "Being able to do it from home or online"
+          },
+          {
+            "value": "enablers.clear_guidance",
+            "text": "Having clear guidance on what to do"
+          },
+          {
+            "value": "enablers.will_make_a_difference",
+            "text": "Knowing it will actually make a difference"
+          }
+        ],
+        "values": data.enablers if data.enablers else undefined
+      }) }}
+
+      {{ continue_button() }}
+
+    </form>
+  {{ two_thirds_column_end() }}
+{% endblock content %}

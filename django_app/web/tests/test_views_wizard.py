@@ -7,8 +7,8 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from pilot_access.models import PilotProfile
-from testing.helpers import make_pilot_profile, make_user, make_user_filter
+from htsh.models import UserProfile, QuestionnaireResponse
+from testing.helpers import make_profile, make_user, make_user_filter
 from testing.mocks import mock_postcodes_io
 
 User = get_user_model()
@@ -19,7 +19,7 @@ class _AuthenticatedTestCase(TestCase):
 
     def setUp(self):
         self.user = make_user()
-        self.profile = make_pilot_profile(
+        self.profile = make_profile(
             user=self.user,
             disclaimer_accepted_at=timezone.now(),
         )
@@ -34,19 +34,32 @@ class StartViewTests(TestCase):
         response = self.client.get(reverse("home"))
         self.assertEqual(response.status_code, 302)
 
-    def test_start_authenticated_no_filter(self):
-        """GET / with logged-in user and no UserFilter defaults start_href to details-contact-details."""
+    def test_start_authenticated_no_data(self):
+        """GET / with logged-in user and no data defaults start_href to details-contact-details."""
         user = make_user()
-        make_pilot_profile(user=user, disclaimer_accepted_at=timezone.now())
+        make_profile(user=user, disclaimer_accepted_at=timezone.now())
         self.client.force_login(user)
         response = self.client.get(reverse("home"))
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"details-contact-details", response.content)
 
+    def test_start_authenticated_with_questionnaire_response(self):
+        """GET / with user who has QuestionnaireResponse routes to listing."""
+        user = make_user()
+        make_profile(user=user, disclaimer_accepted_at=timezone.now())
+        QuestionnaireResponse.objects.create(
+            user=user,
+            motivation="motivation.want_to_feel_better",
+        )
+        self.client.force_login(user)
+        response = self.client.get(reverse("home"))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"listing", response.content)
+
     def test_start_authenticated_with_filter_data(self):
         """GET / with user who has UserFilter data routes to listing."""
         user = make_user()
-        make_pilot_profile(user=user, disclaimer_accepted_at=timezone.now())
+        make_profile(user=user, disclaimer_accepted_at=timezone.now())
         make_user_filter(user=user, data={"allow_check_in": "yes"})
         self.client.force_login(user)
         response = self.client.get(reverse("home"))
@@ -56,7 +69,7 @@ class StartViewTests(TestCase):
     def test_start_magiclink_flow(self):
         """GET / with session entry_flow=magiclink routes to listing."""
         user = make_user()
-        make_pilot_profile(user=user, disclaimer_accepted_at=timezone.now())
+        make_profile(user=user, disclaimer_accepted_at=timezone.now())
         self.client.force_login(user)
         session = self.client.session
         session["entry_flow"] = "magiclink"
@@ -70,9 +83,8 @@ class DetailsContactDetailsViewTests(_AuthenticatedTestCase):
     """Tests for the details-contact-details step."""
 
     def setUp(self):
-        # Override base setUp to use specific email
         self.user = make_user(email="orig@test.com")
-        self.profile = make_pilot_profile(
+        self.profile = make_profile(
             user=self.user,
             disclaimer_accepted_at=timezone.now(),
         )
@@ -80,73 +92,57 @@ class DetailsContactDetailsViewTests(_AuthenticatedTestCase):
         self.url = reverse("details_contact_details")
 
     def test_get_renders_form(self):
-        """GET returns 200."""
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 200)
 
     def test_post_valid_email_preference(self):
-        """POST with valid email preference redirects to details_postcode."""
         response = self.client.post(self.url, {
             "email": "new@test.com",
             "phone": "",
-            "preferred_contact_method": PilotProfile.CONTACT_EMAIL,
+            "preferred_contact_method": UserProfile.CONTACT_EMAIL,
         })
         self.assertRedirects(
-            response,
-            reverse("details_postcode"),
-            fetch_redirect_response=False,
+            response, reverse("details_postcode"), fetch_redirect_response=False,
         )
 
     def test_post_valid_sms_preference(self):
-        """POST with valid SMS preference redirects to details_postcode."""
         response = self.client.post(self.url, {
             "email": "",
             "phone": "07700900123",
-            "preferred_contact_method": PilotProfile.CONTACT_SMS,
+            "preferred_contact_method": UserProfile.CONTACT_SMS,
         })
         self.assertRedirects(
-            response,
-            reverse("details_postcode"),
-            fetch_redirect_response=False,
+            response, reverse("details_postcode"), fetch_redirect_response=False,
         )
 
     def test_post_invalid_no_preference(self):
-        """POST with no preference shows error."""
         response = self.client.post(self.url, {
-            "email": "",
-            "phone": "",
-            "preferred_contact_method": "",
+            "email": "", "phone": "", "preferred_contact_method": "",
         })
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Please choose a preferred contact method", response.content)
 
     def test_post_invalid_email(self):
-        """POST with invalid email shows error."""
         response = self.client.post(self.url, {
-            "email": "notanemail",
-            "phone": "",
-            "preferred_contact_method": PilotProfile.CONTACT_EMAIL,
+            "email": "notanemail", "phone": "",
+            "preferred_contact_method": UserProfile.CONTACT_EMAIL,
         })
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"valid email", response.content)
 
     def test_post_invalid_phone(self):
-        """POST with invalid phone shows error."""
         response = self.client.post(self.url, {
-            "email": "",
-            "phone": "abc",
-            "preferred_contact_method": PilotProfile.CONTACT_SMS,
+            "email": "", "phone": "abc",
+            "preferred_contact_method": UserProfile.CONTACT_SMS,
         })
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"valid mobile", response.content)
 
     def test_post_duplicate_email(self):
-        """POST with email already used by another user shows error."""
         make_user(email="taken@test.com")
         response = self.client.post(self.url, {
-            "email": "taken@test.com",
-            "phone": "",
-            "preferred_contact_method": PilotProfile.CONTACT_EMAIL,
+            "email": "taken@test.com", "phone": "",
+            "preferred_contact_method": UserProfile.CONTACT_EMAIL,
         })
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"already in use", response.content)
@@ -160,28 +156,182 @@ class DetailsPostcodeViewTests(_AuthenticatedTestCase):
         self.url = reverse("details_postcode")
 
     def test_get_renders_form(self):
-        """GET returns 200."""
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 200)
 
     @mock_postcodes_io(is_valid=True)
     def test_post_valid_postcode(self, mock_get):
-        """POST with valid postcode redirects to goals."""
+        """POST with valid postcode redirects to motivation (Q1)."""
         response = self.client.post(self.url, {"details-postcode": "SW1A 1AA"})
         self.assertRedirects(
-            response, reverse("goals"), fetch_redirect_response=False
+            response, reverse("motivation"), fetch_redirect_response=False
         )
 
     def test_post_invalid_format(self):
-        """POST with badly formatted postcode shows error (no API call)."""
         response = self.client.post(self.url, {"details-postcode": "NOTAPC"})
         self.assertEqual(response.status_code, 200)
 
     @mock_postcodes_io(is_valid=False)
     def test_post_api_invalid(self, mock_get):
-        """POST with postcode rejected by API shows error."""
         response = self.client.post(self.url, {"details-postcode": "SW1A 1AA"})
         self.assertEqual(response.status_code, 200)
+
+
+# ---------------------------------------------------------------------------
+# Questionnaire Q1–Q6 views
+# ---------------------------------------------------------------------------
+
+
+class MotivationViewTests(_AuthenticatedTestCase):
+    """Tests for Q1 motivation (single-select radios)."""
+
+    def test_get_renders(self):
+        response = self.client.get(reverse("motivation"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_post_valid_stores_and_redirects(self):
+        response = self.client.post(
+            reverse("motivation"), {"motivation": "motivation.want_to_feel_better"}
+        )
+        self.assertRedirects(
+            response, reverse("priority_behaviour"), fetch_redirect_response=False
+        )
+        self.assertEqual(
+            self.client.session["motivation"], "motivation.want_to_feel_better"
+        )
+
+    def test_post_empty_shows_error(self):
+        response = self.client.post(reverse("motivation"), {})
+        self.assertEqual(response.status_code, 200)
+
+    def test_edit_mode_redirects_home(self):
+        response = self.client.post(
+            reverse("motivation") + "?mode=edit",
+            {"motivation": "motivation.tried_before"},
+        )
+        self.assertRedirects(response, "/", fetch_redirect_response=False)
+
+    def test_post_persists_to_questionnaire_response(self):
+        self.client.post(
+            reverse("motivation"), {"motivation": "motivation.health_scare"}
+        )
+        qr = QuestionnaireResponse.objects.get(user=self.user)
+        self.assertEqual(qr.motivation, "motivation.health_scare")
+
+
+class PriorityBehaviourViewTests(_AuthenticatedTestCase):
+    """Tests for Q2 priority_behaviour (single-select radios)."""
+
+    def test_get_renders(self):
+        response = self.client.get(reverse("priority_behaviour"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_post_valid_stores_and_redirects(self):
+        response = self.client.post(
+            reverse("priority_behaviour"),
+            {"priority_behaviour": "priority_behaviour.more_physically_active"},
+        )
+        self.assertRedirects(
+            response, reverse("past_barriers"), fetch_redirect_response=False
+        )
+
+    def test_post_empty_shows_error(self):
+        response = self.client.post(reverse("priority_behaviour"), {})
+        self.assertEqual(response.status_code, 200)
+
+
+class PastBarriersViewTests(_AuthenticatedTestCase):
+    """Tests for Q3 past_barriers (multi-select checkboxes)."""
+
+    def test_get_renders(self):
+        response = self.client.get(reverse("past_barriers"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_post_valid_stores_and_redirects(self):
+        response = self.client.post(
+            reverse("past_barriers"),
+            {"past_barriers": ["past_barriers.no_time", "past_barriers.too_expensive"]},
+        )
+        self.assertRedirects(
+            response, reverse("current_barriers"), fetch_redirect_response=False
+        )
+        self.assertEqual(
+            self.client.session["past_barriers"],
+            ["past_barriers.no_time", "past_barriers.too_expensive"],
+        )
+
+    def test_post_empty_shows_error(self):
+        response = self.client.post(reverse("past_barriers"), {})
+        self.assertEqual(response.status_code, 200)
+
+
+class CurrentBarriersViewTests(_AuthenticatedTestCase):
+    """Tests for Q4 current_barriers (multi-select checkboxes)."""
+
+    def test_get_renders(self):
+        response = self.client.get(reverse("current_barriers"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_post_valid_stores_and_redirects(self):
+        response = self.client.post(
+            reverse("current_barriers"),
+            {"current_barriers": ["current_barriers.short_on_time"]},
+        )
+        self.assertRedirects(
+            response, reverse("confidence_readiness"), fetch_redirect_response=False
+        )
+
+    def test_post_empty_shows_error(self):
+        response = self.client.post(reverse("current_barriers"), {})
+        self.assertEqual(response.status_code, 200)
+
+
+class ConfidenceReadinessViewTests(_AuthenticatedTestCase):
+    """Tests for Q5 confidence_readiness (single-select radios)."""
+
+    def test_get_renders(self):
+        response = self.client.get(reverse("confidence_readiness"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_post_valid_stores_and_redirects(self):
+        response = self.client.post(
+            reverse("confidence_readiness"),
+            {"confidence_readiness": "confidence_readiness.ready_and_confident"},
+        )
+        self.assertRedirects(
+            response, reverse("enablers"), fetch_redirect_response=False
+        )
+
+    def test_post_empty_shows_error(self):
+        response = self.client.post(reverse("confidence_readiness"), {})
+        self.assertEqual(response.status_code, 200)
+
+
+class EnablersViewTests(_AuthenticatedTestCase):
+    """Tests for Q6 enablers (multi-select checkboxes)."""
+
+    def test_get_renders(self):
+        response = self.client.get(reverse("enablers"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_post_valid_redirects_to_allow_check_in(self):
+        response = self.client.post(
+            reverse("enablers"), {"enablers": ["enablers.affordable"]},
+        )
+        self.assertRedirects(
+            response, reverse("allow-check-in"), fetch_redirect_response=False
+        )
+
+    def test_post_empty_shows_error(self):
+        response = self.client.post(reverse("enablers"), {})
+        self.assertEqual(response.status_code, 200)
+
+    def test_edit_mode_redirects_home(self):
+        response = self.client.post(
+            reverse("enablers") + "?mode=edit",
+            {"enablers": ["enablers.clear_guidance"]},
+        )
+        self.assertRedirects(response, "/", fetch_redirect_response=False)
 
 
 class AllowCheckInViewTests(_AuthenticatedTestCase):
@@ -192,13 +342,11 @@ class AllowCheckInViewTests(_AuthenticatedTestCase):
         self.url = reverse("allow-check-in")
 
     def test_get_renders(self):
-        """GET returns 200."""
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 200)
 
     @patch("web.views.requests.post")
     def test_post_yes(self, mock_post):
-        """POST allow_check_in=yes sets onboarding_complete and redirects to listing."""
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.ok = True
@@ -210,16 +358,127 @@ class AllowCheckInViewTests(_AuthenticatedTestCase):
         self.assertTrue(self.client.session.get("onboarding_complete"))
 
     def test_post_no(self):
-        """POST allow_check_in=no sets onboarding_complete and redirects to no_check_in."""
         response = self.client.post(self.url, {"allow_check_in": "no"})
         self.assertRedirects(
-            response,
-            reverse("no_check_in"),
-            fetch_redirect_response=False,
+            response, reverse("no_check_in"), fetch_redirect_response=False,
         )
         self.assertTrue(self.client.session.get("onboarding_complete"))
 
     def test_post_invalid(self):
-        """POST with no value shows error."""
         response = self.client.post(self.url, {})
         self.assertEqual(response.status_code, 200)
+
+
+# ---------------------------------------------------------------------------
+# Anonymous campaign user tests
+# ---------------------------------------------------------------------------
+
+
+class _AnonymousCampaignTestCase(TestCase):
+    """Base class for anonymous users with valid campaign session."""
+
+    def setUp(self):
+        session = self.client.session
+        session["campaign_code"] = "TESTCAMP"
+        session.save()
+
+
+class AnonymousStartViewTests(_AnonymousCampaignTestCase):
+
+    def test_start_anonymous_with_campaign_shows_postcode_href(self):
+        response = self.client.get(reverse("home"))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"details-postcode", response.content)
+
+    def test_start_anonymous_with_campaign_no_contact_details(self):
+        response = self.client.get(reverse("home"))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn(b'href="/details-contact-details"', response.content)
+
+
+class AnonymousDetailsPostcodeTests(_AnonymousCampaignTestCase):
+
+    def test_get_renders(self):
+        response = self.client.get(reverse("details_postcode"))
+        self.assertEqual(response.status_code, 200)
+
+    @mock_postcodes_io(is_valid=True)
+    def test_post_valid_postcode_redirects_to_motivation(self, mock_get):
+        response = self.client.post(
+            reverse("details_postcode"), {"details-postcode": "SW1A 1AA"}
+        )
+        self.assertRedirects(
+            response, reverse("motivation"), fetch_redirect_response=False
+        )
+
+    @mock_postcodes_io(is_valid=True)
+    def test_post_does_not_persist_to_user_filter(self, mock_get):
+        from htsh.models import UserFilter
+        self.client.post(
+            reverse("details_postcode"), {"details-postcode": "SW1A 1AA"}
+        )
+        self.assertEqual(UserFilter.objects.count(), 0)
+
+
+class AnonymousMotivationTests(_AnonymousCampaignTestCase):
+
+    def test_get_renders(self):
+        response = self.client.get(reverse("motivation"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_post_valid_redirects_to_priority_behaviour(self):
+        response = self.client.post(
+            reverse("motivation"), {"motivation": "motivation.want_to_feel_better"}
+        )
+        self.assertRedirects(
+            response, reverse("priority_behaviour"), fetch_redirect_response=False
+        )
+
+
+class AnonymousPastBarriersTests(_AnonymousCampaignTestCase):
+
+    def test_get_renders(self):
+        response = self.client.get(reverse("past_barriers"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_post_valid_redirects_to_current_barriers(self):
+        response = self.client.post(
+            reverse("past_barriers"), {"past_barriers": ["past_barriers.no_time"]}
+        )
+        self.assertRedirects(
+            response, reverse("current_barriers"), fetch_redirect_response=False
+        )
+
+
+class AnonymousEnablersTests(_AnonymousCampaignTestCase):
+
+    def test_post_redirects_to_listing(self):
+        response = self.client.post(
+            reverse("enablers"), {"enablers": ["enablers.affordable"]}
+        )
+        self.assertRedirects(
+            response, reverse("listing"), fetch_redirect_response=False
+        )
+
+    def test_post_sets_onboarding_complete(self):
+        self.client.post(
+            reverse("enablers"), {"enablers": ["enablers.affordable"]}
+        )
+        self.assertTrue(self.client.session.get("onboarding_complete"))
+
+    def test_post_does_not_redirect_to_allow_check_in(self):
+        response = self.client.post(
+            reverse("enablers"), {"enablers": ["enablers.affordable"]}
+        )
+        self.assertNotIn("allow-check-in", response.url)
+
+
+class AuthenticatedEnablersTests(_AuthenticatedTestCase):
+
+    def test_post_redirects_to_allow_check_in(self):
+        response = self.client.post(
+            reverse("enablers"), {"enablers": ["enablers.affordable"]}
+        )
+        self.assertRedirects(
+            response, reverse("allow-check-in"), fetch_redirect_response=False
+        )

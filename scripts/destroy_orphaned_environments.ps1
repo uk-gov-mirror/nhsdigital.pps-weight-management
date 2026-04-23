@@ -6,7 +6,7 @@ $AWS_REGION          = "eu-west-2"
 $PROJECT             = "nhse-pps-wm"
 $TF_DIR              = "infra/terraform"
 $GhOwner             = "NHSDigital"
-$GhRepo              = "pps-weight-management"
+$GhRepo              = "pps-htsh"
 
 $orphans = @('pr-20','pr-21','pr-22')
 

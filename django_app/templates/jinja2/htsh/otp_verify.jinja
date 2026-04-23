@@ -1,0 +1,81 @@
+{% extends "web/layout/base.jinja" %}
+
+{% from "web/macros/layout.jinja" import two_thirds_column_start, two_thirds_column_end %}
+
+{% set pageName = "Enter your verification code" %}
+
+{% block content %}
+  {{ two_thirds_column_start() }}
+
+  {% if debug_otp %}
+  <div class="nhsuk-warning-callout">
+    <h3 class="nhsuk-warning-callout__label">
+      <span role="text">
+        <span class="nhsuk-u-visually-hidden">Important: </span>
+        Test Mode
+      </span>
+    </h3>
+    <p>Your verification code is: <strong>{{ debug_otp }}</strong></p>
+  </div>
+  {% endif %}
+
+  {% if form.errors %}
+    <div class="nhsuk-error-summary" aria-labelledby="error-summary-title" role="alert" tabindex="-1">
+      <h2 class="nhsuk-error-summary__title" id="error-summary-title">There is a problem</h2>
+      <div class="nhsuk-error-summary__body">
+        <ul class="nhsuk-list nhsuk-error-summary__list">
+          {% for field, errors in form.errors.items() %}
+            {% for error in errors %}
+              <li><a href="#otp">{{ error }}</a></li>
+            {% endfor %}
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  {% endif %}
+
+  <form method="post">
+    {{ csrf_input }}
+
+    <h1 class="nhsuk-heading-l">Enter your verification code</h1>
+
+    <p class="nhsuk-body">
+      We've sent a 6-digit code to {{ contact_display }}. 
+      Please enter it below to continue.
+    </p>
+
+    <p class="nhsuk-body nhsuk-u-secondary-text-color">
+      The code will expire in 15 minutes.
+    </p>
+
+    <div class="nhsuk-form-group{% if form.otp.errors %} nhsuk-form-group--error{% endif %}">
+      <label class="nhsuk-label" for="otp">Verification code</label>
+      {% if form.otp.errors %}
+        <span class="nhsuk-error-message">
+          <span class="nhsuk-u-visually-hidden">Error:</span> {{ form.otp.errors[0] }}
+        </span>
+      {% endif %}
+      <input 
+        class="nhsuk-input nhsuk-input--width-10{% if form.otp.errors %} nhsuk-input--error{% endif %}" 
+        id="otp" 
+        name="otp" 
+        type="text" 
+        inputmode="numeric" 
+        pattern="[0-9]*"
+        maxlength="6"
+        autocomplete="one-time-code"
+        value="{{ form.otp.value() or '' }}"
+      >
+    </div>
+
+    <button class="nhsuk-button" type="submit">Continue</button>
+  </form>
+
+  <p class="nhsuk-body">
+    <a class="nhsuk-link" href="{{ url('htsh:magic_link_request') }}">
+      Didn't receive a code? Request a new one
+    </a>
+  </p>
+
+  {{ two_thirds_column_end() }}
+{% endblock %}

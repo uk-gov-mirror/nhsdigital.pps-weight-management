@@ -60,10 +60,11 @@ class V3_ServiceSummarySerializer(serializers.ModelSerializer):
     costText  = serializers.CharField(source="cost_text")
     serviceType = serializers.CharField(source="service_type.type", allow_null=True)
     locations = serializers.SerializerMethodField()
+    relevance_score = serializers.IntegerField(read_only=True, default=0)
 
     class Meta:
         model = V3_Service
-        fields = ["id","sortOrder","serviceName","description","logoImage","costText","serviceType","locations"]
+        fields = ["id","sortOrder","serviceName","description","logoImage","costText","serviceType","locations","relevance_score"]
 
     def get_locations(self, obj):
         if hasattr(obj, "locations"):
@@ -291,3 +292,10 @@ class V3_ServiceSearchRequestSerializer(serializers.Serializer):
     def validate_postcode(self, value):
         # Normalise spacing/casing so you always get a clean value back
         return re.sub(r"\s+", " ", value.strip().upper())
+
+    activity_attributes = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        default=list,
+        help_text="Activity attribute names from QuestionnaireResponse for relevance ranking.",
+    )

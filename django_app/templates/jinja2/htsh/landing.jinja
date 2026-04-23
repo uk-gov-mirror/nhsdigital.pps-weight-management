@@ -1,0 +1,95 @@
+{% extends "web/layout/base.jinja" %}
+{% from "web/macros/layout.jinja" import two_thirds_column_start, two_thirds_column_end %}
+{% from "web/macros/forms.jinja" import form_error_summary, continue_button, back_link %}
+{% set pageName = "Get help to make healthy lifestyle changes that last" %}
+{% block pageTitle %}Help to Stay Healthy{% endblock %}
+{% block main %}
+  {% if campaign %}
+    <main id="maincontent" class="app-magazine-style-start">
+      <div class="nhsuk-u-padding-top-6 nhsuk-u-padding-bottom-3">
+        <div class="nhsuk-width-container">
+          <div class="nhsuk-grid-row">
+            <div class="nhsuk-grid-column-two-thirds">
+              <h1 class="nhsuk-heading-xl">Get help to make healthy lifestyle changes that last</h1>
+              <p class="nhsuk-lede-text">
+                From improving your mental health to upping your energy levels, exercising and eating well can make a big difference to your quality of life.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="nhsuk-u-padding-top-6 nhsuk-u-padding-bottom-3">
+        <div class="nhsuk-width-container">
+          <div class="nhsuk-grid-row">
+            <div class="nhsuk-grid-column-two-thirds">
+              <div class="nhsuk-inset-text">
+                <p class="nhsuk-body">{{ campaign.comment }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="nhsuk-u-padding-top-6 nhsuk-u-padding-bottom-3">
+        <div class="nhsuk-width-container">
+          <div class="nhsuk-grid-row">
+            <div class="nhsuk-grid-column-two-thirds">
+              <h2>Find new ways to eat well and move more</h2>
+              <p>Choose from:</p>
+              <ul class="nhsuk-u-padding-bottom-3">
+                <li>exercise programmes, like Couch to Fitness</li>
+                <li>weight management programmes, like the NHS Weight Loss Plan</li>
+                <li>walking programmes, like NHS Active 10</li>
+              </ul>
+              <h2>We’ll show you the options that best meet your needs</h2>
+              <p>Tell us a bit about yourself and we'll match you to the activities we think will work best for you.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="nhsuk-u-padding-top-6 nhsuk-u-padding-bottom-0">
+        <div class="nhsuk-width-container">
+          <div class="nhsuk-grid-row">
+            <div class="nhsuk-grid-column-two-thirds nhsuk-u-padding-bottom-6">
+              <div class="app-robo-mecc"
+                   style="background-image: url('/static/assets/images/bot/avatar-standard.svg')">
+                <div>
+                  <h2>We’ll help you keep going</h2>
+                  <p>We’ll check in with you to ask how you’re doing and encourage you to carry on.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="nhsuk-u-padding-top-6 nhsuk-u-padding-bottom-3">
+        <div class="nhsuk-width-container">
+          <div class="nhsuk-grid-row">
+            <div class="nhsuk-grid-column-two-thirds">
+              <p>{{ button({"text": "Start now", "href": "/"}) }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  {% elif campaign_invalid %}
+    <div class="nhsuk-warning-callout">
+      <h2 class="nhsuk-warning-callout__label">Invalid campaign code</h2>
+      <p>The campaign code you provided is not valid or has expired.</p>
+    </div>
+  {% else %}
+    <div class="nhsuk-width-container">
+      <main class="nhsuk-main-wrapper" id="maincontent" role="main">
+        <h1 class="nhsuk-heading-xl">Test site</h1>
+        <p class="nhsuk-body">This site is currently in a beta phase. Access is limited to invited users.</p>
+        <h2 class="nhsuk-heading-m">Already accepted?</h2>
+        <p class="nhsuk-body">
+          If you have already been accepted, you can sign in using a one-time password sent to your email or phone.
+        </p>
+        <p class="nhsuk-body">
+          <a class="nhsuk-link"
+             href="{{ url('htsh:magic_link_request') }}">Sign in</a>
+        </p>
+      </main>
+    </div>
+  {% endif %}
+{% endblock main %}

@@ -1,0 +1,91 @@
+{% extends "web/layout/base.jinja" %}
+
+{% from "web/macros/layout.jinja" import two_thirds_column_start, two_thirds_column_end %}
+{% from "web/macros/forms.jinja" import form_error_summary, continue_button, back_link %}
+
+{% set pageName = "What is making it hardest for you to build healthy habits right now?" %}
+
+{% block beforeContent %}
+  {{ back_link(back_href) }}
+{% endblock beforeContent %}
+
+{% block content %}
+  {{ two_thirds_column_start() }}
+
+    {% if error %}
+    {{ form_error_summary({
+      "titleText": "There is a problem",
+      "errorList": [
+        {
+          "text": "Please choose an option",
+          "href": "#current_barriers"
+        }
+      ]
+    }) }}
+    {% endif %}
+
+    <form method="post">
+      {{ csrf_input }}
+
+      {{ checkboxes({
+        "idPrefix": "current_barriers",
+        "name": "current_barriers",
+        "errorMessage": {
+          "text": "Please choose an option"
+        } if error else undefined,
+        "fieldset": {
+          "legend": {
+            "text": "What is making it hardest for you to build healthy habits right now?",
+            "classes": "nhsuk-fieldset__legend--l",
+            "isPageHeading": true
+          }
+        },
+        "hint": {
+          "text": "Choose all that apply"
+        },
+        "items": [
+          {
+            "value": "current_barriers.short_on_time",
+            "text": "I'm short on time"
+          },
+          {
+            "value": "current_barriers.cant_afford_it",
+            "text": "I can't afford it"
+          },
+          {
+            "value": "current_barriers.health_condition",
+            "text": "My health or a physical condition limits what I can do"
+          },
+          {
+            "value": "current_barriers.not_sure_what_works",
+            "text": "I'm not sure what would actually work for me"
+          },
+          {
+            "value": "current_barriers.low_motivation",
+            "text": "I don't feel motivated right now"
+          },
+          {
+            "value": "current_barriers.self_conscious",
+            "text": "I feel self-conscious or anxious about trying something new"
+          },
+          {
+            "value": "current_barriers.practical_barriers",
+            "text": "I don't have practical support (e.g. childcare, transport)"
+          },
+          {
+            "value": "current_barriers.routine",
+            "text": "I find it hard to make things a routine"
+          },
+          {
+            "value": "current_barriers.low_perceived_need",
+            "text": "I feel fine and don't see an urgent need to change"
+          }
+        ],
+        "values": data.current_barriers if data.current_barriers else undefined
+      }) }}
+
+      {{ continue_button() }}
+
+    </form>
+  {{ two_thirds_column_end() }}
+{% endblock content %}
