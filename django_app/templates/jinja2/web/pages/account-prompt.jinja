@@ -1,0 +1,31 @@
+{% extends "web/layout/base.jinja" %}
+
+{% from "web/macros/layout.jinja" import two_thirds_column_start, two_thirds_column_end %}
+{% from "web/macros/forms.jinja" import back_link %}
+
+{% set pageName = "Create an account" %}
+
+{% block beforeContent %}
+  {{ back_link("/listing") }}
+{% endblock %}
+
+{% block content %}
+  {{ two_thirds_column_start() }}
+
+  <div class="nhsuk-panel">
+    <h1 class="nhsuk-panel__heading">Let's keep in touch</h1>
+    <div class="nhsuk-panel__body">
+      <p>Create an account to save services and continue later.</p>
+    </div>
+  </div>
+
+  <form method="post">
+    {{ csrf_input }}
+    <input type="hidden" name="action" value="create_account">
+    <button type="submit" class="nhsuk-button">Create account</button>
+  </form>
+
+  <p><a href="?skip_prompt=1{% if prompt_next %}&next={{ prompt_next }}{% endif %}" class="nhsuk-link">Skip for now</a></p>
+
+  {{ two_thirds_column_end() }}
+{% endblock %}

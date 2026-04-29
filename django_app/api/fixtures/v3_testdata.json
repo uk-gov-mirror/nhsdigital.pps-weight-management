@@ -1,6 +1,6 @@
 [
   {
-    "model": "pilot_access.campaign",
+    "model": "htsh.campaign",
     "pk": 999,
     "fields": {
       "campaign_code": "999999",

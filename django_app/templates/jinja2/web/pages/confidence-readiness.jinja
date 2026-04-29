@@ -1,0 +1,72 @@
+{% extends "web/layout/base.jinja" %}
+
+{% from "web/macros/layout.jinja" import two_thirds_column_start, two_thirds_column_end %}
+{% from "web/macros/forms.jinja" import form_error_summary, continue_button, back_link %}
+
+{% set pageName = "How do you feel about making a change to your health habits right now?" %}
+
+{% block beforeContent %}
+  {{ back_link(back_href) }}
+{% endblock beforeContent %}
+
+{% block content %}
+  {{ two_thirds_column_start() }}
+
+    {% if error %}
+    {{ form_error_summary({
+      "titleText": "There is a problem",
+      "errorList": [
+        {
+          "text": "Please choose an option",
+          "href": "#confidence_readiness"
+        }
+      ]
+    }) }}
+    {% endif %}
+
+    <form method="post">
+      {{ csrf_input }}
+
+      {{ radios({
+        "idPrefix": "confidence_readiness",
+        "name": "confidence_readiness",
+        "errorMessage": {
+          "text": "Please choose an option"
+        } if error else undefined,
+        "fieldset": {
+          "legend": {
+            "text": "How do you feel about making a change to your health habits right now?",
+            "classes": "nhsuk-fieldset__legend--l",
+            "isPageHeading": true
+          }
+        },
+        "items": [
+          {
+            "value": "confidence_readiness.ready_and_confident",
+            "text": "I feel ready and confident — I just need the right option"
+          },
+          {
+            "value": "confidence_readiness.keen_but_worried",
+            "text": "I'm keen but not sure I can stick to it"
+          },
+          {
+            "value": "confidence_readiness.want_to_but_barriers",
+            "text": "I want to but I'm worried about what might get in the way"
+          },
+          {
+            "value": "confidence_readiness.not_quite_ready",
+            "text": "I'm thinking about it but not quite ready to commit"
+          },
+          {
+            "value": "confidence_readiness.change_out_of_reach",
+            "text": "I'm not sure change is possible for me right now"
+          }
+        ],
+        "value": data.confidence_readiness if data.confidence_readiness else undefined
+      }) }}
+
+      {{ continue_button() }}
+
+    </form>
+  {{ two_thirds_column_end() }}
+{% endblock content %}

@@ -7,7 +7,7 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 
 from api.models_v3 import V3_Category, V3_HelpsWith, V3_Service
-from pilot_access.models import Campaign, MagicLink, PilotProfile, UserFilter
+from htsh.models import Campaign, MagicLink, UserProfile, UserFilter
 
 
 def make_user(**kwargs):
@@ -37,8 +37,8 @@ def make_campaign(**kwargs):
     return campaign
 
 
-def make_pilot_profile(user=None, campaign=None, **kwargs):
-    """Create and return a saved PilotProfile instance."""
+def make_profile(user=None, campaign=None, **kwargs):
+    """Create and return a saved UserProfile instance."""
     if user is None:
         user = make_user()
     if campaign is None:
@@ -47,11 +47,11 @@ def make_pilot_profile(user=None, campaign=None, **kwargs):
         "email": "test@example.com",
         "phone": "07700900000",
         "postcode": "SW1A 1AA",
-        "preferred_contact_method": PilotProfile.CONTACT_EMAIL,
+        "preferred_contact_method": UserProfile.CONTACT_EMAIL,
         "disclaimer_accepted_at": None,
     }
     defaults.update(kwargs)
-    return PilotProfile.objects.create(user=user, campaign=campaign, **defaults)
+    return UserProfile.objects.create(user=user, campaign=campaign, **defaults)
 
 
 def make_magic_link(user=None, **kwargs):
@@ -85,6 +85,17 @@ def make_v3_category(**kwargs):
     }
     defaults.update(kwargs)
     return V3_Category.objects.create(**defaults)
+
+
+def make_favourite_service(user=None, service_id=1, **kwargs):
+    """Create and return a saved FavouriteService instance."""
+    from htsh.models import FavouriteService
+
+    if user is None:
+        user = make_user()
+    defaults = {"service_id": service_id}
+    defaults.update(kwargs)
+    return FavouriteService.objects.create(user=user, **defaults)
 
 
 def make_v3_helps_with(**kwargs):

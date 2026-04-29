@@ -29,7 +29,7 @@ resource "aws_ecs_task_definition" "app" {
       name                   = "web"
       image                  = "${var.docker_image}:${var.image_tag}"
       essential              = true
-      readonlyRootFilesystem = true
+      readonlyRootFilesystem = false
       linuxParameters = {
         initProcessEnabled = true
       }

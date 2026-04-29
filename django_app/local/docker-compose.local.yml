@@ -19,10 +19,10 @@ services:
       context: ..
       dockerfile: Dockerfile
       target: local
-    image: ppswm:local
+    image: ppshtsh:local
     env_file: .env
     environment:
-      DJANGO_SETTINGS_MODULE: wm_django.settings.local
+      DJANGO_SETTINGS_MODULE: config.settings.local
       DJANGO_SECRET_KEY: xxx-local-dev-secret-key-xxx
       DATABASE_URL: postgres://app:app@db:5432/app
       SERVICE_API_BASE_URL: ${SERVICE_API_BASE_URL:-http://localhost:8000}
@@ -35,12 +35,12 @@ services:
     volumes:
       - ../api:/app/api
       - ../core:/app/core
-      - ../pilot_access:/app/pilot_access
+      - ../htsh:/app/htsh
       - ../scheduler:/app/scheduler
       - ../static:/app/static
       - ../templates:/app/templates
       - ../web:/app/web
-      - ../wm_django:/app/wm_django
+      - ../config:/app/config
       - ../manage.py:/app/manage.py
     depends_on:
       db:

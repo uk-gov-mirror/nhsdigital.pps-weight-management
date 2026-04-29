@@ -1,7 +1,7 @@
 """
 admin_v3.py
 
-Version 3 (V3_) admin configuration for the Weight Management API.
+Version 3 (V3_) admin configuration for the HTSH API.
 
 This module is responsible for *all* v3-specific admin customisation.
 It exposes a single entry point used by api.admin:

@@ -1,0 +1,91 @@
+{% extends "web/layout/base.jinja" %}
+
+{% from "web/macros/layout.jinja" import two_thirds_column_start, two_thirds_column_end %}
+{% from "web/macros/forms.jinja" import form_error_summary, continue_button, back_link %}
+
+{% set pageName = "Looking back, what has made it difficult for you to keep up healthy habits?" %}
+
+{% block beforeContent %}
+  {{ back_link(back_href) }}
+{% endblock beforeContent %}
+
+{% block content %}
+  {{ two_thirds_column_start() }}
+
+    {% if error %}
+    {{ form_error_summary({
+      "titleText": "There is a problem",
+      "errorList": [
+        {
+          "text": "Please choose an option",
+          "href": "#past_barriers"
+        }
+      ]
+    }) }}
+    {% endif %}
+
+    <form method="post">
+      {{ csrf_input }}
+
+      {{ checkboxes({
+        "idPrefix": "past_barriers",
+        "name": "past_barriers",
+        "errorMessage": {
+          "text": "Please choose an option"
+        } if error else undefined,
+        "fieldset": {
+          "legend": {
+            "text": "Looking back, what has made it difficult for you to keep up healthy habits?",
+            "classes": "nhsuk-fieldset__legend--l",
+            "isPageHeading": true
+          }
+        },
+        "hint": {
+          "text": "Choose all that apply"
+        },
+        "items": [
+          {
+            "value": "past_barriers.no_time",
+            "text": "I didn't have enough time"
+          },
+          {
+            "value": "past_barriers.too_expensive",
+            "text": "It was too expensive"
+          },
+          {
+            "value": "past_barriers.not_physically_able",
+            "text": "I didn't feel physically able or well enough"
+          },
+          {
+            "value": "past_barriers.didnt_know_where_to_start",
+            "text": "I didn't know what to do or where to start"
+          },
+          {
+            "value": "past_barriers.lost_motivation",
+            "text": "I lost motivation or interest over time"
+          },
+          {
+            "value": "past_barriers.no_one_to_do_it_with",
+            "text": "I didn't have anyone to do it with"
+          },
+          {
+            "value": "past_barriers.nothing_nearby",
+            "text": "There were no suitable options near me"
+          },
+          {
+            "value": "past_barriers.life_pressures",
+            "text": "Life got in the way (stress, work, family)"
+          },
+          {
+            "value": "past_barriers.lack_of_confidence",
+            "text": "I didn't feel confident enough"
+          }
+        ],
+        "values": data.past_barriers if data.past_barriers else undefined
+      }) }}
+
+      {{ continue_button() }}
+
+    </form>
+  {{ two_thirds_column_end() }}
+{% endblock content %}

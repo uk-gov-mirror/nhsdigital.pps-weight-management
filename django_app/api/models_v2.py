@@ -1,5 +1,5 @@
 """
-Version 2 database models for the weight management API.
+Version 2 database models for the HTSH API.
 
 These models map onto database tables/views with names starting "V2_".
 They represent the second iteration of the service catalogue and filtering

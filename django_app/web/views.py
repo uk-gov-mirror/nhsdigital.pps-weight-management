@@ -1,10 +1,10 @@
 """
-Public web views for the weight management journey.
+Public web views for the healthy habits journey.
 
 The journey is a multi-step form stored in the session. Rough order:
 
 1. start                - flush session and show the start page
-2. consent_to_pilot     - pilot consent
+2. consent_to_htsh     - HTSH consent
 3. consent_to_ur        - user research consent
 4. details_name         - collect participant name
 5. details_postcode     - validate postcode via api.postcodes.io
@@ -24,13 +24,16 @@ import logging
 import re
 from json import JSONDecodeError
 from typing import Any, Dict, List
+from urllib.parse import urlparse
 
 import requests
 from django.conf import settings
 from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.contrib import messages
+from django.views.decorators.http import require_POST
 
 logger = logging.getLogger(__name__)
 
@@ -65,23 +68,23 @@ SERVICE_SEARCH_TIMEOUT = 10
 SERVICE_DETAIL_TIMEOUT = 10
 
 FILTER_FIELDS: List[str] = [
-    "goals",
     "cost",
-    "timetable",
     "location",
     "taught",
-    "who_with",
-    "channel",
+]
+
+
+QUESTIONNAIRE_SESSION_KEYS: List[str] = [
+    "motivation",
+    "priority_behaviour",
+    "past_barriers",
+    "current_barriers",
+    "confidence_readiness",
+    "enablers",
 ]
 
 
 PERSISTED_SESSION_KEYS: List[str] = [
-    # Wizard pages
-    "goals",
-    "barriers",
-    "who_with",
-    "timetable",
-    "channel",
     SESSION_KEY_DETAILS_POSTCODE,
     # Listing filters (set/edited on listing page)
     "cost",
@@ -92,7 +95,7 @@ PERSISTED_SESSION_KEYS: List[str] = [
 
 def _get_or_create_user_filter(user):
     """Return the user's persisted filter record (creating if needed)."""
-    from pilot_access.models import UserFilter
+    from htsh.models import UserFilter
 
     uf, _ = UserFilter.objects.get_or_create(user=user)
     return uf
@@ -107,21 +110,51 @@ def _persist_to_user_filter(user, key: str, value: Any) -> None:
     uf.save(update_fields=["data", "updated_at"])
 
 
+def _persist_questionnaire_answer(user, key: str, value: Any) -> None:
+    """Persist a questionnaire answer to QuestionnaireResponse, deriving tags."""
+    if not getattr(user, "is_authenticated", False):
+        return
+    from htsh.models import QuestionnaireResponse
+
+    qr, _ = QuestionnaireResponse.objects.get_or_create(user=user)
+    qr.set_answer(key, value)
+    qr.derive_behavioural_tags()
+    qr.derive_activity_attributes()
+    qr.save()
+
+
 def _hydrate_session_from_user_filter(request: HttpRequest) -> None:
     """Load persisted answers into the session if present."""
     user = request.user
     if not getattr(user, "is_authenticated", False):
         return
 
-    from pilot_access.models import UserFilter
+    changed = False
+
+    # Hydrate questionnaire answers from QuestionnaireResponse
+    from htsh.models import QuestionnaireResponse
+
+    try:
+        qr = QuestionnaireResponse.objects.get(user=user)
+        for key in QUESTIONNAIRE_SESSION_KEYS:
+            val = qr.get_answer(key)
+            if val is not None and val != "" and val != []:
+                request.session[key] = val
+                changed = True
+    except QuestionnaireResponse.DoesNotExist:
+        pass
+
+    # Hydrate filter keys from UserFilter (postcode, cost, location, taught)
+    from htsh.models import UserFilter
 
     try:
         uf = UserFilter.objects.get(user=user)
     except UserFilter.DoesNotExist:
+        if changed:
+            request.session.modified = True
         return
 
     data = uf.data or {}
-    changed = False
     for key in PERSISTED_SESSION_KEYS:
         if key in data and data[key] is not None:
             request.session[key] = data[key]
@@ -137,24 +170,46 @@ def _hydrate_session_from_user_filter(request: HttpRequest) -> None:
 
 def start(request: HttpRequest) -> HttpResponse:
     """Don't call session.flush() !! It clears the logged in users sessionid"""
-    from pilot_access.models import UserFilter
+    from htsh.models import UserFilter, QuestionnaireResponse
 
     # request.session.flush()
-    start_href = "details-contact-details"
     onboarding_complete = request.session.get("onboarding_complete", False)
     opted_in = False
     user_fields = {}
 
-    # If user has already been through the wizard (has UserFilter data), go straight to listings
     if request.user.is_authenticated:
+        start_href = "details-contact-details"
+        # Check QuestionnaireResponse for existing questionnaire answers
+        try:
+            qr = QuestionnaireResponse.objects.get(user=request.user)
+            if qr.motivation or qr.past_barriers:  # has answered at least one question
+                start_href = "listing"
+                for key in QUESTIONNAIRE_SESSION_KEYS:
+                    val = qr.get_answer(key)
+                    if val is not None and val != "" and val != []:
+                        user_fields[key] = val
+        except QuestionnaireResponse.DoesNotExist:
+            pass
+        # Check UserFilter for filter keys + allow_check_in
         try:
             uf = UserFilter.objects.get(user=request.user)
             if uf.data:
-                start_href = "listing"
+                if not user_fields:  # No questionnaire yet but has UserFilter
+                    start_href = "listing"
                 opted_in = uf.data.get("allow_check_in") == "yes"
-                user_fields = uf.data
+                for key in PERSISTED_SESSION_KEYS:
+                    if key in uf.data and uf.data[key] is not None:
+                        user_fields[key] = uf.data[key]
         except UserFilter.DoesNotExist:
             pass
+    else:
+        # Anonymous campaign user — skip contact details, start at postcode
+        start_href = "details-postcode"
+        # Populate user_fields from session so the summary renders correctly
+        if onboarding_complete:
+            for key in QUESTIONNAIRE_SESSION_KEYS + PERSISTED_SESSION_KEYS:
+                if key in request.session:
+                    user_fields[key] = request.session[key]
 
     # Legacy check for magic link flow
     if request.session.get("entry_flow") == "magiclink":
@@ -185,10 +240,10 @@ def details_contact_details(request: HttpRequest) -> HttpResponse:
     preferred contact method (email or text message).
     """
     from django.contrib.auth import get_user_model
-    from pilot_access.models import PilotProfile
+    from htsh.models import UserProfile
 
     user = request.user
-    profile = getattr(user, "pilot_profile", None)
+    profile = getattr(user, "profile", None)
 
     # Initial values come from the profile (and Django user for email)
     initial = {
@@ -200,7 +255,7 @@ def details_contact_details(request: HttpRequest) -> HttpResponse:
     }
 
     if not initial["preferred_contact_method"]:
-        initial["preferred_contact_method"] = PilotProfile.CONTACT_EMAIL
+        initial["preferred_contact_method"] = UserProfile.CONTACT_EMAIL
 
     errors: Dict[str, Any] = {"list": []}
     values = dict(initial)
@@ -214,7 +269,7 @@ def details_contact_details(request: HttpRequest) -> HttpResponse:
 
         pref = values["preferred_contact_method"]
 
-        if pref not in (PilotProfile.CONTACT_EMAIL, PilotProfile.CONTACT_SMS):
+        if pref not in (UserProfile.CONTACT_EMAIL, UserProfile.CONTACT_SMS):
             errors["preferred_contact_method"] = True
             errors["list"].append(
                 {
@@ -224,7 +279,7 @@ def details_contact_details(request: HttpRequest) -> HttpResponse:
             )
 
         # Validate per preference
-        if pref == PilotProfile.CONTACT_EMAIL:
+        if pref == UserProfile.CONTACT_EMAIL:
             if not _is_valid_email(values["email"]):
                 errors["email"] = True
                 errors["list"].append(
@@ -233,7 +288,7 @@ def details_contact_details(request: HttpRequest) -> HttpResponse:
                         "href": "#emailInput",
                     }
                 )
-        elif pref == PilotProfile.CONTACT_SMS:
+        elif pref == UserProfile.CONTACT_SMS:
             if not _is_valid_mobile(values["phone"]):
                 errors["phone"] = True
                 errors["list"].append(
@@ -259,9 +314,9 @@ def details_contact_details(request: HttpRequest) -> HttpResponse:
                     }
                 )
 
-        # If user entered/changed their phone, enforce uniqueness against PilotProfile
+        # If user entered/changed their phone, enforce uniqueness against UserProfile
         if not errors.get("phone") and values["phone"]:
-            qs = PilotProfile.objects.filter(phone=values["phone"])
+            qs = UserProfile.objects.filter(phone=values["phone"])
             if profile is not None and profile.pk is not None:
                 qs = qs.exclude(pk=profile.pk)
             if qs.exists():
@@ -304,10 +359,10 @@ def details_postcode(request: HttpRequest) -> HttpResponse:
 
     Validates locally (UK postcode format) and then via api.postcodes.io.
     On success, stores the postcode in the session and (if available) saves it
-    to the authenticated user's PilotProfile.
+    to the authenticated user's UserProfile.
     """
     user = request.user
-    profile = getattr(user, "pilot_profile", None)
+    profile = getattr(user, "profile", None)
 
     if request.method == "POST":
         postcode = (request.POST.get(SESSION_KEY_DETAILS_POSTCODE) or "").strip()
@@ -333,7 +388,7 @@ def details_postcode(request: HttpRequest) -> HttpResponse:
             profile.postcode = postcode
             profile.save(update_fields=["postcode"])
 
-        return redirect("goals")
+        return redirect("motivation")
 
     return render(
         request,
@@ -343,146 +398,166 @@ def details_postcode(request: HttpRequest) -> HttpResponse:
 
 
 # ---------------------------------------------------------------------------
-# Journey: goals and barriers
+# Journey: behavioural questionnaire (Q1–Q6)
 # ---------------------------------------------------------------------------
 
 
-def goals(request: HttpRequest) -> HttpResponse:
-    """Collect goals as a checkbox list."""
+def motivation(request: HttpRequest) -> HttpResponse:
+    """Q1: What prompted you to look for support with your health today?"""
     mode = request.GET.get("mode")
     back_href = "/" if mode == "edit" else "details-postcode"
     if request.method == "POST":
-        values = _clean_checkbox_list("goals", request)
+        value = request.POST.get("motivation")
+        if value in (None, "", CHECKBOX_UNCHECKED_VALUE):
+            return render(
+                request,
+                "web/pages/motivation.jinja",
+                {"error": True, "data": request.session, "back_href": back_href},
+            )
+        request.session["motivation"] = value
+        _persist_questionnaire_answer(request.user, "motivation", value)
+        if mode == "edit":
+            messages.success(request, "Your data has been updated.")
+            return redirect("/")
+        return redirect("priority_behaviour")
+
+    return render(
+        request,
+        "web/pages/motivation.jinja",
+        {"data": request.session, "back_href": back_href},
+    )
+
+
+def priority_behaviour(request: HttpRequest) -> HttpResponse:
+    """Q2: Which would make the biggest difference to your health right now?"""
+    mode = request.GET.get("mode")
+    back_href = "/" if mode == "edit" else "/motivation"
+    if request.method == "POST":
+        value = request.POST.get("priority_behaviour")
+        if value in (None, "", CHECKBOX_UNCHECKED_VALUE):
+            return render(
+                request,
+                "web/pages/priority-behaviour.jinja",
+                {"error": True, "data": request.session, "back_href": back_href},
+            )
+        request.session["priority_behaviour"] = value
+        _persist_questionnaire_answer(request.user, "priority_behaviour", value)
+        if mode == "edit":
+            messages.success(request, "Your data has been updated.")
+            return redirect("/")
+        return redirect("past_barriers")
+
+    return render(
+        request,
+        "web/pages/priority-behaviour.jinja",
+        {"data": request.session, "back_href": back_href},
+    )
+
+
+def past_barriers(request: HttpRequest) -> HttpResponse:
+    """Q3: What has made it difficult for you to keep up healthy habits?"""
+    mode = request.GET.get("mode")
+    back_href = "/" if mode == "edit" else "/priority-behaviour"
+    if request.method == "POST":
+        values = _clean_checkbox_list("past_barriers", request)
         if not values:
             return render(
                 request,
-                "web/pages/goals.jinja",
+                "web/pages/past-barriers.jinja",
                 {"error": True, "data": request.session, "back_href": back_href},
             )
-        request.session["goals"] = values
-        _persist_to_user_filter(request.user, "goals", values)
+        request.session["past_barriers"] = values
+        _persist_questionnaire_answer(request.user, "past_barriers", values)
         if mode == "edit":
-            messages.success(request, "Your goals have been updated.")
+            messages.success(request, "Your data has been updated.")
             return redirect("/")
-        else:
-            return redirect("barriers")
+        return redirect("current_barriers")
 
     return render(
         request,
-        "web/pages/goals.jinja",
+        "web/pages/past-barriers.jinja",
         {"data": request.session, "back_href": back_href},
     )
 
 
-def barriers(request: HttpRequest) -> HttpResponse:
-    """Collect barriers as a checkbox list."""
+def current_barriers(request: HttpRequest) -> HttpResponse:
+    """Q4: What is making it hardest for you to build healthy habits right now?"""
     mode = request.GET.get("mode")
-    back_href = "/" if mode == "edit" else "/goals"
+    back_href = "/" if mode == "edit" else "/past-barriers"
     if request.method == "POST":
-        values = _clean_checkbox_list("barriers", request)
+        values = _clean_checkbox_list("current_barriers", request)
         if not values:
             return render(
                 request,
-                "web/pages/barriers.jinja",
+                "web/pages/current-barriers.jinja",
                 {"error": True, "data": request.session, "back_href": back_href},
             )
-        request.session["barriers"] = values
-        _persist_to_user_filter(request.user, "barriers", values)
+        request.session["current_barriers"] = values
+        _persist_questionnaire_answer(request.user, "current_barriers", values)
         if mode == "edit":
             messages.success(request, "Your data has been updated.")
             return redirect("/")
-        else:
-            return redirect("preference_who_with")
+        return redirect("confidence_readiness")
 
     return render(
         request,
-        "web/pages/barriers.jinja",
+        "web/pages/current-barriers.jinja",
         {"data": request.session, "back_href": back_href},
     )
 
 
-# ---------------------------------------------------------------------------
-# Journey: preferences (who with / timetable / channel)
-# ---------------------------------------------------------------------------
-
-
-def preference_who_with(request: HttpRequest) -> HttpResponse:
-    """Collect preference for who the participant wants to attend with."""
+def confidence_readiness(request: HttpRequest) -> HttpResponse:
+    """Q5: How do you feel about making a change to your health habits?"""
     mode = request.GET.get("mode")
-    back_href = "/" if mode == "edit" else "/barriers"
+    back_href = "/" if mode == "edit" else "/current-barriers"
     if request.method == "POST":
-        value = request.POST.get("who_with")
+        value = request.POST.get("confidence_readiness")
         if value in (None, "", CHECKBOX_UNCHECKED_VALUE):
             return render(
                 request,
-                "web/pages/preference-who-with.jinja",
+                "web/pages/confidence-readiness.jinja",
                 {"error": True, "data": request.session, "back_href": back_href},
             )
-        request.session["who_with"] = value
-        _persist_to_user_filter(request.user, "who_with", value)
+        request.session["confidence_readiness"] = value
+        _persist_questionnaire_answer(request.user, "confidence_readiness", value)
         if mode == "edit":
             messages.success(request, "Your data has been updated.")
             return redirect("/")
-        else:
-            return redirect("preference_timetable")
+        return redirect("enablers")
 
     return render(
         request,
-        "web/pages/preference-who-with.jinja",
+        "web/pages/confidence-readiness.jinja",
         {"data": request.session, "back_href": back_href},
     )
 
 
-def preference_timetable(request: HttpRequest) -> HttpResponse:
-    """Collect timetable preferences as a checkbox list."""
+def enablers(request: HttpRequest) -> HttpResponse:
+    """Q6: What would make it easier for you to take that first step?"""
     mode = request.GET.get("mode")
-    back_href = "/" if mode == "edit" else "/preference-who-with"
+    back_href = "/" if mode == "edit" else "/confidence-readiness"
     if request.method == "POST":
-        value = request.POST.get("timetable")
-        if value in (None, "", CHECKBOX_UNCHECKED_VALUE):
+        values = _clean_checkbox_list("enablers", request)
+        if not values:
             return render(
                 request,
-                "web/pages/preference-timetable.jinja",
+                "web/pages/enablers.jinja",
                 {"error": True, "data": request.session, "back_href": back_href},
             )
-        request.session["timetable"] = value
-        _persist_to_user_filter(request.user, "timetable", value)
+        request.session["enablers"] = values
+        _persist_questionnaire_answer(request.user, "enablers", values)
         if mode == "edit":
             messages.success(request, "Your data has been updated.")
             return redirect("/")
-        else:
-            return redirect("preference_channel")
-
-    return render(
-        request,
-        "web/pages/preference-timetable.jinja",
-        {"data": request.session, "back_href": back_href},
-    )
-
-
-def preference_channel(request: HttpRequest) -> HttpResponse:
-    """Collect preferred contact channel."""
-    mode = request.GET.get("mode")
-    back_href = "/" if mode == "edit" else "/preference-timetable"
-    if request.method == "POST":
-        value = request.POST.get("channel")
-        if value in (None, "", CHECKBOX_UNCHECKED_VALUE):
-            return render(
-                request,
-                "web/pages/preference-channel.jinja",
-                {"error": True, "data": request.session, "back_href": back_href},
-            )
-        request.session["channel"] = value
-        _persist_to_user_filter(request.user, "channel", value)
-        if mode == "edit":
-            messages.success(request, "Your data has been updated.")
-            return redirect("/")
+        elif not request.user.is_authenticated:
+            request.session["onboarding_complete"] = True
+            return redirect("listing")
         else:
             return redirect("allow-check-in")
 
     return render(
         request,
-        "web/pages/preference-channel.jinja",
+        "web/pages/enablers.jinja",
         {"data": request.session, "back_href": back_href},
     )
 
@@ -493,12 +568,18 @@ def preference_channel(request: HttpRequest) -> HttpResponse:
 def allow_check_in(request: HttpRequest) -> HttpResponse:
     """Collect user permission to check in."""
     mode = request.GET.get("mode")
-    back_href = "/" if mode == "edit" else "/preference-channel"
+    back_href = "/" if mode == "edit" else "/enablers"
     if request.method == "POST":
 
         value = request.POST.get("allow_check_in")
         request.session["allow_check_in"] = value
         _persist_to_user_filter(request.user, "allow_check_in", value)
+
+        service_id = request.session.pop("account_prompt_service_id", None)
+        if service_id and value in ("yes", "no"):
+            request.session["onboarding_complete"] = True
+            return redirect("detail", service_id=service_id)
+
         if mode == "edit" and value in ("yes", "no"):
             messages.success(request, "Your data has been updated.")
             return redirect("/")
@@ -551,7 +632,7 @@ def listing(request: HttpRequest) -> HttpResponse:
 
     user = request.user
     profile = (
-        getattr(user, "pilot_profile", None)
+        getattr(user, "profile", None)
         if getattr(user, "is_authenticated", False)
         else None
     )
@@ -648,6 +729,18 @@ def listing(request: HttpRequest) -> HttpResponse:
         payload["postcode"] = postcode
         payload["distance"] = distance
 
+    # Include activity attributes for relevance ranking (from QuestionnaireResponse)
+    user_activity_attributes = []
+    if request.user.is_authenticated:
+        from htsh.models import QuestionnaireResponse
+        try:
+            qr = QuestionnaireResponse.objects.get(user=request.user)
+            user_activity_attributes = qr.activity_attributes or []
+        except QuestionnaireResponse.DoesNotExist:
+            pass
+    if user_activity_attributes:
+        payload["activity_attributes"] = user_activity_attributes
+
     api_url = _build_internal_api_url(reverse("v3:service-search"))
 
     results: Dict[str, Any] = {"total": 0, "results": []}
@@ -700,6 +793,15 @@ def listing(request: HttpRequest) -> HttpResponse:
         "showing_to": min(offset + page_size, total_results),
     }
 
+    # Favourite state for star icons
+    favourite_ids = set()
+    if request.user.is_authenticated:
+        from htsh.models import FavouriteService
+        favourite_ids = set(
+            FavouriteService.objects.filter(user=request.user)
+            .values_list("service_id", flat=True)
+        )
+
     return render(
         request,
         "web/pages/listing.jinja",
@@ -711,6 +813,7 @@ def listing(request: HttpRequest) -> HttpResponse:
             "postcode": postcode,
             "distance": distance,
             "distance_options": DISTANCE_OPTIONS,
+            "favourite_ids": favourite_ids,
         },
     )
 
@@ -754,6 +857,32 @@ def _get_page_range(current_page: int, total_pages: int, window: int = 2) -> Lis
 
 def detail(request: HttpRequest, service_id: int) -> HttpResponse:
     """Show a single service's details, fetched from the API."""
+    if request.GET.get("skip_prompt"):
+        request.session["account_prompt_dismissed"] = True
+        next_url = request.GET.get("next", "")
+        if next_url and url_has_allowed_host_and_scheme(
+            next_url, allowed_hosts={request.get_host()}
+        ):
+            return redirect(next_url)
+
+    if (not request.user.is_authenticated
+            and not request.session.get("account_prompt_dismissed")):
+        if request.method == "POST" and request.POST.get("action") == "create_account":
+            request.session["account_prompt_service_id"] = service_id
+            return redirect("htsh:disclaimer")
+        if not request.GET.get("skip_prompt"):
+            prompt_next = ""
+            referer = request.META.get("HTTP_REFERER", "")
+            if referer and url_has_allowed_host_and_scheme(
+                referer, allowed_hosts={request.get_host()}
+            ):
+                prompt_next = urlparse(referer).path
+            return render(request, "web/pages/account-prompt.jinja", {
+                "service_id": service_id,
+                "prompt_next": prompt_next,
+            })
+    # --- End interstitial gate ---
+
     api_url = _build_internal_api_url(
         reverse("v3:service-detail", kwargs={"id": service_id})
     )
@@ -766,11 +895,62 @@ def detail(request: HttpRequest, service_id: int) -> HttpResponse:
         logger.exception("Service detail API error")
         raise Http404("Service not found")
 
+    # Favourite state for star icon
+    is_favourited = False
+    if request.user.is_authenticated:
+        from htsh.models import FavouriteService
+        is_favourited = FavouriteService.objects.filter(
+            user=request.user, service_id=service_id
+        ).exists()
+
     return render(
         request,
         "web/pages/detail.jinja",
-        {"service": service, "data": request.session},
+        {"service": service, "data": request.session, "is_favourited": is_favourited},
     )
+
+
+@require_POST
+def toggle_favourite(request: HttpRequest, service_id: int) -> HttpResponse:
+    """Toggle a service in the user's favourites. POST only, redirects back."""
+    if not request.user.is_authenticated:
+        request.session.pop("account_prompt_dismissed", None)
+        return redirect(reverse("detail", kwargs={"service_id": service_id}))
+
+    from htsh.models import FavouriteService
+
+    obj, created = FavouriteService.objects.get_or_create(
+        user=request.user, service_id=service_id
+    )
+    if not created:
+        obj.delete()
+
+    # Redirect to referer if same host, otherwise listing
+    referer = request.META.get("HTTP_REFERER", "")
+    if referer and request.get_host() in referer:
+        return redirect(referer)
+    return redirect(reverse("listing"))
+
+
+def favourites_list(request: HttpRequest) -> HttpResponse:
+    """Show the user's saved (favourited) services as cards."""
+    from htsh.models import FavouriteService
+    from api.models_v3 import V3_Service
+    from api.v3.serializers import V3_ServiceSummarySerializer
+
+    service_ids = list(
+        FavouriteService.objects.filter(user=request.user)
+        .values_list("service_id", flat=True)
+    )
+    services = V3_Service.objects.filter(id__in=service_ids).select_related("service_type")
+    serialized = V3_ServiceSummarySerializer(services, many=True).data
+
+    return render(
+        request,
+        "web/pages/favourites.jinja",
+        {"services": serialized, "data": request.session},
+    )
+
 
 # ---------------------------------------------------------------------------
 # Helpers

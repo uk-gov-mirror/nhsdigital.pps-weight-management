@@ -6,7 +6,7 @@
     "test:ui:headed": "playwright test --headed",
     "test:ui:debug": "playwright test --debug",
     "test:ui:report": "playwright show-report",
-    "test:ui:pilot": "playwright test tests/ui/pilot_access.spec.ts",
+    "test:ui:htsh": "playwright test tests/ui/htsh.spec.ts",
     "test:ci:api": "jest --ci"
   },
   "devDependencies": {

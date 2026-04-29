@@ -1,5 +1,5 @@
 """
-V3 REST API views for the weight management service catalogue.
+V3 REST API views for the HTSH service catalogue.
 
 These views expose the public, read-only API used by the web frontend and
 other consumers:
@@ -17,6 +17,7 @@ and the serializers defined in api.v3.serializers.
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, serializers
+from django.db.models import Count
 from django.http import Http404
 from drf_spectacular.utils import extend_schema, OpenApiExample, inline_serializer
 from api.models_v3 import V3_Service
@@ -233,14 +234,54 @@ class ServiceSearchV3(APIView):
                 if in_radius:
                     filtered.append(service)
 
+            # Attribute-based relevance scoring
+            user_attrs = set(payload.get("activity_attributes", []))
+            if user_attrs:
+                from htsh.models import ServiceActivityAttribute
+                service_ids = [s.id for s in filtered]
+                score_qs = (
+                    ServiceActivityAttribute.objects
+                    .filter(service_id__in=service_ids, attribute__name__in=user_attrs)
+                    .values("service_id")
+                    .annotate(score=Count("id"))
+                )
+                score_map = {row["service_id"]: row["score"] for row in score_qs}
+                for svc in filtered:
+                    svc.relevance_score = score_map.get(svc.id, 0)
+                filtered.sort(key=lambda s: (-s.relevance_score, s.sort_order or 0, s.name))
+            else:
+                for svc in filtered:
+                    svc.relevance_score = 0
+
             total = len(filtered)
             page_services = filtered[offset : offset + limit]
             results = V3_ServiceSummarySerializer(page_services, many=True).data
         else:
             # No valid postcode/distance – behave as before (taxonomy-only)
-            total = qs.count()
-            page_qs = qs[offset : offset + limit]
-            results = V3_ServiceSummarySerializer(page_qs, many=True).data
+            # Attribute-based relevance scoring
+            user_attrs = set(payload.get("activity_attributes", []))
+            if user_attrs:
+                from htsh.models import ServiceActivityAttribute
+                services_list = list(qs)
+                score_qs = (
+                    ServiceActivityAttribute.objects
+                    .filter(attribute__name__in=user_attrs)
+                    .values("service_id")
+                    .annotate(score=Count("id"))
+                )
+                score_map = {row["service_id"]: row["score"] for row in score_qs}
+                for svc in services_list:
+                    svc.relevance_score = score_map.get(svc.id, 0)
+                services_list.sort(key=lambda s: (-s.relevance_score, s.sort_order or 0, s.name))
+                total = len(services_list)
+                page_services = services_list[offset : offset + limit]
+                results = V3_ServiceSummarySerializer(page_services, many=True).data
+            else:
+                total = qs.count()
+                page_qs = list(qs[offset : offset + limit])
+                for svc in page_qs:
+                    svc.relevance_score = 0
+                results = V3_ServiceSummarySerializer(page_qs, many=True).data
 
         return Response({"total": total, "results": results})
 

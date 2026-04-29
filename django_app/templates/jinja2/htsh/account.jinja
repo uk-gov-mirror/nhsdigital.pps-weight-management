@@ -1,0 +1,43 @@
+{% extends "web/layout/base.jinja" %}
+{% from "web/macros/layout.jinja" import two_thirds_column_start, two_thirds_column_end, summary_row %}
+{% from "nhsuk/components/button/macro.jinja" import format_datetime %}
+{% macro summary_row(title, item, link) %}
+  <div class="nhsuk-grid-row nhsuk-u-padding-top-3">
+    <div class="nhsuk-grid-column-one-third">
+      <p class="nhsuk-u-font-weight-bold">{{ title }}</p>
+    </div>
+    <div class="nhsuk-grid-column-one-third">{{ item }}</div>
+    <div class="nhsuk-grid-column-one-third">
+      <a href="{{ link }}" class="nhsuk-link nhsuk-link--no-visited-state">Change</a>
+    </div>
+  </div>
+{% endmacro %}
+{% block content %}
+  {% for message in messages %}
+    <div class="nhsuk-inset-text">
+      <p>{{ message }}</p>
+    </div>
+  {% endfor %}
+  <h1 class="nhsuk-heading-xl nhsuk-u-margin-bottom-5">Edit your details</h1>
+  {% if profile.email %}
+    {{ summary_row("Email Address",
+        profile.email,
+        url("htsh:change_contact_info") 
+    ) }}
+  {% endif %}
+  {% if profile.phone %}
+    {{ summary_row("Phone Number",
+        profile.phone,
+        url("htsh:change_contact_info") 
+    ) }}
+  {% endif %}
+  <hr class="nhsuk-section-break nhsuk-section-break--visible">
+  {{ summary_row("Your home postcode",
+    profile.postcode,
+    url("htsh:account") ) }}
+  <hr class="nhsuk-section-break nhsuk-section-break--visible">
+  <div class="nhsuk-u-padding-top-3">
+    <a class="nhsuk-link nhsuk-link--no-visited-state"
+       href="{{ url('htsh:delete_account') }}">Delete all my information</a>
+  </div>
+{% endblock content %}
