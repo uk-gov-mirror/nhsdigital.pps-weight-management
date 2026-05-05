@@ -56,6 +56,26 @@ class StartViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"listing", response.content)
 
+    def test_start_shows_human_readable_past_barriers_summary(self):
+        """GET / shows selected past barrier text, not the stored enum-like value."""
+        user = make_user()
+        make_profile(user=user, disclaimer_accepted_at=timezone.now())
+        QuestionnaireResponse.objects.create(
+            user=user,
+            motivation="motivation.want_to_feel_better",
+            past_barriers=["past_barriers.didnt_know_where_to_start"],
+        )
+        self.client.force_login(user)
+
+        session = self.client.session
+        session["onboarding_complete"] = True
+        session.save()
+
+        response = self.client.get(reverse("home"))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn(b"past_barriers.didnt_know_where_to_start", response.content)
+        self.assertIn(b"I didn&#39;t know what to do or where to start", response.content)
+
     def test_start_authenticated_with_filter_data(self):
         """GET / with user who has UserFilter data routes to listing."""
         user = make_user()
@@ -102,7 +122,7 @@ class DetailsContactDetailsViewTests(_AuthenticatedTestCase):
             "preferred_contact_method": UserProfile.CONTACT_EMAIL,
         })
         self.assertRedirects(
-            response, reverse("details_postcode"), fetch_redirect_response=False,
+            response, reverse("questionnaire_intro"), fetch_redirect_response=False,
         )
 
     def test_post_valid_sms_preference(self):
@@ -112,7 +132,7 @@ class DetailsContactDetailsViewTests(_AuthenticatedTestCase):
             "preferred_contact_method": UserProfile.CONTACT_SMS,
         })
         self.assertRedirects(
-            response, reverse("details_postcode"), fetch_redirect_response=False,
+            response, reverse("questionnaire_intro"), fetch_redirect_response=False,
         )
 
     def test_post_invalid_no_preference(self):
@@ -161,7 +181,7 @@ class DetailsPostcodeViewTests(_AuthenticatedTestCase):
 
     @mock_postcodes_io(is_valid=True)
     def test_post_valid_postcode(self, mock_get):
-        """POST with valid postcode redirects to motivation (Q1)."""
+        """POST with valid postcode redirects to motivation page."""
         response = self.client.post(self.url, {"details-postcode": "SW1A 1AA"})
         self.assertRedirects(
             response, reverse("motivation"), fetch_redirect_response=False
@@ -180,6 +200,20 @@ class DetailsPostcodeViewTests(_AuthenticatedTestCase):
 # ---------------------------------------------------------------------------
 # Questionnaire Q1–Q6 views
 # ---------------------------------------------------------------------------
+
+
+class QuestionnaireIntroViewTests(_AuthenticatedTestCase):
+    """Tests for pre-postcode context screen before Q1."""
+
+    def test_get_renders(self):
+        response = self.client.get(reverse("questionnaire_intro"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_post_redirects_to_details_postcode(self):
+        response = self.client.post(reverse("questionnaire_intro"))
+        self.assertRedirects(
+            response, reverse("details_postcode"), fetch_redirect_response=False
+        )
 
 
 class MotivationViewTests(_AuthenticatedTestCase):
@@ -314,12 +348,12 @@ class EnablersViewTests(_AuthenticatedTestCase):
         response = self.client.get(reverse("enablers"))
         self.assertEqual(response.status_code, 200)
 
-    def test_post_valid_redirects_to_allow_check_in(self):
+    def test_post_valid_redirects_to_home_summary(self):
         response = self.client.post(
             reverse("enablers"), {"enablers": ["enablers.affordable"]},
         )
         self.assertRedirects(
-            response, reverse("allow-check-in"), fetch_redirect_response=False
+            response, reverse("home"), fetch_redirect_response=False
         )
 
     def test_post_empty_shows_error(self):
@@ -385,10 +419,10 @@ class _AnonymousCampaignTestCase(TestCase):
 
 class AnonymousStartViewTests(_AnonymousCampaignTestCase):
 
-    def test_start_anonymous_with_campaign_shows_postcode_href(self):
+    def test_start_anonymous_with_campaign_shows_questionnaire_intro_href(self):
         response = self.client.get(reverse("home"))
         self.assertEqual(response.status_code, 200)
-        self.assertIn(b"details-postcode", response.content)
+        self.assertIn(b"questionnaire-intro", response.content)
 
     def test_start_anonymous_with_campaign_no_contact_details(self):
         response = self.client.get(reverse("home"))
@@ -452,12 +486,12 @@ class AnonymousPastBarriersTests(_AnonymousCampaignTestCase):
 
 class AnonymousEnablersTests(_AnonymousCampaignTestCase):
 
-    def test_post_redirects_to_listing(self):
+    def test_post_redirects_to_home_summary(self):
         response = self.client.post(
             reverse("enablers"), {"enablers": ["enablers.affordable"]}
         )
         self.assertRedirects(
-            response, reverse("listing"), fetch_redirect_response=False
+            response, reverse("home"), fetch_redirect_response=False
         )
 
     def test_post_sets_onboarding_complete(self):
@@ -475,10 +509,10 @@ class AnonymousEnablersTests(_AnonymousCampaignTestCase):
 
 class AuthenticatedEnablersTests(_AuthenticatedTestCase):
 
-    def test_post_redirects_to_allow_check_in(self):
+    def test_post_redirects_to_home_summary(self):
         response = self.client.post(
             reverse("enablers"), {"enablers": ["enablers.affordable"]}
         )
         self.assertRedirects(
-            response, reverse("allow-check-in"), fetch_redirect_response=False
+            response, reverse("home"), fetch_redirect_response=False
         )

@@ -287,6 +287,20 @@ class FavouritesAuthGateTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertIn("/landing/", response.url)
 
+    def test_campaign_session_favourites_pass_through(self):
+        request = self.factory.get("/favourites")
+        request.user = AnonymousUser()
+        request.session = {"campaign_code": "123456"}
+        response = self.middleware.process_request(request)
+        self.assertIsNone(response)
+
+    def test_campaign_session_favourites_trailing_slash_pass_through(self):
+        request = self.factory.get("/favourites/")
+        request.user = AnonymousUser()
+        request.session = {"campaign_code": "123456"}
+        response = self.middleware.process_request(request)
+        self.assertIsNone(response)
+
     def test_htsh_flow_no_cache_headers(self):
         inner_response = HttpResponse("OK")
         middleware = HtshAccessMiddleware(get_response=lambda r: inner_response)

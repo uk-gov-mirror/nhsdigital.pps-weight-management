@@ -24,14 +24,12 @@ import logging
 import re
 from json import JSONDecodeError
 from typing import Any, Dict, List
-from urllib.parse import urlparse
 
 import requests
 from django.conf import settings
 from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
-from django.utils.http import url_has_allowed_host_and_scheme
 from django.contrib import messages
 from django.views.decorators.http import require_POST
 
@@ -60,6 +58,7 @@ SESSION_KEY_DETAILS_POSTCODE = "details-postcode"
 SESSION_KEY_CONTACT = "contact"
 SESSION_KEY_EMAIL = "emailInput"
 SESSION_KEY_MOBILE = "mobileInput"
+SESSION_KEY_ANONYMOUS_FAVOURITES = "anonymous_favourite_service_ids"
 
 POSTCODE_API_TEMPLATE = "https://api.postcodes.io/postcodes/{postcode}/validate"
 POSTCODE_API_TIMEOUT = 5
@@ -82,6 +81,116 @@ QUESTIONNAIRE_SESSION_KEYS: List[str] = [
     "confidence_readiness",
     "enablers",
 ]
+
+
+QUESTION_OPTION_LABELS: Dict[str, str] = {
+    # Q1 motivation
+    "motivation.want_to_feel_better": "I want to feel better in myself",
+    "motivation.noticed_changes": "I've noticed changes in my weight or fitness",
+    "motivation.health_professional": "A health professional suggested it",
+    "motivation.social_encouragement": "A friend or family member encouraged me",
+    "motivation.health_scare": "I've had a health scare or diagnosis",
+    "motivation.setting_example": "I want to set a good example for others",
+    "motivation.tried_before": "I've tried before and want to try again",
+    "motivation.life_transition": "I'm at a point in my life where I want to make a change",
+    "motivation.just_exploring": "I'm not sure - I'm just exploring",
+    # Q2 priority behaviour
+    "priority_behaviour.more_physically_active": "Becoming more physically active",
+    "priority_behaviour.eating_drinking": "Improving what I eat or drink",
+    "priority_behaviour.managing_weight": "Managing my weight",
+    "priority_behaviour.mental_wellbeing": "Improving my mental wellbeing (e.g. stress, mood, sleep)",
+    "priority_behaviour.energy_stamina": "Building my energy and stamina",
+    "priority_behaviour.managing_condition": "Managing a health condition better",
+    "priority_behaviour.body_confidence": "Feeling more confident in my body",
+    # Q3 past barriers
+    "past_barriers.no_time": "I didn't have enough time",
+    "past_barriers.too_expensive": "It was too expensive",
+    "past_barriers.not_physically_able": "I didn't feel physically able or well enough",
+    "past_barriers.didnt_know_where_to_start": "I didn't know what to do or where to start",
+    "past_barriers.lost_motivation": "I lost motivation or interest over time",
+    "past_barriers.no_one_to_do_it_with": "I didn't have anyone to do it with",
+    "past_barriers.nothing_nearby": "There were no suitable options near me",
+    "past_barriers.life_pressures": "Life got in the way (stress, work, family)",
+    "past_barriers.lack_of_confidence": "I didn't feel confident enough",
+    # Q4 current barriers
+    "current_barriers.short_on_time": "I'm short on time",
+    "current_barriers.cant_afford_it": "I can't afford it",
+    "current_barriers.health_condition": "My health or a physical condition limits what I can do",
+    "current_barriers.not_sure_what_works": "I'm not sure what would actually work for me",
+    "current_barriers.low_motivation": "I don't feel motivated right now",
+    "current_barriers.self_conscious": "I feel self-conscious or anxious about trying something new",
+    "current_barriers.practical_barriers": "I don't have practical support (e.g. childcare, transport)",
+    "current_barriers.routine": "I find it hard to make things a routine",
+    "current_barriers.low_perceived_need": "I feel fine and don't see an urgent need to change",
+    # Q5 confidence and readiness
+    "confidence_readiness.ready_and_confident": "I feel ready and confident - I just need the right option",
+    "confidence_readiness.keen_but_worried": "I'm keen but not sure I can stick to it",
+    "confidence_readiness.want_to_but_barriers": "I want to but I'm worried about what might get in the way",
+    "confidence_readiness.not_quite_ready": "I'm thinking about it but not quite ready to commit",
+    "confidence_readiness.change_out_of_reach": "I'm not sure change is possible for me right now",
+    # Q6 enablers
+    "enablers.wont_take_too_much_time": "Knowing it won't take up too much time",
+    "enablers.affordable": "Finding something affordable",
+    "enablers.support_from_others": "Having support from other people",
+    "enablers.start_slowly": "Doing something I can start slowly and build up",
+    "enablers.suitable_for_me": "Knowing it's suitable for someone like me",
+    "enablers.home_online": "Being able to do it from home or online",
+    "enablers.clear_guidance": "Having clear guidance on what to do",
+    "enablers.will_make_a_difference": "Knowing it will actually make a difference",
+}
+
+
+def _format_answer_label(value: Any) -> str:
+    """Return human-readable text for a stored questionnaire answer value."""
+    if not value:
+        return "Not set"
+    if not isinstance(value, str):
+        return str(value)
+
+    mapped = QUESTION_OPTION_LABELS.get(value)
+    if mapped:
+        return mapped
+
+    # Fallback for unknown values: drop question prefix and prettify token.
+    code = value.split(".", 1)[-1]
+    return code.replace("_", " ").capitalize()
+
+
+def _format_answer_list(values: Any) -> List[str]:
+    """Return human-readable text for multi-select questionnaire answers."""
+    if not values:
+        return ["Not set"]
+    if isinstance(values, list):
+        return [_format_answer_label(v) for v in values]
+    return [_format_answer_label(values)]
+
+
+def _get_anonymous_favourite_ids(session) -> set[int]:
+    """Return normalized anonymous favourite service IDs from session."""
+    raw_values = session.get(SESSION_KEY_ANONYMOUS_FAVOURITES, [])
+    if not isinstance(raw_values, list):
+        raw_values = []
+
+    normalized: set[int] = set()
+    for value in raw_values:
+        try:
+            normalized.add(int(value))
+        except (TypeError, ValueError):
+            # Ignore stale/invalid values without blocking UX.
+            continue
+
+    canonical = sorted(normalized)
+    if raw_values != canonical:
+        session[SESSION_KEY_ANONYMOUS_FAVOURITES] = canonical
+        session.modified = True
+
+    return normalized
+
+
+def _set_anonymous_favourite_ids(session, service_ids: set[int]) -> None:
+    """Persist canonical anonymous favourite IDs in session."""
+    session[SESSION_KEY_ANONYMOUS_FAVOURITES] = sorted(service_ids)
+    session.modified = True
 
 
 PERSISTED_SESSION_KEYS: List[str] = [
@@ -204,7 +313,7 @@ def start(request: HttpRequest) -> HttpResponse:
             pass
     else:
         # Anonymous campaign user — skip contact details, start at postcode
-        start_href = "details-postcode"
+        start_href = "questionnaire-intro"
         # Populate user_fields from session so the summary renders correctly
         if onboarding_complete:
             for key in QUESTIONNAIRE_SESSION_KEYS + PERSISTED_SESSION_KEYS:
@@ -215,6 +324,15 @@ def start(request: HttpRequest) -> HttpResponse:
     if request.session.get("entry_flow") == "magiclink":
         start_href = "listing"
 
+    user_fields_display = {
+        "motivation": _format_answer_label(user_fields.get("motivation")),
+        "priority_behaviour": _format_answer_label(user_fields.get("priority_behaviour")),
+        "past_barriers": _format_answer_list(user_fields.get("past_barriers")),
+        "current_barriers": _format_answer_list(user_fields.get("current_barriers")),
+        "confidence_readiness": _format_answer_label(user_fields.get("confidence_readiness")),
+        "enablers": _format_answer_list(user_fields.get("enablers")),
+    }
+
     return render(
         request,
         "web/pages/index.jinja",
@@ -224,6 +342,7 @@ def start(request: HttpRequest) -> HttpResponse:
             "onboarding_complete": onboarding_complete,
             "opted_in": opted_in,
             "user_fields": user_fields,
+            "user_fields_display": user_fields_display,
         },
     )
 
@@ -345,7 +464,7 @@ def details_contact_details(request: HttpRequest) -> HttpResponse:
                 profile.preferred_contact_method = pref
                 profile.save(update_fields=["phone", "preferred_contact_method"])
 
-            return redirect("details_postcode")
+            return redirect("questionnaire_intro")
 
     return render(
         request,
@@ -405,7 +524,7 @@ def details_postcode(request: HttpRequest) -> HttpResponse:
 def motivation(request: HttpRequest) -> HttpResponse:
     """Q1: What prompted you to look for support with your health today?"""
     mode = request.GET.get("mode")
-    back_href = "/" if mode == "edit" else "details-postcode"
+    back_href = "/" if mode == "edit" else "/details-postcode"
     if request.method == "POST":
         value = request.POST.get("motivation")
         if value in (None, "", CHECKBOX_UNCHECKED_VALUE):
@@ -549,16 +668,24 @@ def enablers(request: HttpRequest) -> HttpResponse:
         if mode == "edit":
             messages.success(request, "Your data has been updated.")
             return redirect("/")
-        elif not request.user.is_authenticated:
-            request.session["onboarding_complete"] = True
-            return redirect("listing")
-        else:
-            return redirect("allow-check-in")
+        request.session["onboarding_complete"] = True
+        return redirect("home")
 
     return render(
         request,
         "web/pages/enablers.jinja",
         {"data": request.session, "back_href": back_href},
+    )
+
+
+def questionnaire_intro(request: HttpRequest) -> HttpResponse:
+    """Provide context before users begin the questionnaire."""
+    if request.method == "POST":
+        return redirect("details_postcode")
+
+    return render(
+        request,
+        "web/pages/questionnaire-intro.jinja",
     )
 
 # ---------------------------------------------------------------------------
@@ -801,6 +928,8 @@ def listing(request: HttpRequest) -> HttpResponse:
             FavouriteService.objects.filter(user=request.user)
             .values_list("service_id", flat=True)
         )
+    else:
+        favourite_ids = _get_anonymous_favourite_ids(request.session)
 
     return render(
         request,
@@ -857,31 +986,15 @@ def _get_page_range(current_page: int, total_pages: int, window: int = 2) -> Lis
 
 def detail(request: HttpRequest, service_id: int) -> HttpResponse:
     """Show a single service's details, fetched from the API."""
-    if request.GET.get("skip_prompt"):
-        request.session["account_prompt_dismissed"] = True
-        next_url = request.GET.get("next", "")
-        if next_url and url_has_allowed_host_and_scheme(
-            next_url, allowed_hosts={request.get_host()}
-        ):
-            return redirect(next_url)
-
-    if (not request.user.is_authenticated
-            and not request.session.get("account_prompt_dismissed")):
-        if request.method == "POST" and request.POST.get("action") == "create_account":
-            request.session["account_prompt_service_id"] = service_id
-            return redirect("htsh:disclaimer")
-        if not request.GET.get("skip_prompt"):
-            prompt_next = ""
-            referer = request.META.get("HTTP_REFERER", "")
-            if referer and url_has_allowed_host_and_scheme(
-                referer, allowed_hosts={request.get_host()}
-            ):
-                prompt_next = urlparse(referer).path
-            return render(request, "web/pages/account-prompt.jinja", {
-                "service_id": service_id,
-                "prompt_next": prompt_next,
-            })
-    # --- End interstitial gate ---
+    if (
+        request.method == "POST"
+        and not request.user.is_authenticated
+        and request.session.get("campaign_code")
+        and request.POST.get("action") == "create_account"
+    ):
+        request.session["account_prompt_service_id"] = service_id
+        request.session.modified = True
+        return redirect("htsh:disclaimer")
 
     api_url = _build_internal_api_url(
         reverse("v3:service-detail", kwargs={"id": service_id})
@@ -902,6 +1015,8 @@ def detail(request: HttpRequest, service_id: int) -> HttpResponse:
         is_favourited = FavouriteService.objects.filter(
             user=request.user, service_id=service_id
         ).exists()
+    else:
+        is_favourited = service_id in _get_anonymous_favourite_ids(request.session)
 
     return render(
         request,
@@ -914,8 +1029,20 @@ def detail(request: HttpRequest, service_id: int) -> HttpResponse:
 def toggle_favourite(request: HttpRequest, service_id: int) -> HttpResponse:
     """Toggle a service in the user's favourites. POST only, redirects back."""
     if not request.user.is_authenticated:
-        request.session.pop("account_prompt_dismissed", None)
-        return redirect(reverse("detail", kwargs={"service_id": service_id}))
+        if not request.session.get("campaign_code"):
+            return redirect("landing")
+
+        anonymous_favourites = _get_anonymous_favourite_ids(request.session)
+        if service_id in anonymous_favourites:
+            anonymous_favourites.remove(service_id)
+        else:
+            anonymous_favourites.add(service_id)
+        _set_anonymous_favourite_ids(request.session, anonymous_favourites)
+
+        referer = request.META.get("HTTP_REFERER", "")
+        if referer and request.get_host() in referer:
+            return redirect(referer)
+        return redirect(reverse("listing"))
 
     from htsh.models import FavouriteService
 
@@ -934,14 +1061,19 @@ def toggle_favourite(request: HttpRequest, service_id: int) -> HttpResponse:
 
 def favourites_list(request: HttpRequest) -> HttpResponse:
     """Show the user's saved (favourited) services as cards."""
-    from htsh.models import FavouriteService
     from api.models_v3 import V3_Service
     from api.v3.serializers import V3_ServiceSummarySerializer
 
-    service_ids = list(
-        FavouriteService.objects.filter(user=request.user)
-        .values_list("service_id", flat=True)
-    )
+    if request.user.is_authenticated:
+        from htsh.models import FavouriteService
+
+        service_ids = list(
+            FavouriteService.objects.filter(user=request.user)
+            .values_list("service_id", flat=True)
+        )
+    else:
+        service_ids = sorted(_get_anonymous_favourite_ids(request.session))
+
     services = V3_Service.objects.filter(id__in=service_ids).select_related("service_type")
     serialized = V3_ServiceSummarySerializer(services, many=True).data
 

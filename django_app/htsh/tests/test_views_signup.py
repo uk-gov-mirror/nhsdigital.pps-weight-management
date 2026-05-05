@@ -9,7 +9,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from htsh.models import MagicLink, UserProfile
+from htsh.models import FavouriteService, MagicLink, UserProfile
 from htsh.services.tokens import generate_otp, hash_token
 from testing.helpers import (
     make_campaign,
@@ -78,7 +78,7 @@ class LandingViewTests(TestCase):
 
         response = self.client.get(reverse("home"))
         self.assertEqual(response.status_code, 200)
-        self.assertIn(b"details-postcode", response.content)
+        self.assertIn(b"questionnaire-intro", response.content)
         self.assertNotIn("_auth_user_id", self.client.session)
         self.assertEqual(self.client.session.get("campaign_code"), campaign.campaign_code)
 
@@ -94,6 +94,19 @@ class LandingViewTests(TestCase):
         )
         self.assertEqual(response["Pragma"], "no-cache")
         self.assertEqual(response["Expires"], "0")
+
+    def test_landing_valid_campaign_clears_anonymous_session_favourites(self):
+        """Valid campaign entry clears anonymous favourites session state."""
+        session = self.client.session
+        session["anonymous_favourite_service_ids"] = [42, 43]
+        session.save()
+
+        campaign = make_campaign(campaign_code="111222")
+        response = self.client.get(reverse("landing"), {"cc": campaign.campaign_code})
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, "/")
+        self.assertNotIn("anonymous_favourite_service_ids", self.client.session)
 
     def test_landing_invalid_campaign_sets_no_store_headers(self):
         """Campaign code error pages should not be edge-cached either."""
@@ -380,13 +393,15 @@ class OtpVerifyViewTests(TestCase):
             expires_at=timezone.now() + timedelta(minutes=15),
         )
 
-    def _set_otp_session(self, flow="login"):
+    def _set_otp_session(self, flow="login", **extra):
         """Set OTP session keys."""
         session = self.client.session
         session["otp_user_id"] = self.user.id
         session["otp_flow"] = flow
         session["otp_contact"] = self.profile.email
         session["otp_is_email"] = True
+        for key, value in extra.items():
+            session[key] = value
         session.save()
 
     def test_otp_verify_get_renders_form(self, mock_timing):
@@ -475,6 +490,30 @@ class OtpVerifyViewTests(TestCase):
         self.profile.refresh_from_db()
         self.assertIsNotNone(self.profile.disclaimer_accepted_at)
 
+    def test_otp_verify_login_imports_anonymous_favourites(self, mock_timing):
+        """OTP login imports valid anonymous favourites and clears the session key."""
+        self._set_otp_session(
+            anonymous_favourite_service_ids=[7, "8", "invalid", 7]
+        )
+
+        response = self.client.post(
+            reverse("htsh:otp_verify"),
+            {"otp": self.otp},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            FavouriteService.objects.filter(user=self.user, service_id=7).exists()
+        )
+        self.assertTrue(
+            FavouriteService.objects.filter(user=self.user, service_id=8).exists()
+        )
+        self.assertEqual(
+            FavouriteService.objects.filter(user=self.user).count(),
+            2,
+        )
+        self.assertNotIn("anonymous_favourite_service_ids", self.client.session)
+
 
 @patch("htsh.views._ensure_min_response_time")
 class InterstitialSignupSessionMigrationTests(TestCase):
@@ -550,3 +589,42 @@ class InterstitialSignupSessionMigrationTests(TestCase):
         )
         self.assertEqual(response.status_code, 302)
         self.assertIn("/success", response.url)
+
+    def test_signup_imports_anonymous_favourites(self, mock_timing):
+        """OTP signup imports valid anonymous favourites into FavouriteService rows."""
+        self._set_otp_session(anonymous_favourite_service_ids=[42, "43", "bad"])
+
+        response = self.client.post(
+            reverse("htsh:otp_verify"),
+            {"otp": self.otp},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            FavouriteService.objects.filter(user=self.user, service_id=42).exists()
+        )
+        self.assertTrue(
+            FavouriteService.objects.filter(user=self.user, service_id=43).exists()
+        )
+        self.assertEqual(FavouriteService.objects.filter(user=self.user).count(), 2)
+        self.assertNotIn("anonymous_favourite_service_ids", self.client.session)
+
+    def test_signup_import_deduplicates_existing_favourites(self, mock_timing):
+        """OTP signup does not duplicate favourites already saved on the account."""
+        FavouriteService.objects.create(user=self.user, service_id=42)
+        self._set_otp_session(anonymous_favourite_service_ids=[42, "42", 43])
+
+        response = self.client.post(
+            reverse("htsh:otp_verify"),
+            {"otp": self.otp},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            FavouriteService.objects.filter(user=self.user, service_id=42).count(),
+            1,
+        )
+        self.assertTrue(
+            FavouriteService.objects.filter(user=self.user, service_id=43).exists()
+        )
+        self.assertEqual(FavouriteService.objects.filter(user=self.user).count(), 2)

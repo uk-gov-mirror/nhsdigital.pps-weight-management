@@ -32,6 +32,10 @@ class HtshAccessMiddleware(MiddlewareMixin):
     def process_request(self, request):
         path = request.path
 
+        if path in ("/favourites", "/favourites/"):
+            if not request.user.is_authenticated and request.session.get("campaign_code"):
+                return None
+
         # 1. Auth-required paths need fully authenticated HTSH user
         if self._requires_auth(path):
             if not request.user.is_authenticated:

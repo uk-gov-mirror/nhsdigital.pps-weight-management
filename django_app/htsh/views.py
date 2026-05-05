@@ -27,7 +27,14 @@ from .forms import (
     DeleteAccountForm,
     ReturningForm,
 )
-from .models import UserProfile, MagicLink, UserFilter, Campaign, generate_username
+from .models import (
+    UserProfile,
+    MagicLink,
+    UserFilter,
+    Campaign,
+    FavouriteService,
+    generate_username,
+)
 
 from .services.tokens import generate_otp, hash_token
 from .services.sender import get_email_sender, get_sms_sender
@@ -126,6 +133,29 @@ def _invalidate_existing_otps(user) -> None:
 def _normalize_phone(phone: str) -> str:
     """Normalize phone number by removing spaces and common formatting."""
     return re.sub(r"[\s\-\(\)]+", "", phone)
+
+
+def _import_anonymous_favourites(request: HttpRequest, user) -> None:
+    """Move anonymous session favourites into persistent account favourites."""
+    from web.views import SESSION_KEY_ANONYMOUS_FAVOURITES
+
+    raw_values = request.session.get(SESSION_KEY_ANONYMOUS_FAVOURITES, [])
+    if not isinstance(raw_values, list):
+        raw_values = []
+
+    normalized_ids: set[int] = set()
+    for value in raw_values:
+        try:
+            normalized_ids.add(int(value))
+        except (TypeError, ValueError):
+            continue
+
+    for service_id in normalized_ids:
+        FavouriteService.objects.get_or_create(user=user, service_id=service_id)
+
+    if SESSION_KEY_ANONYMOUS_FAVOURITES in request.session:
+        request.session.pop(SESSION_KEY_ANONYMOUS_FAVOURITES, None)
+        request.session.modified = True
 
 
 def magic_link_request(request: HttpRequest) -> HttpResponse:
@@ -351,6 +381,8 @@ def otp_verify(request: HttpRequest) -> HttpResponse:
             request.session.pop("campaign_code", None)
             request.session.pop("disclaimer_accepted", None)
 
+            _import_anonymous_favourites(request, user)
+
             if otp_flow == "signup":
                 from web.views import (
                     QUESTIONNAIRE_SESSION_KEYS,
@@ -454,7 +486,11 @@ def landing(request: HttpRequest) -> HttpResponse:
                 if request.user.is_authenticated:
                     logout(request)
 
-                from web.views import QUESTIONNAIRE_SESSION_KEYS, PERSISTED_SESSION_KEYS
+                from web.views import (
+                    QUESTIONNAIRE_SESSION_KEYS,
+                    PERSISTED_SESSION_KEYS,
+                    SESSION_KEY_ANONYMOUS_FAVOURITES,
+                )
 
                 for key in QUESTIONNAIRE_SESSION_KEYS + PERSISTED_SESSION_KEYS:
                     request.session.pop(key, None)
@@ -463,6 +499,7 @@ def landing(request: HttpRequest) -> HttpResponse:
                     "entry_flow",
                     "disclaimer_accepted",
                     "preferred_contact_method",
+                    SESSION_KEY_ANONYMOUS_FAVOURITES,
                 ]:
                     request.session.pop(key, None)
 

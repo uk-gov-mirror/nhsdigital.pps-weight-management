@@ -7,7 +7,7 @@
 {% set pageName = "What is your home postcode?" %}
 
 {% block beforeContent %}
-  {{ back_link("/") }}
+  {{ back_link("/questionnaire-intro") }}
 {% endblock %}
 
 {% block content %}
@@ -28,11 +28,16 @@
     <form method="post">
       {{ csrf_input }}
 
+      <p class="nhsuk-caption-l">1/7</p>
+
       {{ input({
         "label": {
           "text": "What is your home postcode?",
           "classes": "nhsuk-label--l",
           "isPageHeading": "true"
+        },
+        "hint": {
+          "text": "We use this to show you activities and services available near you."
         },
         "id": "details-postcode",
         "name": "details-postcode",

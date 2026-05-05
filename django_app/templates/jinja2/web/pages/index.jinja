@@ -69,28 +69,28 @@
           </div>
         </div>
         {{ summary_row("What prompted you to look for support",
-                (user_fields.motivation if user_fields.motivation else "Not set").replace("_", " ").capitalize(),
+          user_fields_display.motivation,
         url("motivation") ~ "?mode=edit"
         ) }}
         <hr class="nhsuk-section-break--m">
         {{ summary_row("Biggest difference to your health",
-                (user_fields.priority_behaviour if user_fields.priority_behaviour else "Not set").replace("_", " ").capitalize(),
+          user_fields_display.priority_behaviour,
         url("priority_behaviour") ~ "?mode=edit") }}
         <hr class="nhsuk-section-break--m">
         {{ summary_row("Past barriers",
-                user_fields.past_barriers | map("replace", "_", " ") | map("capitalize") if user_fields.past_barriers else ["Not set"],
+          user_fields_display.past_barriers,
         url("past_barriers") ~ "?mode=edit") }}
         <hr class="nhsuk-section-break--m">
         {{ summary_row("Current barriers",
-                user_fields.current_barriers | map("replace", "_", " ") | map("capitalize") if user_fields.current_barriers else ["Not set"],
+          user_fields_display.current_barriers,
         url("current_barriers") ~ "?mode=edit") }}
         <hr class="nhsuk-section-break--m">
         {{ summary_row("Confidence and readiness",
-                (user_fields.confidence_readiness if user_fields.confidence_readiness else "Not set").replace("_", " ").capitalize(),
+          user_fields_display.confidence_readiness,
         url("confidence_readiness") ~ "?mode=edit") }}
         <hr class="nhsuk-section-break--m">
         {{ summary_row("What helps you stay on track",
-                user_fields.enablers | map("replace", "_", " ") | map("capitalize") if user_fields.enablers else ["Not set"],
+          user_fields_display.enablers,
         url("enablers") ~ "?mode=edit") }}
       </div>
       <hr class="nhsuk-section-break--m">

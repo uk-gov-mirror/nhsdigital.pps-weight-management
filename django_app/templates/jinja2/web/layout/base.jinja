@@ -28,7 +28,11 @@
   { "text": "Edit my details", "icon": true, "href": url("htsh:account") },
   { "text": "Sign out", "href": url("htsh:logout") },
   ]
-  } if showPilotAccount else none)
+  } if showPilotAccount else ({
+  "items": [
+  { "text": "Sign up", "href": url("htsh:disclaimer") },
+  ]
+  } if not request.user.is_authenticated else none))
   }) }}
 {% endblock %}
 {% block footer %}

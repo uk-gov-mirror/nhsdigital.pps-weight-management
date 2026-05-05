@@ -1,0 +1,26 @@
+{% extends "web/layout/base.jinja" %}
+
+{% from "web/macros/layout.jinja" import two_thirds_column_start, two_thirds_column_end %}
+{% from "web/macros/forms.jinja" import continue_button, back_link %}
+
+{% set pageName = "Before you start the questions" %}
+
+{% block beforeContent %}
+  {{ back_link("/") }}
+{% endblock beforeContent %}
+
+{% block content %}
+  {{ two_thirds_column_start() }}
+
+    <h1 class="nhsuk-heading-l">Finding what works for you</h1>
+    <p class="nhsuk-body">We'd like to ask you 7 short questions about what you're hoping to change, what's got in the way before, and what would help you this time.</p>
+    <p class="nhsuk-body">Your answers help us show you activities and support that actually fit your life — not just a list of everything we offer.</p>
+    <p class="nhsuk-body">There are no right or wrong answers, and you can update them any time.</p>
+
+    <form method="post">
+      {{ csrf_input }}
+      {{ continue_button("Start questions") }}
+    </form>
+
+  {{ two_thirds_column_end() }}
+{% endblock content %}

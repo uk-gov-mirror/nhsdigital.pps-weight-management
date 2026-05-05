@@ -20,11 +20,11 @@ class ReturningAnonymousUserTests(TestCase):
         session["campaign_code"] = self.campaign.campaign_code
         session.save()
 
-    def test_anonymous_with_campaign_routes_to_postcode(self):
-        """Fresh anonymous session with campaign_code routes start_href to details-postcode."""
+    def test_anonymous_with_campaign_routes_to_questionnaire_intro(self):
+        """Fresh anonymous session with campaign_code routes start_href to questionnaire-intro."""
         response = self.client.get(reverse("home"))
         self.assertEqual(response.status_code, 200)
-        self.assertIn(b"details-postcode", response.content)
+        self.assertIn(b"questionnaire-intro", response.content)
 
     def test_anonymous_with_campaign_has_no_persisted_keys(self):
         """Fresh anonymous session with campaign_code has no PERSISTED_SESSION_KEYS values."""

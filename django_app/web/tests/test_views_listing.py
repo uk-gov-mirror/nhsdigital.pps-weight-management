@@ -268,34 +268,36 @@ class AnonymousDetailViewTests(_AnonymousCampaignTestCase):
 
     @patch("web.views.requests.get")
     def test_valid_service(self, mock_get):
-        """GET /detail/1 as anonymous with dismissed prompt → 200."""
+        """GET /detail/1 as anonymous → 200."""
         mock_get.return_value = _mock_response({
             "id": 1,
             "serviceName": "Test Service",
             "description": "A test service",
         })
-        session = self.client.session
-        session["account_prompt_dismissed"] = True
-        session.save()
         response = self.client.get(reverse("detail", kwargs={"service_id": 1}))
         self.assertEqual(response.status_code, 200)
 
 
 @override_settings(SERVICE_API_BASE_URL="http://testserver")
-class AccountPromptInterstitialTests(_AnonymousCampaignTestCase):
-    """Tests for the account creation interstitial on first service detail visit."""
-
-    def test_anonymous_first_visit_shows_prompt(self):
-        """GET /detail/1 without dismissed flag → 200, shows interstitial."""
-        response = self.client.get(reverse("detail", kwargs={"service_id": 1}))
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(b"nhsuk-panel", response.content)
-        self.assertIn(b"Create an account", response.content)
-        self.assertIn(b"Skip", response.content)
+class AnonymousDetailNoPromptTests(_AnonymousCampaignTestCase):
+    """Anonymous users should go straight to service details without prompt."""
 
     @patch("web.views.requests.get")
-    def test_skip_dismisses_and_shows_detail(self, mock_get):
-        """GET /detail/1?skip_prompt=1 → dismisses prompt, shows detail."""
+    def test_anonymous_first_visit_shows_detail(self, mock_get):
+        """GET /detail/1 as anonymous → 200, shows detail content."""
+        mock_get.return_value = _mock_response({
+            "id": 1,
+            "serviceName": "Test Service",
+            "description": "A test",
+        })
+        response = self.client.get(reverse("detail", kwargs={"service_id": 1}))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Test Service", response.content)
+        self.assertNotIn(b"Create an account", response.content)
+
+    @patch("web.views.requests.get")
+    def test_skip_prompt_query_is_ignored(self, mock_get):
+        """GET /detail/1?skip_prompt=1 shows detail and does not set session flags."""
         mock_get.return_value = _mock_response({
             "id": 1,
             "serviceName": "Test Service",
@@ -306,74 +308,23 @@ class AccountPromptInterstitialTests(_AnonymousCampaignTestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Test Service", response.content)
-        self.assertTrue(self.client.session.get("account_prompt_dismissed"))
-
-    def test_skip_prompt_with_safe_next_redirects(self):
-        """GET /detail/42?skip_prompt=1&next=/listing → 302 to /listing."""
-        response = self.client.get(
-            reverse("detail", kwargs={"service_id": 42}) + "?skip_prompt=1&next=/listing"
-        )
-        self.assertEqual(response.status_code, 302)
-        self.assertEqual(response.url, "/listing")
-        self.assertTrue(self.client.session.get("account_prompt_dismissed"))
-
-    def test_skip_prompt_with_unsafe_next_ignores(self):
-        """GET /detail/42?skip_prompt=1&next=http://evil.com → does not redirect to evil.com."""
-        mock_get_patcher = patch("web.views.requests.get")
-        mock_get = mock_get_patcher.start()
-        mock_get.return_value = _mock_response({
-            "id": 42,
-            "serviceName": "Test Service",
-            "description": "A test",
-        })
-        response = self.client.get(
-            reverse("detail", kwargs={"service_id": 42}) + "?skip_prompt=1&next=http://evil.com"
-        )
-        mock_get_patcher.stop()
-        # Should NOT redirect to evil.com — renders detail instead
-        self.assertEqual(response.status_code, 200)
-        self.assertTrue(self.client.session.get("account_prompt_dismissed"))
+        self.assertIsNone(self.client.session.get("account_prompt_dismissed"))
 
     @patch("web.views.requests.get")
-    def test_dismissed_shows_detail_directly(self, mock_get):
-        """GET /detail/1 with dismissed flag → 200, shows detail, no panel."""
+    def test_create_account_post_redirects_to_disclaimer(self, mock_get):
+        """POST /detail/1 action=create_account redirects to disclaimer and stores prompt session."""
         mock_get.return_value = _mock_response({
             "id": 1,
             "serviceName": "Test Service",
             "description": "A test",
         })
-        session = self.client.session
-        session["account_prompt_dismissed"] = True
-        session.save()
-        response = self.client.get(reverse("detail", kwargs={"service_id": 1}))
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(b"Test Service", response.content)
-        self.assertNotIn(b"nhsuk-panel", response.content)
-
-    def test_create_account_redirects_to_disclaimer(self):
-        """POST /detail/1 action=create_account → 302 to /disclaimer/."""
         response = self.client.post(
             reverse("detail", kwargs={"service_id": 1}),
             {"action": "create_account"},
         )
         self.assertEqual(response.status_code, 302)
-        self.assertIn("/disclaimer/", response.url)
+        self.assertEqual(response.url, reverse("htsh:disclaimer"))
         self.assertEqual(self.client.session.get("account_prompt_service_id"), 1)
-
-    @patch("web.views.requests.get")
-    def test_prompt_not_shown_after_dismiss_on_different_service(self, mock_get):
-        """Dismiss on service 1, visit service 99 → no interstitial."""
-        mock_get.return_value = _mock_response({
-            "id": 99,
-            "serviceName": "Other Service",
-            "description": "Another",
-        })
-        session = self.client.session
-        session["account_prompt_dismissed"] = True
-        session.save()
-        response = self.client.get(reverse("detail", kwargs={"service_id": 99}))
-        self.assertEqual(response.status_code, 200)
-        self.assertNotIn(b"nhsuk-panel", response.content)
 
 
 @override_settings(SERVICE_API_BASE_URL="http://testserver")
